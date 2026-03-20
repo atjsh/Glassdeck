@@ -182,12 +182,82 @@ struct DisplayRoutingPicker: View {
     }
 }
 
-/// Placeholder for terminal settings
+/// Terminal settings with theme picker, font controls, and behavior options.
 struct TerminalSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var config = TerminalConfiguration()
+    @State private var showHelpBrowser = false
+
     var body: some View {
         NavigationStack {
-            Text("Terminal Settings")
-                .navigationTitle("Settings")
+            Form {
+                // Appearance
+                Section("Appearance") {
+                    Picker("Color Scheme", selection: $config.colorScheme) {
+                        ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
+                            HStack {
+                                Circle()
+                                    .fill(Color(
+                                        red: Double(scheme.backgroundColor.r) / 255,
+                                        green: Double(scheme.backgroundColor.g) / 255,
+                                        blue: Double(scheme.backgroundColor.b) / 255
+                                    ))
+                                    .frame(width: 16, height: 16)
+                                Text(scheme.rawValue)
+                            }
+                            .tag(scheme)
+                        }
+                    }
+
+                    HStack {
+                        Text("Font Size")
+                        Spacer()
+                        Text("\(Int(config.fontSize))pt")
+                            .foregroundStyle(.secondary)
+                        Stepper("", value: $config.fontSize, in: 8...32, step: 1)
+                            .labelsHidden()
+                    }
+
+                    Picker("Cursor", selection: $config.cursorStyle) {
+                        ForEach(TerminalConfiguration.CursorStyle.allCases, id: \.self) { style in
+                            Text(style.rawValue.capitalized).tag(style)
+                        }
+                    }
+
+                    Toggle("Cursor Blink", isOn: $config.cursorBlink)
+                }
+
+                // Behavior
+                Section("Behavior") {
+                    HStack {
+                        Text("Scrollback Lines")
+                        Spacer()
+                        Text("\(config.scrollbackLines)")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle("Bell Sound", isOn: $config.bellSound)
+                }
+
+                // Help
+                Section {
+                    Button {
+                        showHelpBrowser = true
+                    } label: {
+                        Label("SSH Reference", systemImage: "book")
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showHelpBrowser) {
+                HelpBrowserView()
+            }
         }
     }
 }

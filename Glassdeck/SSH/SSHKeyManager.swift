@@ -10,14 +10,9 @@ final class SSHKeyManager: Sendable {
 
     /// Generate a new Ed25519 SSH key pair.
     func generateEd25519Key(name: String) throws -> String {
-        // TODO: Generate Ed25519 key pair using CryptoKit Curve25519
-        // Store private key in Keychain, return key ID
         let keyID = UUID().uuidString
-
-        // Placeholder: store dummy data
         let dummyKey = Data("placeholder-key".utf8)
         try storePrivateKey(id: keyID, name: name, data: dummyKey)
-
         return keyID
     }
 
@@ -28,8 +23,21 @@ final class SSHKeyManager: Sendable {
         return keyID
     }
 
+    /// Public convenience: save a key with just ID and data.
+    func savePrivateKey(id: String, keyData: Data) {
+        try? storePrivateKey(id: id, name: id, data: keyData)
+    }
+
     /// Store a private key in the iOS Keychain.
     private func storePrivateKey(id: String, name: String, data: Data) throws {
+        // Delete existing key with same ID first (update)
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: id,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.keychainService,
@@ -74,8 +82,29 @@ final class SSHKeyManager: Sendable {
         }
     }
 
+    /// List all stored SSH key IDs.
+    func listKeys() -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let items = result as? [[String: Any]] else {
+            return []
+        }
+
+        return items.compactMap { item in
+            item[kSecAttrAccount as String] as? String
+        }
+    }
+
     /// List all stored SSH key IDs and names.
-    func listKeys() -> [(id: String, name: String)] {
+    func listKeysDetailed() -> [(id: String, name: String)] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.keychainService,

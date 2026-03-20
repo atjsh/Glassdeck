@@ -1,14 +1,23 @@
 import Foundation
-import NIOSSH
 import NIOCore
+import NIOPosix
+import NIOSSH
+import SSHClient
 
 /// Manages SSH connection lifecycle with Swift actor isolation.
+///
+/// Uses swift-ssh-client for high-level connection management and
+/// SwiftNIO SSH for the underlying transport. Each connection is
+/// tracked by UUID and supports shell request and disconnect.
 actor SSHConnectionManager {
-    private var connections: [UUID: SSHConnection] = [:]
+    private var connections: [UUID: ManagedConnection] = [:]
+    private let eventLoopGroup: EventLoopGroup
 
-    struct SSHConnection {
+    struct ManagedConnection {
         let id: UUID
         let profile: ConnectionProfile
+        let connection: SSHConnection
+        var shell: SSHShell?
         var status: ConnectionStatus
     }
 
@@ -18,38 +27,90 @@ actor SSHConnectionManager {
         case connected
         case disconnecting
         case disconnected
-        case failed(Error)
+        case failed(String)
     }
 
-    /// Establish an SSH connection to the given profile.
-    func connect(to profile: ConnectionProfile) async throws -> UUID {
+    init() {
+        self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    }
+
+    deinit {
+        try? eventLoopGroup.syncShutdownGracefully()
+    }
+
+    /// Establish an SSH connection with authentication.
+    ///
+    /// - Parameters:
+    ///   - profile: Connection details (host, port, username, auth method).
+    ///   - password: Password for password auth (ignored for key auth).
+    /// - Returns: Connection UUID for referencing this connection.
+    func connect(to profile: ConnectionProfile, password: String? = nil) async throws -> UUID {
         let id = UUID()
-        connections[id] = SSHConnection(
+        let authMethod = try buildAuthMethod(for: profile, password: password)
+
+        let sshConnection = SSHConnection(
+            host: profile.host,
+            port: UInt16(profile.port),
+            authentication: SSHAuthentication(
+                username: profile.username,
+                method: authMethod,
+                hostKeyValidation: .acceptAll()
+            ),
+            defaultTimeout: 15.0
+        )
+
+        connections[id] = ManagedConnection(
             id: id,
             profile: profile,
+            connection: sshConnection,
+            shell: nil,
             status: .connecting
         )
 
-        // TODO: Implement SwiftNIO SSH connection
-        // 1. Create NIO event loop group
-        // 2. Bootstrap TCP connection to profile.host:profile.port
-        // 3. SSH handshake via NIOSSHHandler
-        // 4. Authenticate (password or key)
-        // 5. Open PTY channel
-        // 6. Update status to .connected
+        // Monitor connection state
+        sshConnection.stateUpdateHandler = { [weak self] state in
+            Task { await self?.handleStateUpdate(id: id, state: state) }
+        }
 
-        connections[id]?.status = .connected
+        // Connect and authenticate
+        do {
+            connections[id]?.status = .authenticating
+            try await sshConnection.start()
+            connections[id]?.status = .connected
+        } catch {
+            connections[id]?.status = .failed(error.localizedDescription)
+            throw error
+        }
+
         return id
+    }
+
+    /// Open a PTY shell on an existing connection.
+    ///
+    /// Requests a shell channel with TERM=xterm-256color.
+    func openShell(connectionID: UUID) async throws -> SSHShell {
+        guard let managed = connections[connectionID],
+              case .connected = managed.status else {
+            throw SSHError.notConnected
+        }
+
+        let shell = try await managed.connection.requestShell()
+        connections[connectionID]?.shell = shell
+        return shell
     }
 
     /// Disconnect an active SSH session.
     func disconnect(id: UUID) async {
-        guard connections[id] != nil else { return }
-        connections[id]?.status = .disconnecting
+        guard var managed = connections[id] else { return }
+        managed.status = .disconnecting
 
-        // TODO: Close SSH channel and TCP connection gracefully
+        if let shell = managed.shell {
+            shell.close { _ in }
+        }
 
-        connections[id]?.status = .disconnected
+        managed.connection.cancel { }
+        managed.status = .disconnected
+        connections[id] = managed
     }
 
     /// Get current status of a connection.
@@ -61,4 +122,50 @@ actor SSHConnectionManager {
     func remove(id: UUID) {
         connections.removeValue(forKey: id)
     }
+
+    // MARK: - Private
+
+    private func buildAuthMethod(
+        for profile: ConnectionProfile,
+        password: String?
+    ) throws -> SSHAuthentication.Method {
+        switch profile.authMethod {
+        case .password:
+            return SSHAuthenticator.passwordMethod(password ?? "")
+        case .sshKey:
+            if let keyID = profile.sshKeyID {
+                return try SSHAuthenticator.keyMethod(keyID: keyID)
+            }
+            // Fallback to password if no key is configured
+            return SSHAuthenticator.passwordMethod(password ?? "")
+        }
+    }
+
+    private func handleStateUpdate(id: UUID, state: SSHConnection.State) {
+        switch state {
+        case .idle:
+            connections[id]?.status = .disconnected
+        case .ready:
+            connections[id]?.status = .connected
+        case .failed:
+            connections[id]?.status = .failed("Connection failed")
+        @unknown default:
+            break
+        }
+    }
+
+    enum SSHError: Error, LocalizedError {
+        case notConnected
+        case authFailed(String)
+        case shellFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .notConnected: return "Not connected to SSH server"
+            case .authFailed(let msg): return "Authentication failed: \(msg)"
+            case .shellFailed(let msg): return "Failed to open shell: \(msg)"
+            }
+        }
+    }
 }
+

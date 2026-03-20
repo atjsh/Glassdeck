@@ -4,11 +4,15 @@ import SwiftUI
 ///
 /// Wraps the terminal surface view with a GlassEffectContainer toolbar
 /// providing quick actions: disconnect, new tab, AI assist, and settings.
+/// Handles the full connection lifecycle including password prompting.
 struct TerminalContainerView: View {
     let profile: ConnectionProfile
     @Environment(SessionManager.self) private var sessionManager
     @State private var showAIAssistant = false
     @State private var showSettings = false
+    @State private var showPasswordPrompt = false
+    @State private var password = ""
+    @State private var showDisplayPicker = false
 
     var body: some View {
         ZStack {
@@ -31,6 +35,7 @@ struct TerminalContainerView: View {
                     onDisconnect: { sessionManager.disconnect() },
                     onNewTab: { sessionManager.openNewTab() },
                     onAI: { showAIAssistant = true },
+                    onDisplay: { showDisplayPicker = true },
                     onSettings: { showSettings = true }
                 )
                 .padding(.bottom, 8)
@@ -44,8 +49,28 @@ struct TerminalContainerView: View {
         .sheet(isPresented: $showSettings) {
             TerminalSettingsView()
         }
+        .sheet(isPresented: $showDisplayPicker) {
+            DisplayRoutingPicker()
+        }
+        .alert("Password Required", isPresented: $showPasswordPrompt) {
+            SecureField("Password", text: $password)
+            Button("Connect") {
+                Task {
+                    await sessionManager.connect(to: profile, password: password)
+                    password = ""
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter password for \(profile.username)@\(profile.host)")
+        }
         .task {
-            await sessionManager.connect(to: profile)
+            if profile.authMethod == .password {
+                showPasswordPrompt = true
+            } else {
+                // Key auth — connect immediately
+                await sessionManager.connect(to: profile)
+            }
         }
     }
 }
@@ -55,6 +80,7 @@ struct GlassToolbar: View {
     let onDisconnect: () -> Void
     let onNewTab: () -> Void
     let onAI: () -> Void
+    let onDisplay: () -> Void
     let onSettings: () -> Void
 
     var body: some View {
@@ -74,6 +100,11 @@ struct GlassToolbar: View {
                     icon: "sparkles",
                     tint: .purple,
                     action: onAI
+                )
+                ToolbarButton(
+                    icon: "rectangle.on.rectangle",
+                    tint: .orange,
+                    action: onDisplay
                 )
                 ToolbarButton(
                     icon: "gearshape",
@@ -99,6 +130,55 @@ struct ToolbarButton: View {
                 .frame(width: 36, height: 36)
         }
         .glassEffect(.regular.tint(tint), in: .circle)
+    }
+}
+
+/// Picker to route sessions to external display.
+struct DisplayRoutingPicker: View {
+    @Environment(SessionManager.self) private var sessionManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Route to External Display") {
+                    ForEach(sessionManager.sessions) { session in
+                        Button {
+                            sessionManager.routeToExternalDisplay(sessionID: session.id)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Image(systemName: session.isOnExternalDisplay
+                                    ? "display"
+                                    : "terminal")
+                                Text(session.displayName)
+                                Spacer()
+                                if session.isOnExternalDisplay {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if sessionManager.externalDisplaySessionID != nil {
+                    Section {
+                        Button("Clear External Display", role: .destructive) {
+                            sessionManager.clearExternalDisplay()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("External Display")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 

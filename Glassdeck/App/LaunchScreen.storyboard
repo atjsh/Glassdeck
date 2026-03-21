@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="LaunchScreenViewController">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="LaunchScene">
+            <objects>
+                <viewController id="LaunchScreenViewController" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="LaunchScreenView">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <view contentMode="scaleToFill" ambiguous="YES" translatesAutoresizingMaskIntoConstraints="NO" id="BadgeBackground">
+                                <rect key="frame" x="28" y="266" width="337" height="320"/>
+                                <subviews>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" ambiguous="YES" text="Glassdeck" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TitleLabel">
+                                        <rect key="frame" x="69.333333333333329" y="120" width="198.33333333333337" height="52"/>
+                                        <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="42"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" ambiguous="YES" text="SSH and SFTP on iPhone, powered by libghostty-vt." textAlignment="center" lineBreakMode="wordWrap" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="SubtitleLabel">
+                                        <rect key="frame" x="24" y="188" width="289" height="44"/>
+                                        <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                        <color key="textColor" red="0.34509803919999998" green="0.35686274509999999" blue="0.3803921569" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                    <view contentMode="scaleToFill" ambiguous="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TerminalStrip">
+                                        <rect key="frame" x="34" y="56" width="269" height="44"/>
+                                        <subviews>
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" ambiguous="YES" text="ssh root@host" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="PromptLabel">
+                                                <rect key="frame" x="18" y="10" width="133.33333333333334" height="24"/>
+                                                <fontDescription key="fontDescription" name="Menlo-Regular" family="Menlo" pointSize="17"/>
+                                                <color key="textColor" red="0.8862745098" green="0.90980392160000001" blue="0.93333333330000001" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                                <nil key="highlightedColor"/>
+                                            </label>
+                                            <view contentMode="scaleToFill" ambiguous="YES" translatesAutoresizingMaskIntoConstraints="NO" id="CursorView">
+                                                <rect key="frame" x="157.33333333333334" y="10" width="10" height="24"/>
+                                                <color key="backgroundColor" red="0.16078431369999999" green="0.69411764710000001" blue="0.55294117649999996" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                            </view>
+                                        </subviews>
+                                        <color key="backgroundColor" red="0.070588235289999995" green="0.090196078430000007" blue="0.14117647059999999" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <constraints>
+                                            <constraint firstItem="CursorView" firstAttribute="centerY" secondItem="PromptLabel" secondAttribute="centerY" id="cursor-centery"/>
+                                            <constraint firstItem="CursorView" firstAttribute="height" constant="24" id="cursor-height"/>
+                                            <constraint firstItem="CursorView" firstAttribute="leading" secondItem="PromptLabel" secondAttribute="trailing" constant="6" id="cursor-leading"/>
+                                            <constraint firstItem="CursorView" firstAttribute="width" constant="10" id="cursor-width"/>
+                                            <constraint firstItem="PromptLabel" firstAttribute="centerY" secondItem="TerminalStrip" secondAttribute="centerY" id="prompt-centery"/>
+                                            <constraint firstItem="PromptLabel" firstAttribute="leading" secondItem="TerminalStrip" secondAttribute="leading" constant="18" id="prompt-leading"/>
+                                        </constraints>
+                                    </view>
+                                </subviews>
+                                <color key="backgroundColor" red="0.96078431369999995" green="0.97254901959999995" blue="0.98039215690000003" alpha="0.95999999999999996" colorSpace="custom" customColorSpace="sRGB"/>
+                                <constraints>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="leading" secondItem="BadgeBackground" secondAttribute="leading" constant="24" id="subtitle-leading"/>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="top" secondItem="TitleLabel" secondAttribute="bottom" constant="16" id="subtitle-top"/>
+                                    <constraint firstItem="SubtitleLabel" firstAttribute="trailing" secondItem="BadgeBackground" secondAttribute="trailing" constant="-24" id="subtitle-trailing"/>
+                                    <constraint firstItem="TerminalStrip" firstAttribute="leading" secondItem="BadgeBackground" secondAttribute="leading" constant="34" id="terminal-leading"/>
+                                    <constraint firstItem="TerminalStrip" firstAttribute="top" secondItem="BadgeBackground" secondAttribute="top" constant="56" id="terminal-top"/>
+                                    <constraint firstItem="TerminalStrip" firstAttribute="trailing" secondItem="BadgeBackground" secondAttribute="trailing" constant="-34" id="terminal-trailing"/>
+                                    <constraint firstItem="TitleLabel" firstAttribute="centerX" secondItem="BadgeBackground" secondAttribute="centerX" id="title-center"/>
+                                    <constraint firstItem="TitleLabel" firstAttribute="top" secondItem="TerminalStrip" secondAttribute="bottom" constant="20" id="title-top"/>
+                                </constraints>
+                            </view>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="SafeArea"/>
+                        <color key="backgroundColor" red="0.94117647059999998" green="0.95686274510000002" blue="0.97254901959999995" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="BadgeBackground" firstAttribute="centerY" secondItem="SafeArea" secondAttribute="centerY" id="badge-centery"/>
+                            <constraint firstItem="BadgeBackground" firstAttribute="leading" secondItem="SafeArea" secondAttribute="leading" constant="28" id="badge-leading"/>
+                            <constraint firstItem="BadgeBackground" firstAttribute="trailing" secondItem="SafeArea" secondAttribute="trailing" constant="-28" id="badge-trailing"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="FirstResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="140" y="125"/>
+        </scene>
+    </scenes>
+</document>

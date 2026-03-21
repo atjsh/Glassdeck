@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 import SwiftUI
 
@@ -23,3 +24,4 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return config
     }
 }
+#endif

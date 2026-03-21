@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import Foundation
 import UIKit
 
@@ -5,6 +6,7 @@ import UIKit
 ///
 /// Uses UIKeyCommand responder chain to capture hardware key events
 /// including modifier keys (Ctrl, Alt/Option, Cmd), arrow keys, and function keys.
+@MainActor
 final class KeyboardInputHandler {
     weak var terminalResponder: TerminalInputDelegate?
 
@@ -131,3 +133,4 @@ extension UIResponder {
         // Forwarded by subclasses that implement keyboard handling
     }
 }
+#endif

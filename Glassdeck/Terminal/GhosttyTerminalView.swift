@@ -1,228 +1,1022 @@
+#if canImport(UIKit)
+import CoreImage
+import Foundation
+import GlassdeckCore
+import Metal
 import SwiftUI
 import UIKit
 
-// NOTE: Requires GhosttyKit.xcframework in Frameworks/
-// Build from https://github.com/ghostty-org/ghostty using:
-//   ./macos/build.nu --scheme Ghostty-iOS --configuration Release --action build
-//
-// When GhosttyKit is not available, the app falls back to SwiftTerm.
-// Uncomment `import GhosttyKit` once the framework is embedded.
-
-// import GhosttyKit
-
-// MARK: - GhosttyKit App Wrapper
-
-/// Wraps the Ghostty terminal engine lifecycle.
-///
-/// Manages the `ghostty_app_t` instance and runtime configuration.
-/// On iOS, clipboard and action callbacks have basic implementations.
-@Observable
-final class GhosttyApp {
-    enum Readiness: Sendable {
-        case loading
-        case ready
-        case error
-    }
-
-    private(set) var readiness: Readiness = .loading
-
-    // Opaque pointer to the Ghostty app instance.
-    // Type will be `ghostty_app_t?` when GhosttyKit is imported.
-    private var app: AnyObject?
-
-    init() {
-        initializeApp()
-    }
-
-    private func initializeApp() {
-        // TODO: Uncomment when GhosttyKit.xcframework is available
-        //
-        // let config = ghostty_config_new()
-        // ghostty_config_finalize(config)
-        //
-        // var runtimeConfig = ghostty_runtime_config_s(
-        //     userdata: Unmanaged.passUnretained(self).toOpaque(),
-        //     supports_selection_clipboard: false,
-        //     wakeup_cb: { _ in },
-        //     action_cb: { _, _, _ in false },
-        //     read_clipboard_cb: { _, _, _ in false },
-        //     confirm_read_clipboard_cb: { _, _, _, _ in },
-        //     write_clipboard_cb: { _, _, _, _, _ in },
-        //     close_surface_cb: { _, _ in }
-        // )
-        //
-        // guard let app = ghostty_app_new(&runtimeConfig, config) else {
-        //     readiness = .error
-        //     return
-        // }
-        // self.app = app
-        // readiness = .ready
-
-        // Placeholder: mark as ready for UI development
-        readiness = .ready
-    }
-
-    /// Tick the Ghostty event loop. Call from a display link or timer.
-    func tick() {
-        // TODO: ghostty_app_tick(app)
-    }
-
-    deinit {
-        // TODO: ghostty_app_free(app)
-    }
+struct GhosttySurfaceState: Sendable, Equatable {
+    let title: String?
+    let terminalSize: TerminalSize
+    let pixelSize: TerminalPixelSize?
+    let scrollbackLines: Int
+    let isHealthy: Bool
+    let renderFailureReason: String?
+    let visibleTextSummary: String
+    let interactionGeometry: RemoteTerminalGeometry
+    let interactionCapabilities: GhosttyVTInteractionCapabilities
 }
 
-// MARK: - GhosttyKit Surface View (UIKit)
+final class GhosttySurface: UIView, UIKeyInput {
+    private let engine: GhosttyVTTerminalEngine
+    private let renderer: GhosttyMetalRenderer
+    private let softwareMirrorView = UIImageView()
 
-/// A UIView backed by CAMetalLayer that renders the Ghostty terminal surface.
-///
-/// This is the actual terminal rendering view. It manages:
-/// - Metal GPU-accelerated rendering via CAMetalLayer
-/// - Terminal surface lifecycle (ghostty_surface_t)
-/// - Input forwarding (keyboard, mouse)
-/// - Size/scale tracking for the terminal grid
-final class GhosttySurface: UIView {
-    // Published terminal state
-    var title: String = "Terminal"
-    var isHealthy: Bool = true
+    private var outputHandler: (@Sendable (Data) -> Void)?
+    private var currentTerminalSize = TerminalSize(columns: 80, rows: 24)
+    private var currentPixelSize = TerminalPixelSize(width: 0, height: 0)
+    private var currentMetrics = GhosttyMetalRenderer.Metrics.zero
+    private var terminalIsFocused = false
+    private var lastScrollRows = 0
+    private var currentScrollbackLines = 0
+    private var currentRenderFailureReason: String?
+    private var currentVisibleTextSummary = ""
+    private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
+        supportsMousePlacement: false,
+        supportsScrollReporting: false
+    )
+
+    var title: String?
+    var isHealthy = true
     var cellSize: CGSize = .zero
-
-    // Opaque pointer to the Ghostty surface
-    // Type will be `ghostty_surface_t?` when GhosttyKit is imported
-    private var surface: AnyObject?
-
-    /// Callback invoked when the terminal produces output data.
-    /// Wire this to send data to the SSH channel.
-    var onOutput: ((Data) -> Void)?
-
-    /// Callback invoked when the terminal resizes (columns, rows).
-    var onResize: ((Int, Int) -> Void)?
+    var onResize: ((Int, Int, TerminalPixelSize) -> Void)?
+    var onStateChange: ((GhosttySurfaceState) -> Void)?
 
     override class var layerClass: AnyClass {
         CAMetalLayer.self
+    }
+
+    private static var usesSoftwareMirrorPresentation: Bool {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
     }
 
     private var metalLayer: CAMetalLayer {
         layer as! CAMetalLayer
     }
 
-    init(app: GhosttyApp) {
+    var terminalSize: TerminalSize {
+        currentTerminalSize
+    }
+
+    var pixelSize: TerminalPixelSize? {
+        currentPixelSize.width > 0 && currentPixelSize.height > 0 ? currentPixelSize : nil
+    }
+
+    var stateSnapshot: GhosttySurfaceState {
+        GhosttySurfaceState(
+            title: title,
+            terminalSize: currentTerminalSize,
+            pixelSize: pixelSize,
+            scrollbackLines: currentScrollbackLines,
+            isHealthy: isHealthy,
+            renderFailureReason: currentRenderFailureReason,
+            visibleTextSummary: currentVisibleTextSummary,
+            interactionGeometry: interactionGeometry,
+            interactionCapabilities: currentInteractionCapabilities
+        )
+    }
+
+    var interactionGeometry: RemoteTerminalGeometry {
+        RemoteTerminalGeometry(
+            terminalSize: currentMetrics.terminalSize,
+            surfacePixelSize: currentMetrics.pixelSize,
+            cellPixelSize: currentMetrics.cellPixelSize,
+            padding: RemoteControlInsets(
+                top: Int((currentMetrics.padding.top * currentMetrics.displayScale).rounded()),
+                left: Int((currentMetrics.padding.left * currentMetrics.displayScale).rounded()),
+                bottom: Int((currentMetrics.padding.bottom * currentMetrics.displayScale).rounded()),
+                right: Int((currentMetrics.padding.right * currentMetrics.displayScale).rounded())
+            ),
+            displayScale: currentMetrics.displayScale
+        )
+    }
+
+    init(configuration: TerminalConfiguration = TerminalConfiguration()) throws {
+        self.engine = try GhosttyVTTerminalEngine(
+            options: GhosttyVTTerminalOptions(
+                columns: 80,
+                rows: 24,
+                scrollbackLines: configuration.scrollbackLines
+            )
+        )
+        self.renderer = try GhosttyMetalRenderer(configuration: configuration)
         super.init(frame: .zero)
-        setupMetalLayer()
-        createSurface(app: app)
+        setupView()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) not supported")
     }
 
-    private func setupMetalLayer() {
-        metalLayer.device = MTLCreateSystemDefaultDevice()
-        metalLayer.pixelFormat = .bgra8Unorm
-        metalLayer.framebufferOnly = true
-        metalLayer.contentsScale = UIScreen.main.scale
-        backgroundColor = .black
+    override var canBecomeFirstResponder: Bool {
+        true
     }
 
-    private func createSurface(app: GhosttyApp) {
-        // TODO: Uncomment when GhosttyKit.xcframework is available
-        //
-        // guard let ghosttyApp = app.app else { return }
-        //
-        // var config = ghostty_surface_config_s()
-        // config.userdata = Unmanaged.passUnretained(self).toOpaque()
-        // config.platform_tag = GHOSTTY_PLATFORM_IOS
-        // config.metal_layer = Unmanaged.passUnretained(metalLayer).toOpaque()
-        //
-        // surface = ghostty_surface_new(ghosttyApp, &config)
+    override var canResignFirstResponder: Bool {
+        true
     }
 
-    /// Write data received from SSH channel into the terminal.
+    var hasText: Bool {
+        true
+    }
+
+    func setOutputHandler(_ handler: (@Sendable (Data) -> Void)?) {
+        outputHandler = handler
+    }
+
     func writeToTerminal(_ data: Data) {
-        // TODO: ghostty_surface_write(surface, data.withUnsafeBytes { $0.baseAddress }, data.count)
+        engine.write(data)
+        render(clearDirty: true)
     }
 
-    /// Notify the surface that its size changed.
+    func setFocused(_ focused: Bool) {
+        guard focused != terminalIsFocused else { return }
+        terminalIsFocused = focused
+
+        if focused {
+            _ = becomeFirstResponder()
+        } else {
+            _ = resignFirstResponder()
+        }
+
+        if let data = try? engine.encodeFocus(focused), !data.isEmpty {
+            outputHandler?(data)
+        }
+        render(clearDirty: true)
+        publishState()
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let result = super.becomeFirstResponder()
+        if result {
+            terminalIsFocused = true
+        }
+        return result
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let result = super.resignFirstResponder()
+        if result {
+            terminalIsFocused = false
+        }
+        return result
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        let scale = metalLayer.contentsScale
-        let width = UInt32(bounds.width * scale)
-        let height = UInt32(bounds.height * scale)
-        metalLayer.drawableSize = CGSize(width: CGFloat(width), height: CGFloat(height))
-
-        // TODO: ghostty_surface_set_size(surface, width, height)
-        // TODO: ghostty_surface_set_content_scale(surface, Float(scale), Float(scale))
-        //
-        // if let size = ghostty_surface_size(surface) {
-        //     onResize?(Int(size.columns), Int(size.rows))
-        // }
+        updateLayout()
     }
 
-    /// Forward focus state to the surface.
-    func setFocused(_ focused: Bool) {
-        // TODO: ghostty_surface_set_focus(surface, focused)
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            updateLayout()
+        }
     }
 
-    deinit {
-        // TODO: ghostty_surface_free(surface)
+    func insertText(_ text: String) {
+        let event = GhosttyVTKeyEventDescriptor(text: text)
+        sendKey(event)
+    }
+
+    func deleteBackward() {
+        sendKey(
+            GhosttyVTKeyEventDescriptor(
+                keyCode: .backspace
+            )
+        )
+    }
+
+    override func paste(_ sender: Any?) {
+        guard let string = UIPasteboard.general.string else { return }
+        guard let data = try? engine.encodePaste(Data(string.utf8)) else { return }
+        outputHandler?(data)
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let unhandled = handleHardwarePresses(presses, action: .press)
+        if !unhandled.isEmpty {
+            super.pressesBegan(unhandled, with: event)
+        }
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let unhandled = handleHardwarePresses(presses, action: .release)
+        if !unhandled.isEmpty {
+            super.pressesEnded(unhandled, with: event)
+        }
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let unhandled = handleHardwarePresses(presses, action: .release)
+        if !unhandled.isEmpty {
+            super.pressesCancelled(unhandled, with: event)
+        }
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        setFocused(true)
+        handleTouchMouse(touches, action: .press, button: .left)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        handleTouchMouse(touches, action: .motion, button: nil)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        handleTouchMouse(touches, action: .release, button: .left)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        handleTouchMouse(touches, action: .release, button: .left)
+    }
+
+    private func setupView() {
+        backgroundColor = .black
+        clipsToBounds = true
+        isAccessibilityElement = true
+        accessibilityIdentifier = "ghostty-terminal-surface"
+        accessibilityTraits.insert(.allowsDirectInteraction)
+        metalLayer.device = renderer.device
+        metalLayer.pixelFormat = .bgra8Unorm
+        metalLayer.framebufferOnly = false
+        metalLayer.contentsScale = traitCollection.displayScale
+
+        softwareMirrorView.backgroundColor = .clear
+        softwareMirrorView.contentMode = .scaleToFill
+        softwareMirrorView.isUserInteractionEnabled = false
+        softwareMirrorView.frame = bounds
+        softwareMirrorView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        softwareMirrorView.isHidden = !Self.usesSoftwareMirrorPresentation
+        addSubview(softwareMirrorView)
+
+        let scrollRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleScrollPan(_:)))
+        scrollRecognizer.minimumNumberOfTouches = 2
+        scrollRecognizer.maximumNumberOfTouches = 2
+        addGestureRecognizer(scrollRecognizer)
+
+        if #available(iOS 13.4, *) {
+            let hoverRecognizer = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
+            addGestureRecognizer(hoverRecognizer)
+        }
+    }
+
+    @objc private func handleScrollPan(_ recognizer: UIPanGestureRecognizer) {
+        guard currentMetrics.cellSize.height > 0 else { return }
+        if recognizer.state == .ended || recognizer.state == .cancelled || recognizer.state == .failed {
+            recognizer.setTranslation(.zero, in: self)
+            lastScrollRows = 0
+            return
+        }
+
+        let translation = recognizer.translation(in: self)
+        let rowDelta = Int(translation.y / currentMetrics.cellSize.height)
+        guard rowDelta != lastScrollRows else { return }
+
+        engine.scrollViewport(delta: rowDelta - lastScrollRows)
+        lastScrollRows = rowDelta
+        render(clearDirty: true)
+    }
+
+    @available(iOS 13.4, *)
+    @objc private func handleHover(_ recognizer: UIHoverGestureRecognizer) {
+        let location = recognizer.location(in: self)
+        guard let descriptor = mouseDescriptor(
+            action: .motion,
+            button: nil,
+            location: location
+        ) else {
+            return
+        }
+        if let data = try? engine.encodeMouse(descriptor), !data.isEmpty {
+            outputHandler?(data)
+        }
+    }
+
+    private func updateLayout() {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+
+        let scale = traitCollection.displayScale
+        metalLayer.contentsScale = scale
+        metalLayer.drawableSize = CGSize(
+            width: bounds.width * scale,
+            height: bounds.height * scale
+        )
+
+        let previousTerminalSize = currentTerminalSize
+        let previousPixelSize = currentPixelSize
+        let metrics = renderer.metrics(for: bounds, scale: scale)
+        currentMetrics = metrics
+        cellSize = metrics.cellSize
+
+        guard metrics.terminalSize != previousTerminalSize || metrics.pixelSize != previousPixelSize else {
+            render(clearDirty: true)
+            return
+        }
+
+        currentTerminalSize = metrics.terminalSize
+        currentPixelSize = metrics.pixelSize
+
+        do {
+            try engine.resize(
+                columns: numericCast(metrics.terminalSize.columns),
+                rows: numericCast(metrics.terminalSize.rows)
+            )
+            if let sizeReport = try engine.encodeInBandResizeReport(
+                pixelSize: metrics.pixelSize,
+                cellPixelSize: metrics.cellPixelSize
+            ), !sizeReport.isEmpty {
+                outputHandler?(sizeReport)
+            }
+        } catch {
+            isHealthy = false
+            publishState()
+        }
+
+        onResize?(
+            metrics.terminalSize.columns,
+            metrics.terminalSize.rows,
+            metrics.pixelSize
+        )
+        render(clearDirty: true)
+    }
+
+    private func render(clearDirty: Bool) {
+        do {
+            let projection = try engine.snapshotProjection(clearDirty: clearDirty)
+            currentInteractionCapabilities = try engine.interactionCapabilities()
+            currentScrollbackLines = max(0, Int((projection.scrollbar?.total ?? 0)) - projection.rows)
+            currentVisibleTextSummary = Self.visibleTextSummary(from: projection)
+            renderer.render(
+                projection: projection,
+                in: metalLayer,
+                bounds: bounds,
+                metrics: currentMetrics,
+                focused: terminalIsFocused
+            )
+            if Self.usesSoftwareMirrorPresentation {
+                softwareMirrorView.image = renderer.cachedFrameImage
+            }
+            isHealthy = true
+            currentRenderFailureReason = nil
+        } catch {
+            isHealthy = false
+            if Self.usesSoftwareMirrorPresentation {
+                softwareMirrorView.image = nil
+            }
+            currentRenderFailureReason = Self.renderFailureReason(from: error)
+        }
+        publishState()
+    }
+
+    private func publishState() {
+        onStateChange?(stateSnapshot)
+    }
+
+    private static func visibleTextSummary(from projection: GhosttyVTRenderProjection) -> String {
+        projection.rowsProjection
+            .sorted { $0.index < $1.index }
+            .map(Self.visibleTextRow(from:))
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func visibleTextRow(from row: GhosttyVTRowProjection) -> String {
+        let text = row.cells
+            .sorted { $0.column < $1.column }
+            .compactMap { cell -> String? in
+                switch cell.width {
+                case .spacerHead, .spacerTail:
+                    return nil
+                case .narrow, .wide:
+                    return cell.text.isEmpty ? " " : cell.text
+                }
+            }
+            .joined()
+
+        return text.replacingOccurrences(
+            of: #"\s+$"#,
+            with: "",
+            options: .regularExpression
+        )
+    }
+
+    private static func renderFailureReason(from error: Error) -> String {
+        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.isEmpty {
+            return description
+        }
+        return String(describing: error)
+    }
+
+    func sendRemoteMouse(
+        action: GhosttyVTMouseAction,
+        button: GhosttyVTMouseButton?,
+        surfacePixelPoint: CGPoint
+    ) -> Bool {
+        guard let descriptor = mouseDescriptor(
+            action: action,
+            button: button,
+            surfacePixelPoint: interactionGeometry.clampedSurfacePixelPoint(surfacePixelPoint)
+        ) else {
+            return false
+        }
+
+        do {
+            guard let data = try engine.encodeMouse(descriptor), !data.isEmpty else { return false }
+            outputHandler?(data)
+            return true
+        } catch {
+            isHealthy = false
+            publishState()
+            return false
+        }
+    }
+
+    func sendRemoteScroll(steps: Int, surfacePixelPoint: CGPoint) -> Bool {
+        guard steps != 0 else { return false }
+        guard currentInteractionCapabilities.supportsScrollReporting else { return false }
+        guard let coordinates = sgrScrollCoordinates(for: surfacePixelPoint) else { return false }
+
+        let button = steps > 0 ? 65 : 64
+        for _ in 0..<abs(steps) {
+            let sequence = "\u{1B}[<\(button);\(coordinates.column);\(coordinates.row)M"
+            outputHandler?(Data(sequence.utf8))
+        }
+        return true
+    }
+
+    @discardableResult
+    func handleHardwarePresses(
+        _ presses: Set<UIPress>,
+        action: GhosttyVTKeyAction
+    ) -> Set<UIPress> {
+        var unhandled = Set<UIPress>()
+
+        for press in presses {
+            guard
+                let key = press.key,
+                let descriptor = keyDescriptor(for: key, action: action)
+            else {
+                unhandled.insert(press)
+                continue
+            }
+
+            if shouldUseTextInputFallback(descriptor: descriptor, action: action) {
+                unhandled.insert(press)
+                continue
+            }
+
+            sendKey(descriptor)
+        }
+
+        return unhandled
+    }
+
+    private func sendKey(_ descriptor: GhosttyVTKeyEventDescriptor) {
+        do {
+            guard let data = try engine.encodeKey(descriptor), !data.isEmpty else { return }
+            outputHandler?(data)
+        } catch {
+            isHealthy = false
+        }
+    }
+
+    private func handleTouchMouse(
+        _ touches: Set<UITouch>,
+        action: GhosttyVTMouseAction,
+        button: GhosttyVTMouseButton?
+    ) {
+        guard let touch = touches.first else { return }
+        let location = touch.location(in: self)
+        _ = sendRemoteMouse(
+            action: action,
+            button: button,
+            surfacePixelPoint: CGPoint(
+                x: location.x * traitCollection.displayScale,
+                y: location.y * traitCollection.displayScale
+            )
+        )
+    }
+
+    private func mouseDescriptor(
+        action: GhosttyVTMouseAction,
+        button: GhosttyVTMouseButton?,
+        location: CGPoint
+    ) -> GhosttyVTMouseEventDescriptor? {
+        mouseDescriptor(
+            action: action,
+            button: button,
+            surfacePixelPoint: CGPoint(
+                x: location.x * traitCollection.displayScale,
+                y: location.y * traitCollection.displayScale
+            )
+        )
+    }
+
+    private func mouseDescriptor(
+        action: GhosttyVTMouseAction,
+        button: GhosttyVTMouseButton?,
+        surfacePixelPoint: CGPoint
+    ) -> GhosttyVTMouseEventDescriptor? {
+        guard currentMetrics.pixelSize.width > 0, currentMetrics.pixelSize.height > 0 else {
+            return nil
+        }
+
+        return GhosttyVTMouseEventDescriptor(
+            action: action,
+            button: button,
+            modifiers: [],
+            position: GhosttyVTPoint(
+                x: surfacePixelPoint.x,
+                y: surfacePixelPoint.y
+            ),
+            sizeContext: currentMetrics.mouseSizeContext
+        )
+    }
+
+    private func sgrScrollCoordinates(for surfacePixelPoint: CGPoint) -> (column: Int, row: Int)? {
+        guard let cell = interactionGeometry.cellPosition(forSurfacePixelPoint: surfacePixelPoint) else {
+            return nil
+        }
+        return (cell.column + 1, cell.row + 1)
+    }
+
+    private func keyDescriptor(
+        for key: UIKey,
+        action: GhosttyVTKeyAction
+    ) -> GhosttyVTKeyEventDescriptor? {
+        let text = action == .release ? "" : key.characters
+        let keyCode = key.keyCode.ghosttyKeyCode
+        if keyCode == nil && text.isEmpty {
+            return nil
+        }
+
+        return GhosttyVTKeyEventDescriptor(
+            action: action,
+            keyCode: keyCode,
+            modifiers: GhosttyVTModifiers(key.modifierFlags),
+            text: text,
+            unshiftedText: key.charactersIgnoringModifiers.nilIfEmpty
+        )
+    }
+
+    private func shouldUseTextInputFallback(
+        descriptor: GhosttyVTKeyEventDescriptor,
+        action: GhosttyVTKeyAction
+    ) -> Bool {
+        guard action == .press else { return false }
+        guard descriptor.modifiers.isEmpty else { return false }
+        guard let keyCode = descriptor.keyCode else { return false }
+
+        switch keyCode {
+        case .a, .b, .c, .d, .e, .f, .g, .h, .i, .j, .k, .l, .m,
+             .n, .o, .p, .q, .r, .s, .t, .u, .v, .w, .x, .y, .z,
+             .digit0, .digit1, .digit2, .digit3, .digit4, .digit5,
+             .digit6, .digit7, .digit8, .digit9, .space, .tab,
+             .comma, .period, .slash, .backquote, .minus, .equal,
+             .quote, .semicolon, .backslash, .bracketLeft, .bracketRight:
+            return !descriptor.text.isEmpty
+        default:
+            return false
+        }
     }
 }
 
-// MARK: - SwiftUI UIViewRepresentable Wrapper
+final class GhosttySurfaceTerminalIO: TerminalIO, @unchecked Sendable {
+    private weak var surface: GhosttySurface?
 
-/// SwiftUI wrapper for the GhosttyKit terminal surface.
-///
-/// Usage:
-/// ```swift
-/// GhosttyTerminalView(app: ghosttyApp, session: sshSession)
-///     .ignoresSafeArea()
-/// ```
-struct GhosttyTerminalView: UIViewRepresentable {
-    let app: GhosttyApp
-
-    /// Called when the terminal produces output to send to SSH.
-    var onOutput: ((Data) -> Void)?
-
-    /// Called when terminal dimensions change (columns, rows).
-    var onResize: ((Int, Int) -> Void)?
-
-    /// Data to write into the terminal (from SSH channel).
-    var incomingData: Data?
-
-    func makeUIView(context: Context) -> GhosttySurface {
-        let surface = GhosttySurface(app: app)
-        surface.onOutput = onOutput
-        surface.onResize = onResize
-        return surface
+    init(surface: GhosttySurface) {
+        self.surface = surface
     }
 
-    func updateUIView(_ uiView: GhosttySurface, context: Context) {
-        if let data = incomingData, !data.isEmpty {
-            uiView.writeToTerminal(data)
+    func setOutputHandler(_ handler: (@Sendable (Data) -> Void)?) async {
+        await MainActor.run {
+            surface?.setOutputHandler(handler)
         }
-        uiView.onOutput = onOutput
-        uiView.onResize = onResize
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    class Coordinator {
-        var displayLink: CADisplayLink?
-
-        func startDisplayLink(for surface: GhosttySurface, app: GhosttyApp) {
-            displayLink = CADisplayLink(target: self, selector: #selector(tick))
-            displayLink?.add(to: .main, forMode: .common)
-        }
-
-        @objc private func tick() {
-            // Drive the Ghostty event loop at display refresh rate
-            // app.tick()
-        }
-
-        deinit {
-            displayLink?.invalidate()
+    func write(_ data: Data) async {
+        await MainActor.run {
+            surface?.writeToTerminal(data)
         }
     }
 }
+
+private final class GhosttyMetalRenderer {
+    struct Metrics: Sendable, Equatable {
+        var terminalSize: TerminalSize
+        var pixelSize: TerminalPixelSize
+        var cellSize: CGSize
+        var cellPixelSize: TerminalPixelSize
+        var padding: UIEdgeInsets
+        var displayScale: CGFloat
+
+        static let zero = Metrics(
+            terminalSize: TerminalSize(columns: 80, rows: 24),
+            pixelSize: TerminalPixelSize(width: 0, height: 0),
+            cellSize: .zero,
+            cellPixelSize: TerminalPixelSize(width: 0, height: 0),
+            padding: .zero,
+            displayScale: 1
+        )
+
+        var mouseSizeContext: GhosttyVTMouseSizeContext {
+            GhosttyVTMouseSizeContext(
+                screenWidth: pixelSize.width,
+                screenHeight: pixelSize.height,
+                cellWidth: cellPixelSize.width,
+                cellHeight: cellPixelSize.height,
+                paddingTop: Int((padding.top * displayScale).rounded()),
+                paddingBottom: Int((padding.bottom * displayScale).rounded()),
+                paddingRight: Int((padding.right * displayScale).rounded()),
+                paddingLeft: Int((padding.left * displayScale).rounded())
+            )
+        }
+    }
+
+    let device: MTLDevice
+    private let commandQueue: MTLCommandQueue
+    private let ciContext: CIContext
+    private let configuration: TerminalConfiguration
+
+    private var cachedFrame: UIImage?
+
+    var cachedFrameImage: UIImage? {
+        cachedFrame
+    }
+
+    init(configuration: TerminalConfiguration) throws {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let commandQueue = device.makeCommandQueue() else {
+            throw GhosttyVTError.unavailable
+        }
+
+        self.device = device
+        self.commandQueue = commandQueue
+        self.ciContext = CIContext(mtlDevice: device)
+        self.configuration = configuration
+    }
+
+    func metrics(for bounds: CGRect, scale: CGFloat) -> Metrics {
+        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
+        let characterSize = ("W" as NSString).size(withAttributes: [.font: font])
+        let cellWidth = max(8, ceil(characterSize.width + 1))
+        let cellHeight = max(12, ceil(font.lineHeight * 1.15))
+
+        let horizontalInset = max(8, floor(bounds.width * 0.015))
+        let verticalInset = max(8, floor(bounds.height * 0.02))
+        let usableWidth = max(1, bounds.width - (horizontalInset * 2))
+        let usableHeight = max(1, bounds.height - (verticalInset * 2))
+
+        let columns = max(2, Int(usableWidth / cellWidth))
+        let rows = max(2, Int(usableHeight / cellHeight))
+
+        let contentWidth = CGFloat(columns) * cellWidth
+        let contentHeight = CGFloat(rows) * cellHeight
+        let leftPadding = max(horizontalInset, floor((bounds.width - contentWidth) / 2))
+        let topPadding = max(verticalInset, floor((bounds.height - contentHeight) / 2))
+        let padding = UIEdgeInsets(
+            top: topPadding,
+            left: leftPadding,
+            bottom: max(verticalInset, ceil(bounds.height - contentHeight - topPadding)),
+            right: max(horizontalInset, ceil(bounds.width - contentWidth - leftPadding))
+        )
+
+        return Metrics(
+            terminalSize: TerminalSize(columns: columns, rows: rows),
+            pixelSize: TerminalPixelSize(
+                width: Int((bounds.width * scale).rounded()),
+                height: Int((bounds.height * scale).rounded())
+            ),
+            cellSize: CGSize(width: cellWidth, height: cellHeight),
+            cellPixelSize: TerminalPixelSize(
+                width: max(1, Int((cellWidth * scale).rounded())),
+                height: max(1, Int((cellHeight * scale).rounded()))
+            ),
+            padding: padding,
+            displayScale: scale
+        )
+    }
+
+    func render(
+        projection: GhosttyVTRenderProjection,
+        in layer: CAMetalLayer,
+        bounds: CGRect,
+        metrics: Metrics,
+        focused: Bool
+    ) {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        guard let drawable = layer.nextDrawable() else { return }
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = layer.contentsScale
+        format.opaque = true
+        let imageRenderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
+
+        let shouldReuseFrame = projection.dirtyState == .partial && cachedFrame != nil
+        let dirtyRows = Set(projection.dirtyRows)
+
+        let image = imageRenderer.image { context in
+            if shouldReuseFrame, let cachedFrame {
+                cachedFrame.draw(in: bounds)
+            } else {
+                color(for: projection.backgroundColor).setFill()
+                context.fill(bounds)
+            }
+
+            let rowsToDraw: [GhosttyVTRowProjection]
+            if shouldReuseFrame, !dirtyRows.isEmpty {
+                rowsToDraw = projection.rowsProjection.filter { dirtyRows.contains($0.index) }
+            } else {
+                rowsToDraw = projection.rowsProjection
+            }
+
+            for row in rowsToDraw {
+                draw(row: row, projection: projection, metrics: metrics)
+            }
+
+            drawCursor(
+                projection: projection,
+                metrics: metrics,
+                focused: focused
+            )
+        }
+
+        cachedFrame = image
+        guard let cgImage = image.cgImage else { return }
+
+        let ciImage = CIImage(cgImage: cgImage)
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else { return }
+        let renderBounds = CGRect(origin: .zero, size: layer.drawableSize)
+        ciContext.render(
+            ciImage,
+            to: drawable.texture,
+            commandBuffer: commandBuffer,
+            bounds: renderBounds,
+            colorSpace: CGColorSpaceCreateDeviceRGB()
+        )
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
+
+    private func draw(
+        row: GhosttyVTRowProjection,
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics
+    ) {
+        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
+
+        for cell in row.cells {
+            let rect = cellRect(
+                column: cell.column,
+                row: row.index,
+                width: cell.width == .wide ? 2 : 1,
+                metrics: metrics
+            )
+
+            let colors = resolvedColors(for: cell.style, projection: projection)
+            colors.background.setFill()
+            UIBezierPath(rect: rect).fill()
+
+            switch cell.width {
+            case .spacerHead, .spacerTail:
+                continue
+            case .narrow, .wide:
+                break
+            }
+
+            guard !cell.text.isEmpty, !cell.style.invisible else { continue }
+
+            let drawRect = rect.insetBy(
+                dx: 1,
+                dy: max(0, floor((rect.height - font.lineHeight) / 2))
+            )
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: colors.foreground.withAlphaComponent(cell.style.faint ? 0.6 : 1.0),
+                .underlineStyle: cell.style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
+                .strikethroughStyle: cell.style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+            ]
+            (cell.text as NSString).draw(in: drawRect, withAttributes: attributes)
+        }
+    }
+
+    private func drawCursor(
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics,
+        focused: Bool
+    ) {
+        guard projection.cursor.visible else { return }
+        guard let cursorX = projection.cursor.x, let cursorY = projection.cursor.y else { return }
+
+        let rect = cellRect(
+            column: cursorX,
+            row: cursorY,
+            width: projection.cursor.wideTail ? 2 : 1,
+            metrics: metrics
+        )
+        let color = color(for: projection.cursorColor ?? projection.foregroundColor)
+        color.withAlphaComponent(focused ? 0.85 : 0.45).setFill()
+        color.setStroke()
+
+        switch projection.cursor.visualStyle {
+        case .bar:
+            UIBezierPath(rect: CGRect(x: rect.minX, y: rect.minY, width: 2, height: rect.height)).fill()
+        case .underline:
+            UIBezierPath(rect: CGRect(x: rect.minX, y: rect.maxY - 2, width: rect.width, height: 2)).fill()
+        case .hollowBlock:
+            let path = UIBezierPath(rect: rect.insetBy(dx: 1, dy: 1))
+            path.lineWidth = 1.5
+            path.stroke()
+        case .block:
+            UIBezierPath(rect: rect).fill()
+        }
+    }
+
+    private func cellRect(
+        column: Int,
+        row: Int,
+        width: Int,
+        metrics: Metrics
+    ) -> CGRect {
+        CGRect(
+            x: metrics.padding.left + (CGFloat(column) * metrics.cellSize.width),
+            y: metrics.padding.top + (CGFloat(row) * metrics.cellSize.height),
+            width: CGFloat(width) * metrics.cellSize.width,
+            height: metrics.cellSize.height
+        ).integral
+    }
+
+    private func resolvedColors(
+        for style: GhosttyVTTextStyle,
+        projection: GhosttyVTRenderProjection
+    ) -> (foreground: UIColor, background: UIColor) {
+        let defaultForeground = color(for: projection.foregroundColor)
+        let defaultBackground = color(for: projection.backgroundColor)
+        var foreground = color(
+            for: style.foreground,
+            palette: projection.palette,
+            fallback: defaultForeground
+        )
+        var background = color(
+            for: style.background,
+            palette: projection.palette,
+            fallback: defaultBackground
+        )
+
+        if style.inverse {
+            swap(&foreground, &background)
+        }
+
+        return (foreground, background)
+    }
+
+    private func color(for color: GhosttyVTColor) -> UIColor {
+        UIColor(
+            red: CGFloat(color.r) / 255,
+            green: CGFloat(color.g) / 255,
+            blue: CGFloat(color.b) / 255,
+            alpha: 1
+        )
+    }
+
+    private func color(
+        for styleColor: GhosttyVTStyleColor,
+        palette: [GhosttyVTColor],
+        fallback: UIColor
+    ) -> UIColor {
+        switch styleColor {
+        case .none:
+            return fallback
+        case .palette(let index):
+            guard palette.indices.contains(Int(index)) else { return fallback }
+            return color(for: palette[Int(index)])
+        case .rgb(let color):
+            return self.color(for: color)
+        }
+    }
+}
+
+private extension UIKeyModifierFlags {
+    var ghosttyModifiers: GhosttyVTModifiers {
+        var modifiers: GhosttyVTModifiers = []
+        if contains(.shift) { modifiers.insert(.shift) }
+        if contains(.control) { modifiers.insert(.control) }
+        if contains(.alternate) { modifiers.insert(.alt) }
+        if contains(.command) { modifiers.insert(.super) }
+        if contains(.alphaShift) { modifiers.insert(.capsLock) }
+        return modifiers
+    }
+}
+
+private extension GhosttyVTModifiers {
+    init(_ flags: UIKeyModifierFlags) {
+        self = flags.ghosttyModifiers
+    }
+}
+
+private extension UIKeyboardHIDUsage {
+    var ghosttyKeyCode: GhosttyVTKeyCode? {
+        switch self {
+        case .keyboardA: return .a
+        case .keyboardB: return .b
+        case .keyboardC: return .c
+        case .keyboardD: return .d
+        case .keyboardE: return .e
+        case .keyboardF: return .f
+        case .keyboardG: return .g
+        case .keyboardH: return .h
+        case .keyboardI: return .i
+        case .keyboardJ: return .j
+        case .keyboardK: return .k
+        case .keyboardL: return .l
+        case .keyboardM: return .m
+        case .keyboardN: return .n
+        case .keyboardO: return .o
+        case .keyboardP: return .p
+        case .keyboardQ: return .q
+        case .keyboardR: return .r
+        case .keyboardS: return .s
+        case .keyboardT: return .t
+        case .keyboardU: return .u
+        case .keyboardV: return .v
+        case .keyboardW: return .w
+        case .keyboardX: return .x
+        case .keyboardY: return .y
+        case .keyboardZ: return .z
+        case .keyboard0: return .digit0
+        case .keyboard1: return .digit1
+        case .keyboard2: return .digit2
+        case .keyboard3: return .digit3
+        case .keyboard4: return .digit4
+        case .keyboard5: return .digit5
+        case .keyboard6: return .digit6
+        case .keyboard7: return .digit7
+        case .keyboard8: return .digit8
+        case .keyboard9: return .digit9
+        case .keyboardGraveAccentAndTilde: return .backquote
+        case .keyboardBackslash: return .backslash
+        case .keyboardOpenBracket: return .bracketLeft
+        case .keyboardCloseBracket: return .bracketRight
+        case .keyboardComma: return .comma
+        case .keyboardEqualSign: return .equal
+        case .keyboardHyphen: return .minus
+        case .keyboardPeriod: return .period
+        case .keyboardQuote: return .quote
+        case .keyboardSemicolon: return .semicolon
+        case .keyboardSlash: return .slash
+        case .keyboardDeleteOrBackspace: return .backspace
+        case .keyboardCapsLock: return .capsLock
+        case .keyboardReturnOrEnter: return .enter
+        case .keyboardSpacebar: return .space
+        case .keyboardTab: return .tab
+        case .keyboardDeleteForward: return .delete
+        case .keyboardEnd: return .end
+        case .keyboardHome: return .home
+        case .keyboardInsert: return .insert
+        case .keyboardPageDown: return .pageDown
+        case .keyboardPageUp: return .pageUp
+        case .keyboardDownArrow: return .arrowDown
+        case .keyboardLeftArrow: return .arrowLeft
+        case .keyboardRightArrow: return .arrowRight
+        case .keyboardUpArrow: return .arrowUp
+        case .keyboardEscape: return .escape
+        case .keyboardLeftAlt: return .altLeft
+        case .keyboardRightAlt: return .altRight
+        case .keyboardLeftControl: return .controlLeft
+        case .keyboardRightControl: return .controlRight
+        case .keyboardLeftGUI: return .metaLeft
+        case .keyboardRightGUI: return .metaRight
+        case .keyboardLeftShift: return .shiftLeft
+        case .keyboardRightShift: return .shiftRight
+        case .keyboardF1: return .f1
+        case .keyboardF2: return .f2
+        case .keyboardF3: return .f3
+        case .keyboardF4: return .f4
+        case .keyboardF5: return .f5
+        case .keyboardF6: return .f6
+        case .keyboardF7: return .f7
+        case .keyboardF8: return .f8
+        case .keyboardF9: return .f9
+        case .keyboardF10: return .f10
+        case .keyboardF11: return .f11
+        case .keyboardF12: return .f12
+        default:
+            return nil
+        }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
+#endif

@@ -19,8 +19,17 @@ Packages/
 # CocoaPods
 Pods/
 
-# Frameworks (pre-built, downloaded separately)
-Frameworks/
+# Frameworks
+Frameworks/*
+!Frameworks/CGhosttyVT.xcframework/
+!Frameworks/CGhosttyVT.xcframework/**
+!GlassdeckApp.xcodeproj/
+!GlassdeckApp.xcodeproj/project.pbxproj
+!GlassdeckApp.xcodeproj/project.xcworkspace/
+!GlassdeckApp.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+!GlassdeckApp.xcodeproj/project.xcworkspace/xcshareddata/
+!GlassdeckApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+!GlassdeckApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # macOS
 .DS_Store

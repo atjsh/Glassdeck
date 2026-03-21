@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 
 /// Handles mouse and trackpad input for the terminal.
@@ -83,3 +84,4 @@ final class PointerInputHandler: NSObject, UIPointerInteractionDelegate {
         case down
     }
 }
+#endif

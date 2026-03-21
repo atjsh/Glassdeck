@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 import SwiftUI
 
@@ -11,8 +12,13 @@ class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = UIHostingController(rootView: ContentView())
+        let rootView = ContentView()
+            .environment(GlassdeckEnvironment.sessionManager)
+            .environment(GlassdeckEnvironment.connectionStore)
+            .environment(GlassdeckEnvironment.appSettings)
+        window.rootViewController = UIHostingController(rootView: rootView)
         self.window = window
         window.makeKeyAndVisible()
     }
 }
+#endif

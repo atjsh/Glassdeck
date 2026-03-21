@@ -1,4 +1,6 @@
+#if canImport(UIKit)
 import SwiftUI
+import GlassdeckCore
 
 /// Manages the active terminal session displayed on an external monitor.
 ///
@@ -12,6 +14,9 @@ struct ExternalTerminalView: View {
             if let session = sessionManager.externalDisplaySession {
                 TerminalSurfaceView(session: session)
                     .ignoresSafeArea()
+
+                RemotePointerOverlay(session: session)
+                    .allowsHitTesting(false)
 
                 // Minimal glass HUD in top-right corner
                 VStack {
@@ -38,6 +43,56 @@ struct ExternalTerminalView: View {
     }
 }
 
+private struct RemotePointerOverlay: View {
+    let session: SSHSessionModel
+
+    var body: some View {
+        if session.remotePointerOverlayState.isVisible {
+            switch session.remotePointerOverlayState.mode {
+            case .mouse:
+                pointer
+            case .cursor:
+                reticle
+            }
+        }
+    }
+
+    private var pointer: some View {
+        let point = session.terminalInteractionGeometry.viewPoint(
+            forSurfacePixelPoint: session.remotePointerOverlayState.surfacePixelPoint
+        )
+
+        return Image(systemName: session.remotePointerOverlayState.isDragging ? "cursorarrow.click.2" : "cursorarrow.motionlines")
+            .font(.title2.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(10)
+            .background(.black.opacity(0.6), in: Circle())
+            .overlay(
+                Circle()
+                    .strokeBorder(.white.opacity(0.9), lineWidth: 1)
+            )
+            .position(point)
+    }
+
+    private var reticle: some View {
+        guard let cell = session.remotePointerOverlayState.cellPosition else {
+            return AnyView(EmptyView())
+        }
+
+        let rect = session.terminalInteractionGeometry.viewRect(for: cell)
+        return AnyView(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .stroke(.white.opacity(0.95), lineWidth: 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(.white.opacity(0.12))
+                )
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
+        )
+    }
+}
+
 struct ConnectionStatusPill: View {
     let session: SSHSessionModel
 
@@ -54,3 +109,5 @@ struct ConnectionStatusPill: View {
         .glassEffect(.clear, in: .capsule)
     }
 }
+
+#endif

@@ -1,0 +1,5 @@
+module CGhosttyVT {
+  umbrella header "CGhosttyVT.h"
+  export *
+  module * { export * }
+}

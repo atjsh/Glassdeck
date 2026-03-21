@@ -1,99 +1,159 @@
 # Glassdeck
 
-English | [한국어](README-ko.md)
+Glassdeck is an iOS 26 SSH client with a shared Swift core and a generated Xcode app target. The current revision uses a real `libghostty-vt` backend for terminal state, a Glassdeck-owned Metal renderer, PTY-aware SSH shells, and an expanding SFTP workflow.
 
-Glassdeck is an experimental SSH client for iOS 26 built with SwiftUI. The repository is aimed at an iPhone-first terminal experience with session management, external display routing, hardware input support, and hooks for on-device AI features.
+## Current Scope
 
-## Overview
+- SSH terminal sessions backed by `libghostty-vt`
+- PTY shell startup and runtime resize through the vendored `swift-ssh-client`
+- External display routing
+- Hardware keyboard, touch, focus, paste, and local scrollback handling
+- SFTP directory browsing, text preview, upload, delete, and export
 
-- SwiftUI app structure for connection management and multi-session terminal workflows
-- SSH connection and session scaffolding built on `swift-nio-ssh` and `swift-ssh-client`
-- External display scene support, keyboard and pointer input handlers, and terminal configuration models
-- AI assistant UI and service placeholders intended for Foundation Models integration
-
-## Highlights
-
-### In the Repository Today
-
-- Saved connection profiles with search, create/edit flows, and local persistence via `UserDefaults`
-- Session management for connect, open shell, disconnect, and multi-session routing
-- External display scene support with a dedicated routing picker and separate terminal view
-- Terminal configuration models for themes, font size, cursor style, and scrollback settings
-- SSH key storage helpers backed by Keychain, plus password and key-based auth models
-- Built-in help browser and AI assistant sheet wired into the main app shell
-
-### Gated or Partial
-
-- `GhosttyKit` integration is scaffolded in `Glassdeck/Terminal/GhosttyTerminalView.swift`, but the framework is not vendored in this repo and the bridging code is still commented out
-- Foundation Models-backed AI is not active yet; `AIAssistant` currently returns placeholder responses until framework integration is completed
-- Some SSH and terminal behaviors are still TODO-backed, including PTY resize plumbing, host key verification wiring, and parts of the SSH key import/export experience
-- Persistence currently uses `UserDefaults`; code comments indicate a later move to SwiftData
-
-## Current Status
-
-- Public work in progress, not a finished production client
-- Requires Xcode 26 and the iOS 26 SDK to work on the current codebase
-- The supported developer workflow is opening the package in Xcode and running it against an iOS target from there
-- `swift build` is not currently a supported default path; the package still hits a platform compatibility issue against its SSH dependencies when built from the CLI
-- Optional integrations such as GhosttyKit and Foundation Models require additional setup or unfinished implementation work
-
-## Requirements
-
-- macOS with Xcode 26 beta and the iOS 26 SDK
-- iPhone 15 Pro is the intended device target for the current product direction
-- Apple Intelligence-capable hardware if you want to finish and test the on-device AI path
-- Optional `GhosttyKit.xcframework` if you want to work on the Ghostty-backed terminal integration
-
-## Build and Run
-
-Use Xcode as the primary workflow for this repository.
-
-```bash
-git clone git@github-atjsh:atjsh/Glassdeck
-cd Glassdeck
-swift package resolve
-open Package.swift
-```
-
-Then:
-
-1. Open the package in Xcode 26.
-2. Select an iOS 26 target device.
-3. Build and run from Xcode.
-
-Do not treat `swift build` as the primary verification step until the package platform metadata is corrected for CLI builds.
-
-### Optional GhosttyKit Setup
-
-If you want to continue the Ghostty-backed terminal path:
-
-1. Build `GhosttyKit.xcframework` from [Ghostty](https://github.com/ghostty-org/ghostty) using `./macos/build.nu --scheme Ghostty-iOS --configuration Release --action build`.
-2. Place the framework in `Frameworks/`.
-3. Uncomment `import GhosttyKit` and the related bridge code in `Glassdeck/Terminal/GhosttyTerminalView.swift`.
-4. Verify the terminal surface lifecycle and rendering paths against the vendored framework.
-
-## Architecture Snapshot
+## Repository Layout
 
 ```text
 Glassdeck/
-├── App/        App entry point, app delegate, Info.plist
-├── Scenes/     Main and external display scene delegates
-├── Views/      SwiftUI flows for connections, terminal UI, settings, and help
-├── Models/     Connection profiles, app settings, and session state
-├── SSH/        Connection lifecycle, auth, PTY bridge, and key storage
-├── Terminal/   Terminal surface wrappers, configuration, and protocols
-├── Input/      Keyboard and pointer input handling
-└── AI/         AI assistant actor and overlay UI scaffolding
+├── Glassdeck/            iOS app shell, SwiftUI views, UIKit terminal surface
+├── GlassdeckCore/        Shared models, SSH, terminal engine bindings, SFTP
+├── Frameworks/           Vendored CGhosttyVT xcframework
+├── GlassdeckApp.xcodeproj Generated iOS app project for simulator/device runs
+├── Scripts/              Ghostty packaging, simulator scripts, Docker SSH target
+├── Tests/                iOS simulator XCTest sources
+└── Vendor/               Forked swift-ssh-client dependency
 ```
 
-## Roadmap / Known Gaps
+## Terminal Architecture
 
-- Finish the GhosttyKit rendering bridge and remove placeholder terminal behavior
-- Replace AI placeholder responses with real Foundation Models availability checks and generation flows
-- Complete SSH ergonomics such as host key verification wiring, terminal resize requests, and richer key import/export UX
-- Revisit package metadata so CLI builds can become a documented and supported path
-- Evaluate the planned move from `UserDefaults` persistence to SwiftData
+- `GlassdeckCore/Terminal/GhosttyVTBindings.swift` owns the live `GhosttyTerminal`, `GhosttyRenderState`, key encoder, and mouse encoder.
+- `GlassdeckCore/Terminal/GhosttyVTTypes.swift` defines the pure Swift render projection and input descriptor types.
+- `Glassdeck/Terminal/GhosttyTerminalView.swift` contains the iOS surface: a `UIView` backed by `CAMetalLayer`, a Core Image based Metal renderer, and the UIKit input bridge.
+- `GlassdeckCore/SSH/SSHPTYBridge.swift` remains the UI-agnostic PTY bridge. Shell output writes into the terminal engine, and VT-encoded local input goes back to the shell.
 
-## License
+## Vendored Ghostty Build
 
-MIT. See [LICENSE](LICENSE).
+`Frameworks/CGhosttyVT.xcframework` is committed in-repo as a static-library Apple-platform artifact. To rebuild it from a local Ghostty checkout:
+
+```bash
+./Scripts/build-cghosttyvt.sh
+```
+
+Defaults:
+
+- device target: `aarch64-ios`
+- simulator target: `aarch64-ios-simulator -Dcpu=apple_a17`
+- optional Intel simulator slice: `INCLUDE_X86_64_SIMULATOR=true`
+- VT packaging mode: static xcframework, no runtime framework embedding
+- SIMD: disabled by default for the vendored iOS build so the archive remains pure-static and device-safe
+
+## Development
+
+### Regenerate the Xcode project
+
+```bash
+./Scripts/generate-xcodeproj.sh
+```
+
+### Run on the canonical iOS simulator
+
+```bash
+./Scripts/run-ios-sim.sh
+```
+
+### Run simulator XCTest
+
+```bash
+./Scripts/test-ios-sim.sh
+```
+
+Run a single test target without hand-writing `xcodebuild` flags:
+
+```bash
+./Scripts/test-ios-sim.sh --only-testing GlassdeckAppTests/RemoteControlStateTests
+```
+
+### Run the live Docker SSH integration tests
+
+```bash
+./Scripts/test-live-docker-ssh.sh
+```
+
+### Run the Docker UI screenshot tests
+
+```bash
+./Scripts/test-docker-ui-sim.sh
+```
+
+### Start the canonical live SSH test target
+
+```bash
+./Scripts/docker/start-test-ssh.sh
+```
+
+Optional host-side smoke validation:
+
+```bash
+./Scripts/docker/smoke-test-ssh.sh
+```
+
+Stop the Docker target:
+
+```bash
+./Scripts/docker/stop-test-ssh.sh
+```
+
+Optional live log tail:
+
+```bash
+./Scripts/run-ios-sim.sh --logs
+```
+
+The XCTest runner scripts default to quiet output. Each run saves the raw `xcodebuild` log under `.build/TestLogs/` and the `xcresult` bundle under `.build/TestResults/`.
+
+If you want the raw `xcodebuild` stream back, use `--verbose` or `GLASSDECK_VERBOSE=1`:
+
+```bash
+./Scripts/test-ios-sim.sh --verbose
+GLASSDECK_VERBOSE=1 ./Scripts/test-live-docker-ssh.sh
+```
+
+The expected local simulator target is `iPhone 17` on the latest installed iOS runtime.
+
+The simulator run path uses the generated `GlassdeckApp.xcodeproj` and scheme `GlassdeckApp`. Set `SIMULATOR_ID` to target a specific booted or available simulator directly; otherwise the scripts resolve the latest available `iPhone 17`. If `project.yml` is newer than the project, the repo scripts regenerate it with `./Scripts/generate-xcodeproj.sh`.
+
+Glassdeck is currently supported on iOS only. The canonical local workflow is the generated Xcode project plus the simulator scripts above.
+
+## Docker SSH Test Target
+
+Glassdeck now treats the repo-owned Docker SSH server as the canonical live test endpoint instead of a separate Raspberry Pi host.
+
+- Requires Docker Desktop on the Mac that is running the repo.
+- Publishes OpenSSH on port `22222` by default.
+- Supports both password auth and SSH-key auth for the same `glassdeck` user.
+- Seeds a deterministic home directory with:
+  - `~/bin/health-check.sh`
+  - `~/testdata/preview.txt`
+  - `~/testdata/nested/dir/info.txt`
+  - `~/testdata/nano-target.txt`
+  - `~/upload-target/`
+
+`./Scripts/docker/start-test-ssh.sh` prints the exact host, port, username, password, SSH private-key path, and current host-key fingerprint to use in Glassdeck. For physical-iPhone testing, the iPhone and the Mac running Docker must be on the same LAN so the published SSH port is reachable over the Mac’s LAN IP.
+
+## Manual Smoke Checklist
+
+- Start the Docker SSH target with `./Scripts/docker/start-test-ssh.sh`
+- Or run `./Scripts/test-live-docker-ssh.sh` to boot the Docker target, verify it with the host-side smoke checks, and run the opt-in live `SSHConnectionManager` XCTest cases on `iPhone 17`
+- Launch the app on the simulator or physical iPhone
+- Create a connection profile using the printed host/port and connect over password auth
+- Open a second profile or switch auth to the printed SSH key and connect over SSH-key auth
+- In the terminal, run `~/bin/health-check.sh`, `pwd`, and `ls ~/testdata` to confirm login and command execution
+- Verify terminal rendering, typing, paste, special keys, resize, disconnect, and reconnect
+- Open the SFTP browser from the terminal toolbar and browse `~/testdata`, preview `preview.txt`, upload into `~/upload-target`, and delete the uploaded file
+- With an external monitor and physical keyboard attached, route the active session to the external display and validate `Mouse` mode, `Cursor` mode, two-finger scroll, `View Local Terminal`, and `nano --mouse ~/testdata/nano-target.txt`
+
+## Notes
+
+- `GlassdeckCore` is the only supported source of truth for shared SSH, key, model, and terminal logic.
+- The Metal renderer is Glassdeck-owned; this repo does not depend on `GhosttyKit`.
+- The VT C API is upstream work in progress, so keeping the vendored static xcframework and rebuild script in sync matters.
+- The Docker SSH server is the canonical live acceptance target for password auth, SSH-key auth, SFTP, and external-display testing.

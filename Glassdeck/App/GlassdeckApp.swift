@@ -1,35 +1,67 @@
+#if canImport(UIKit)
+import GlassdeckCore
 import SwiftUI
 
+enum AppRootTab: Hashable {
+    case sessions
+    case connections
+}
+
 @main
+@MainActor
 struct GlassdeckApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var sessionManager = SessionManager()
-    @State private var connectionStore = ConnectionStore()
+    private let sessionManager = GlassdeckEnvironment.sessionManager
+    private let connectionStore = GlassdeckEnvironment.connectionStore
+    private let appSettings = GlassdeckEnvironment.appSettings
+
+    init() {
+        UITestLaunchSupport.configureIfNeeded(
+            sessionManager: GlassdeckEnvironment.sessionManager,
+            connectionStore: GlassdeckEnvironment.connectionStore,
+            appSettings: GlassdeckEnvironment.appSettings
+        )
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(sessionManager)
                 .environment(connectionStore)
+                .environment(appSettings)
         }
     }
 }
 
 struct ContentView: View {
-    @State private var selectedConnection: ConnectionProfile?
     @Environment(SessionManager.self) private var sessionManager
+    @State private var selectedTab: AppRootTab = .connections
+    @State private var sessionsPath: [UUID] = []
+    @State private var appliedLaunchRouting = false
 
     var body: some View {
-        NavigationSplitView {
-            ConnectionListView(selection: $selectedConnection)
-        } detail: {
-            if let connection = selectedConnection {
-                TerminalContainerView(profile: connection)
-            } else if !sessionManager.sessions.isEmpty {
-                SessionTabView()
-            } else {
-                WelcomeView()
+        TabView(selection: $selectedTab) {
+            SessionsRootView(
+                selectedTab: $selectedTab,
+                sessionsPath: $sessionsPath
+            )
+            .tag(AppRootTab.sessions)
+            .tabItem {
+                Label("Sessions", systemImage: "rectangle.on.rectangle")
             }
+
+            ConnectionsRootView(
+                selectedTab: $selectedTab,
+                sessionsPath: $sessionsPath
+            )
+            .tag(AppRootTab.connections)
+            .tabItem {
+                Label("Connections", systemImage: "server.rack")
+            }
+        }
+        .onAppear(perform: synchronizeRootState)
+        .onChange(of: sessionManager.sessions.count) { _, _ in
+            synchronizeRootState()
         }
         .sheet(isPresented: Binding(
             get: { sessionManager.showConnectionPicker },
@@ -37,14 +69,40 @@ struct ContentView: View {
         )) {
             ConnectionPickerSheet { profile in
                 Task {
-                    await sessionManager.connect(to: profile)
+                    if let session = await sessionManager.connect(to: profile) {
+                        sessionManager.setActiveSession(
+                            id: session.id,
+                            focusSurface: !UITestLaunchSupport.exposesTerminalRenderSummary
+                        )
+                        sessionsPath = [session.id]
+                        selectedTab = .sessions
+                    }
                 }
             }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func synchronizeRootState() {
+        if !appliedLaunchRouting,
+           ProcessInfo.processInfo.arguments.contains("-uiTestOpenActiveSession"),
+           let activeSession = sessionManager.activeSession {
+            selectedTab = .sessions
+            sessionsPath = [activeSession.id]
+            appliedLaunchRouting = true
+            return
+        }
+
+        if selectedTab == .sessions && sessionManager.sessions.isEmpty {
+            selectedTab = .connections
+        } else if sessionManager.activeSession != nil && sessionsPath.isEmpty {
+            selectedTab = .sessions
+        } else if sessionManager.sessions.isEmpty {
+            selectedTab = .connections
         }
     }
 }
 
-/// Quick connection picker for new tab flow.
 struct ConnectionPickerSheet: View {
     let onSelect: (ConnectionProfile) -> Void
     @Environment(ConnectionStore.self) private var store
@@ -52,17 +110,16 @@ struct ConnectionPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(store.connections) { profile in
-                    Button {
-                        onSelect(profile)
-                        dismiss()
-                    } label: {
-                        ConnectionRow(profile: profile)
-                    }
+            List(store.connections) { profile in
+                Button {
+                    onSelect(profile)
+                    dismiss()
+                } label: {
+                    ConnectionRow(profile: profile)
                 }
+                .buttonStyle(.plain)
             }
-            .navigationTitle("Connect")
+            .navigationTitle("New Session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -72,19 +129,4 @@ struct ConnectionPickerSheet: View {
         }
     }
 }
-
-struct WelcomeView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "terminal.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-            Text("Glassdeck")
-                .font(.largeTitle.bold())
-            Text("Select a connection or create a new one")
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
-    }
-}
+#endif

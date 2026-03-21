@@ -1,139 +1,338 @@
+#if canImport(UIKit)
+import GlassdeckCore
 import SwiftUI
 
-/// Terminal container with Liquid Glass floating toolbar.
-///
-/// Wraps the terminal surface view with a GlassEffectContainer toolbar
-/// providing quick actions: disconnect, new tab, AI assist, and settings.
-/// Handles the full connection lifecycle including password prompting.
-struct TerminalContainerView: View {
-    let profile: ConnectionProfile
+private enum SessionPresentationSheet: Identifiable {
+    case sftp(ConnectionProfile)
+    case displayRouting
+    case settings
+    case help
+
+    var id: String {
+        switch self {
+        case .sftp(let profile):
+            "sftp-\(profile.id.uuidString)"
+        case .displayRouting:
+            "display-routing"
+        case .settings:
+            "terminal-settings"
+        case .help:
+            "help-browser"
+        }
+    }
+}
+
+struct SessionDetailView: View {
+    let sessionID: UUID
+
     @Environment(SessionManager.self) private var sessionManager
-    @State private var showAIAssistant = false
-    @State private var showSettings = false
-    @State private var showPasswordPrompt = false
-    @State private var password = ""
-    @State private var showDisplayPicker = false
+    @State private var activeSheet: SessionPresentationSheet?
+    @State private var appliedLaunchSheet = false
+
+    private var session: SSHSessionModel? {
+        sessionManager.session(with: sessionID)
+    }
+
+    var body: some View {
+        Group {
+            if let session {
+                SessionDetailContent(session: session, activeSheet: $activeSheet)
+            } else {
+                ContentUnavailableView(
+                    "Session Closed",
+                    systemImage: "rectangle.on.rectangle.slash",
+                    description: Text("This session is no longer available.")
+                )
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("session-detail-view")
+        .toolbar(.hidden, for: .tabBar)
+        .task(id: session?.id) {
+            guard !appliedLaunchSheet else { return }
+            guard let session else { return }
+            if ProcessInfo.processInfo.arguments.contains("-uiTestPresentSFTP") {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                activeSheet = .sftp(session.profile)
+            }
+            appliedLaunchSheet = true
+        }
+    }
+}
+
+private struct SessionDetailContent: View {
+    let session: SSHSessionModel
+    @Binding var activeSheet: SessionPresentationSheet?
+
+    @Environment(SessionManager.self) private var sessionManager
+
+    private var exposesRenderSummaryForUITests: Bool {
+        UITestLaunchSupport.exposesTerminalRenderSummary
+    }
+
+    private var showingRemoteTrackpad: Bool {
+        sessionManager.shouldShowRemoteTrackpad(for: session)
+    }
+
+    private var terminalRenderSummaryValue: String {
+        if session.terminalVisibleTextSummary.isEmpty {
+            return session.terminalRenderFailureReason ?? ""
+        }
+        if let terminalRenderFailureReason = session.terminalRenderFailureReason {
+            return "\(session.terminalVisibleTextSummary)\n[render unavailable] \(terminalRenderFailureReason)"
+        }
+        return session.terminalVisibleTextSummary
+    }
 
     var body: some View {
         ZStack {
-            // Terminal surface (full bleed)
-            if let session = sessionManager.activeSession {
-                TerminalSurfaceView(session: session)
-                    .ignoresSafeArea(.container, edges: .bottom)
-            } else {
-                Color.black
-                    .ignoresSafeArea()
-                ProgressView("Connecting…")
-                    .tint(.white)
-                    .foregroundStyle(.white)
+            sessionWorkspace
+
+            if let recoveryState = recoveryState {
+                SessionRecoveryPanel(
+                    state: recoveryState,
+                    reconnect: {
+                        Task {
+                            _ = await sessionManager.reconnect(sessionID: session.id)
+                        }
+                    },
+                    close: {
+                        sessionManager.closeSession(id: session.id)
+                    }
+                )
+                .padding(24)
+            }
+        }
+        .background(showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : Color.black)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(showingRemoteTrackpad ? .regularMaterial : .ultraThinMaterial, for: .navigationBar)
+        .toolbarColorScheme(showingRemoteTrackpad ? .light : .dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                SessionTitleView(session: session)
             }
 
-            // Floating glass toolbar
-            VStack {
-                Spacer()
-                GlassToolbar(
-                    onDisconnect: { sessionManager.disconnect() },
-                    onNewTab: { sessionManager.openNewTab() },
-                    onAI: { showAIAssistant = true },
-                    onDisplay: { showDisplayPicker = true },
-                    onSettings: { showSettings = true }
-                )
-                .padding(.bottom, 8)
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showAIAssistant) {
-            AIOverlayView()
-        }
-        .sheet(isPresented: $showSettings) {
-            TerminalSettingsView()
-        }
-        .sheet(isPresented: $showDisplayPicker) {
-            DisplayRoutingPicker()
-        }
-        .alert("Password Required", isPresented: $showPasswordPrompt) {
-            SecureField("Password", text: $password)
-            Button("Connect") {
-                Task {
-                    await sessionManager.connect(to: profile, password: password)
-                    password = ""
+            if session.isConnected {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        activeSheet = .sftp(session.profile)
+                    } label: {
+                        Label("Files", systemImage: "folder")
+                    }
+                    .accessibilityIdentifier("session-files-button")
                 }
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Enter password for \(profile.username)@\(profile.host)")
-        }
-        .task {
-            if profile.authMethod == .password {
-                showPasswordPrompt = true
-            } else {
-                // Key auth — connect immediately
-                await sessionManager.connect(to: profile)
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if session.isConnected {
+                        Button {
+                            sessionManager.disconnect(sessionID: session.id)
+                        } label: {
+                            Label("Disconnect", systemImage: "bolt.slash")
+                        }
+                    } else {
+                        Button {
+                            Task {
+                                _ = await sessionManager.reconnect(sessionID: session.id)
+                            }
+                        } label: {
+                            Label("Reconnect", systemImage: "arrow.clockwise")
+                        }
+                    }
+
+                    if showingRemoteTrackpad {
+                        Button {
+                            sessionManager.showLocalTerminalForCurrentVisit(sessionID: session.id)
+                        } label: {
+                            Label("View Local Terminal", systemImage: "rectangle.on.rectangle")
+                        }
+                    }
+
+                    Button {
+                        activeSheet = .displayRouting
+                    } label: {
+                        Label("Display Routing", systemImage: "display.2")
+                    }
+
+                    Button {
+                        activeSheet = .settings
+                    } label: {
+                        Label("Terminal Settings", systemImage: "gearshape")
+                    }
+
+                    Button {
+                        activeSheet = .help
+                    } label: {
+                        Label("SSH Reference", systemImage: "book")
+                    }
+
+                    Button(role: .destructive) {
+                        sessionManager.closeSession(id: session.id)
+                    } label: {
+                        Label("Close Session", systemImage: "xmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityIdentifier("session-menu-button")
             }
+        }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .sftp(let profile):
+                SFTPBrowserView(profile: profile)
+                    .presentationDetents([.large])
+            case .displayRouting:
+                DisplayRoutingPicker()
+                    .presentationDetents([.medium, .large])
+            case .settings:
+                TerminalSettingsView()
+                    .presentationDetents([.large])
+            case .help:
+                HelpBrowserView()
+                    .presentationDetents([.large])
+            }
+        }
+        .onAppear {
+            sessionManager.setActiveSession(
+                id: session.id,
+                focusSurface: !exposesRenderSummaryForUITests
+            )
+        }
+        .accessibilityElement(children: .contain)
+        .overlay(alignment: .bottomTrailing) {
+            if exposesRenderSummaryForUITests {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: 1, height: 1)
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("terminal-render-summary")
+                    .accessibilityValue(terminalRenderSummaryValue)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sessionWorkspace: some View {
+        if showingRemoteTrackpad {
+            RemoteTrackpadView(session: session)
+        } else {
+            ZStack(alignment: .top) {
+                TerminalSurfaceView(session: session)
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .accessibilityIdentifier("terminal-surface-view")
+
+                if let statusBannerState {
+                    InlineStatusBanner(
+                        label: statusBannerState.label,
+                        systemImage: statusBannerState.systemImage,
+                        tint: statusBannerState.tint
+                    )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
+            }
+            .accessibilityIdentifier("terminal-surface-view")
+        }
+    }
+
+    private var statusBannerState: (label: String, systemImage: String, tint: Color)? {
+        switch session.status {
+        case .connecting:
+            ("Connecting to \(session.profile.host)…", "bolt.horizontal", .blue)
+        case .authenticating:
+            ("Authenticating…", "lock.shield", .blue)
+        case .reconnecting:
+            (session.reconnectState.label ?? "Reconnecting…", "arrow.clockwise", .orange)
+        case .connected, .disconnected, .failed:
+            nil
+        }
+    }
+
+    private var recoveryState: SessionRecoveryState? {
+        switch session.status {
+        case .failed(let message):
+            SessionRecoveryState(
+                title: "Session Unavailable",
+                message: message,
+                tint: .red,
+                systemImage: "exclamationmark.triangle"
+            )
+        case .disconnected:
+            SessionRecoveryState(
+                title: "Disconnected",
+                message: "Reconnect to resume this terminal session.",
+                tint: .secondary,
+                systemImage: "bolt.slash"
+            )
+        case .connected, .connecting, .authenticating, .reconnecting:
+            nil
         }
     }
 }
 
-/// Floating glass toolbar with morphing action buttons.
-struct GlassToolbar: View {
-    let onDisconnect: () -> Void
-    let onNewTab: () -> Void
-    let onAI: () -> Void
-    let onDisplay: () -> Void
-    let onSettings: () -> Void
+private struct SessionTitleView: View {
+    let session: SSHSessionModel
 
     var body: some View {
-        GlassEffectContainer {
-            HStack(spacing: 16) {
-                ToolbarButton(
-                    icon: "xmark.circle",
-                    tint: .red,
-                    action: onDisconnect
-                )
-                ToolbarButton(
-                    icon: "plus.rectangle.on.rectangle",
-                    tint: .blue,
-                    action: onNewTab
-                )
-                ToolbarButton(
-                    icon: "sparkles",
-                    tint: .purple,
-                    action: onAI
-                )
-                ToolbarButton(
-                    icon: "rectangle.on.rectangle",
-                    tint: .orange,
-                    action: onDisplay
-                )
-                ToolbarButton(
-                    icon: "gearshape",
-                    tint: .gray,
-                    action: onSettings
-                )
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
+        VStack(spacing: 2) {
+            Text(session.shortName)
+                .font(.headline)
+                .lineLimit(1)
+            Text("\(session.profile.username)@\(session.profile.host)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
+        .accessibilityIdentifier("session-detail-view")
     }
 }
 
-struct ToolbarButton: View {
-    let icon: String
+private struct SessionRecoveryState {
+    let title: String
+    let message: String
     let tint: Color
-    let action: () -> Void
+    let systemImage: String
+}
+
+private struct SessionRecoveryPanel: View {
+    let state: SessionRecoveryState
+    let reconnect: () -> Void
+    let close: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.title3)
-                .frame(width: 36, height: 36)
+        VStack(spacing: 16) {
+            Image(systemName: state.systemImage)
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundStyle(state.tint)
+
+            VStack(spacing: 8) {
+                Text(state.title)
+                    .font(.title3.weight(.semibold))
+                Text(state.message)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: 12) {
+                Button("Reconnect", action: reconnect)
+                    .buttonStyle(.borderedProminent)
+                Button("Close", role: .destructive, action: close)
+                    .buttonStyle(.bordered)
+            }
         }
-        .glassEffect(.regular.tint(tint), in: .circle)
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .accessibilityIdentifier("session-recovery-panel")
     }
 }
 
-/// Picker to route sessions to external display.
 struct DisplayRoutingPicker: View {
     @Environment(SessionManager.self) private var sessionManager
     @Environment(\.dismiss) private var dismiss
@@ -148,9 +347,7 @@ struct DisplayRoutingPicker: View {
                             dismiss()
                         } label: {
                             HStack {
-                                Image(systemName: session.isOnExternalDisplay
-                                    ? "display"
-                                    : "terminal")
+                                Image(systemName: session.isOnExternalDisplay ? "display" : "terminal")
                                 Text(session.displayName)
                                 Spacer()
                                 if session.isOnExternalDisplay {
@@ -175,14 +372,13 @@ struct DisplayRoutingPicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    SheetDismissButton()
                 }
             }
         }
     }
 }
 
-/// Terminal settings with theme picker, font controls, and behavior options.
 struct TerminalSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var config = TerminalConfiguration()
@@ -191,7 +387,6 @@ struct TerminalSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // Appearance
                 Section("Appearance") {
                     Picker("Color Scheme", selection: $config.colorScheme) {
                         ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
@@ -227,7 +422,6 @@ struct TerminalSettingsView: View {
                     Toggle("Cursor Blink", isOn: $config.cursorBlink)
                 }
 
-                // Behavior
                 Section("Behavior") {
                     HStack {
                         Text("Scrollback Lines")
@@ -239,7 +433,6 @@ struct TerminalSettingsView: View {
                     Toggle("Bell Sound", isOn: $config.bellSound)
                 }
 
-                // Help
                 Section {
                     Button {
                         showHelpBrowser = true
@@ -248,11 +441,11 @@ struct TerminalSettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("Terminal Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    SheetDismissButton()
                 }
             }
             .sheet(isPresented: $showHelpBrowser) {
@@ -261,3 +454,12 @@ struct TerminalSettingsView: View {
         }
     }
 }
+
+private struct SheetDismissButton: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Button("Done") { dismiss() }
+    }
+}
+#endif

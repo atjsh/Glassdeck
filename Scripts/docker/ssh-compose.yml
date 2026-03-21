@@ -1,0 +1,18 @@
+services:
+  ssh:
+    build:
+      context: .
+      dockerfile: ssh/Dockerfile
+    environment:
+      GLASSDECK_TEST_SSH_USER: glassdeck
+      GLASSDECK_TEST_SSH_PASSWORD: ${GLASSDECK_TEST_SSH_PASSWORD:-glassdeck}
+    ports:
+      - "${GLASSDECK_TEST_SSH_PORT:-22222}:22"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - "${GLASSDECK_TEST_SSH_RUNTIME_DIR:-../../.build/docker-ssh}:/var/lib/glassdeck-runtime"

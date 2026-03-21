@@ -1,0 +1,3 @@
+Glassdeck remote cursor placement target.
+Open this file with:
+nano --mouse ~/testdata/nano-target.txt

@@ -1,0 +1,2 @@
+GLASSDECK_SFTP_PREVIEW_OK
+This file is used for SFTP preview validation inside Glassdeck.

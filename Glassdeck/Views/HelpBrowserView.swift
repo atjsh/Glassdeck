@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import WebKit
 
@@ -54,3 +55,5 @@ struct WebViewWrapper: UIViewRepresentable {
         }
     }
 }
+
+#endif

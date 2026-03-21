@@ -1,0 +1,1106 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B93B58B59D4DD72F32A79FD /* GlassdeckCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		10173DBC0E9259E14E27EF09 /* ConnectionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */; };
+		10EB1C42BD0813571ECF9291 /* GhosttyVTPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */; };
+		131E3D6DF8E11DEBCEEB7C97 /* GlassdeckCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; };
+		1370592A0BF881763A97EB60 /* TerminalIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A41F781492401F7FB04B39F /* TerminalIO.swift */; };
+		13DC2A8B327222C369BE1635 /* SSHPTYBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BBC3E86CE1C00CA623A96D /* SSHPTYBridge.swift */; };
+		1661B8ADE4D9B9DE6F9154F7 /* ConnectionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21009691205AE27E102D8B7C /* ConnectionProfile.swift */; };
+		18D8F9722B62D58F3B595B9A /* TerminalViewProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3647E6D1BA75126F5047157 /* TerminalViewProtocol.swift */; };
+		1A26E9797AF482E3591E0DBE /* RemoteTrackpadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */; };
+		1AD85BA84B4CF6D1C17B5985 /* TerminalTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36286365FB2BA217E77A74F1 /* TerminalTypes.swift */; };
+		1CFC0247F93C87A78D1471E1 /* HostKeyVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C0E8BDE6FB844C55279C64 /* HostKeyVerifier.swift */; };
+		21ED504312C7033EA00337C0 /* GhosttyVTTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */; };
+		238456104395F3D1E0677A22 /* SSHConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */; };
+		23E2FD7ED2F5433A0789C115 /* InputCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2CF4A869284921964E6599 /* InputCoordinator.swift */; };
+		2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */; };
+		32F9D3FC5C7BAF26589C3735 /* SSHConnectionManagerLiveDockerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB6CF6F229C898018461F96 /* SSHConnectionManagerLiveDockerTests.swift */; };
+		45631027515F25DDDE00D894 /* ConnectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */; };
+		495D4E93F2ED1B79FE99E218 /* SessionKeyboardInputHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1818040EBC65B6B4002B52D /* SessionKeyboardInputHost.swift */; };
+		4CD0812DA8161FDAED02F689 /* SSHKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */; };
+		4D39521E309D66B02163B6AF /* GhosttyTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */; };
+		4F53994BA80B871E7633BA26 /* UITestLaunchSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFC9B6AF63BC559E5A43A39 /* UITestLaunchSupport.swift */; };
+		53437FB7C871DCB65B8A51EB /* SSHClientInteractiveShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5628E8E8CD7EDDA4235BFCD /* SSHClientInteractiveShell.swift */; };
+		58065A8C1341F7B10B297E4B /* SSHKeyImportValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0848B319DEEE53AB0D6B6AA /* SSHKeyImportValidator.swift */; };
+		59147CEDC7E11F0E371FFA08 /* ExternalTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */; };
+		598BCD44FE9D6F0306092196 /* RemoteControlStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */; };
+		5DB4B3F84B79B402AAFE96AB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E110E69F51C992B909FD3F4E /* AppSettings.swift */; };
+		6F7FA86F088FF746A5721929 /* ConnectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */; };
+		81A4566DAF3E90F9337870D4 /* SSHReconnectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */; };
+		86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */; };
+		8A9CD3DA1EECC95D2D41DA4C /* GlassdeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70392DFE68FDADDEBF93A9F2 /* GlassdeckApp.swift */; };
+		8F1CBE6B51107A060C37C69F /* RemoteControlMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3105D44E097230A7374ACEC /* RemoteControlMode.swift */; };
+		92B3AE8BCF98BA568F85486C /* GlassdeckAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0D826DED51A49CB3D0B278 /* GlassdeckAppUITests.swift */; };
+		94A25079A13308C0A32580ED /* GlassdeckPlatformShim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8418D705452033F873CEF199 /* GlassdeckPlatformShim.swift */; };
+		9886DFAB02094EA6EA2FEABF /* ConnectionFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 702A42675CA14F0EA26EA4ED /* ConnectionFormView.swift */; };
+		98B6D1350DC0EFC5751A240E /* KeyboardInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2726D79F764F8BC99E7FFC03 /* KeyboardInputHandler.swift */; };
+		9CB2F2526348F91CCBB53AA8 /* SSHPTYBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44F3882C1AF2363E996FA14E /* SSHPTYBridgeTests.swift */; };
+		9DF55CDB5F60A7B2268C5032 /* HelpBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9DCE8C3DACD9233C06208D /* HelpBrowserView.swift */; };
+		9EEB5408D5480B7A67A48E3A /* TerminalConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEA7042758FD9637994E45A /* TerminalConfiguration.swift */; };
+		A5FC60E9ACD6DCD48608CB49 /* RemoteTrackpadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314D2F8ADC57EFF45DF89639 /* RemoteTrackpadCoordinator.swift */; };
+		A7BE3A32809E925DFA396F8B /* SFTPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9DC70802E4D701B6E71614 /* SFTPManager.swift */; };
+		ACB698F2AE1745C3A59421B3 /* SessionTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044C1023D42EC76E628CD06D /* SessionTabView.swift */; };
+		ADCF756264146F9287ACAEB5 /* MainSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E86628142C521FB3A885ED2 /* MainSceneDelegate.swift */; };
+		AE2E81E494B8F9C720CC5D92 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB4D260FBCF1015AC9C2233 /* SessionManager.swift */; };
+		AE57B3ADE1CD18036DB6FC93 /* SFTPBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F70D15BB314CA4F2DD7B78F8 /* SFTPBrowserView.swift */; };
+		B09C93F4EB70032DD152954A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240707A2CC1ADF499F20C22D /* AppDelegate.swift */; };
+		B50F17463B3EA1EAF79C43A8 /* SSHAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */; };
+		B9238B2A05296209F5F4A9C9 /* InteractiveShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7197037A07EEDF4779EC844A /* InteractiveShell.swift */; };
+		C30CA3444947ABF8B76B16C0 /* GhosttyVTBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */; };
+		C3F1F893FF605228DDF16520 /* PointerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */; };
+		C51405D26C0AA665BE8FE928 /* SSHCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */; };
+		C7D5DDC6609F76479E9A47E6 /* TerminalContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4CC05A3A4E1897A4F52A56 /* TerminalContainerView.swift */; };
+		D0FFE6D936A614F8D29DC84A /* UITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C181B166BD2A79C753076DF3 /* UITestSupport.swift */; };
+		D1964747F9CF8E51F7DFD01E /* SSHSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */; };
+		D210599485BA66D3F7D966A8 /* SSHClient in Frameworks */ = {isa = PBXBuildFile; productRef = 2106CF0362740D6BD93337A5 /* SSHClient */; };
+		D2AC0FBEB4FBF562A58E08CA /* SFTPManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */; };
+		D2FF02B43A760FE684E8EB3E /* CGhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */; };
+		D5E29A59037E517DF350DCD5 /* NIOSSH in Frameworks */ = {isa = PBXBuildFile; productRef = E42CC0280A1E0E604DC0D9C3 /* NIOSSH */; };
+		D91C292466C7379C3E509D27 /* GlassdeckCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */; };
+		DF914286741A1D00D74BB5C0 /* AppChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E834C2043B25F09FF46E75D3 /* AppChrome.swift */; };
+		E3B0F60EDDEA3E62A03BF57A /* RemoteControlSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0020F203A8B8772184F0D1 /* RemoteControlSupport.swift */; };
+		E50D7EFEAF56DBE4009853A2 /* GlassdeckCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; };
+		E69B87144634AFD2108CB61B /* GlassdeckEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025660FB2C230BA04A599321 /* GlassdeckEnvironment.swift */; };
+		FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0A4EDACDDC4CD6BBDABB178C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49846D4FEB4B003271AA3A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6121DEE5151A73B41FA342EE;
+			remoteInfo = GlassdeckCore;
+		};
+		0D524B6567D1D7BC0BB2E3A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49846D4FEB4B003271AA3A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6121DEE5151A73B41FA342EE;
+			remoteInfo = GlassdeckCore;
+		};
+		24C8BB593BD74D6D318A621A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49846D4FEB4B003271AA3A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 23F6A6B171C5AF045C8793D9;
+			remoteInfo = GlassdeckApp;
+		};
+		F24197AD99647E4053A731B2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49846D4FEB4B003271AA3A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 23F6A6B171C5AF045C8793D9;
+			remoteInfo = GlassdeckApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C51A1FF86AA7BFF43767A03B /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				0B93B58B59D4DD72F32A79FD /* GlassdeckCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C67616A3CCD62074FA384BF6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				D91C292466C7379C3E509D27 /* GlassdeckCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		025660FB2C230BA04A599321 /* GlassdeckEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassdeckEnvironment.swift; sourceTree = "<group>"; };
+		044C1023D42EC76E628CD06D /* SessionTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTabView.swift; sourceTree = "<group>"; };
+		06C0E8BDE6FB844C55279C64 /* HostKeyVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostKeyVerifier.swift; sourceTree = "<group>"; };
+		0AFC9B6AF63BC559E5A43A39 /* UITestLaunchSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestLaunchSupport.swift; sourceTree = "<group>"; };
+		0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHConnectionManager.swift; sourceTree = "<group>"; };
+		1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHKeyManager.swift; sourceTree = "<group>"; };
+		20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerInputHandler.swift; sourceTree = "<group>"; };
+		20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveUITests.swift; sourceTree = "<group>"; };
+		21009691205AE27E102D8B7C /* ConnectionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionProfile.swift; sourceTree = "<group>"; };
+		240707A2CC1ADF499F20C22D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTBindings.swift; sourceTree = "<group>"; };
+		2726D79F764F8BC99E7FFC03 /* KeyboardInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputHandler.swift; sourceTree = "<group>"; };
+		29BBC3E86CE1C00CA623A96D /* SSHPTYBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHPTYBridge.swift; sourceTree = "<group>"; };
+		314D2F8ADC57EFF45DF89639 /* RemoteTrackpadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadCoordinator.swift; sourceTree = "<group>"; };
+		36286365FB2BA217E77A74F1 /* TerminalTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTypes.swift; sourceTree = "<group>"; };
+		3AB4D260FBCF1015AC9C2233 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
+		3B9DCE8C3DACD9233C06208D /* HelpBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpBrowserView.swift; sourceTree = "<group>"; };
+		3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionListView.swift; sourceTree = "<group>"; };
+		3E86628142C521FB3A885ED2 /* MainSceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainSceneDelegate.swift; sourceTree = "<group>"; };
+		3EB6CF6F229C898018461F96 /* SSHConnectionManagerLiveDockerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHConnectionManagerLiveDockerTests.swift; sourceTree = "<group>"; };
+		404A49CDA64B96BA2EBA72F5 /* swift-ssh-client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "swift-ssh-client"; path = "Vendor/swift-ssh-client"; sourceTree = SOURCE_ROOT; };
+		44F3882C1AF2363E996FA14E /* SSHPTYBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHPTYBridgeTests.swift; sourceTree = "<group>"; };
+		498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHAuthenticator.swift; sourceTree = "<group>"; };
+		50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadView.swift; sourceTree = "<group>"; };
+		5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalView.swift; sourceTree = "<group>"; };
+		5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStore.swift; sourceTree = "<group>"; };
+		68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTPlatformTests.swift; sourceTree = "<group>"; };
+		6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHSessionModel.swift; sourceTree = "<group>"; };
+		6A41F781492401F7FB04B39F /* TerminalIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalIO.swift; sourceTree = "<group>"; };
+		702A42675CA14F0EA26EA4ED /* ConnectionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFormView.swift; sourceTree = "<group>"; };
+		70392DFE68FDADDEBF93A9F2 /* GlassdeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassdeckApp.swift; sourceTree = "<group>"; };
+		7197037A07EEDF4779EC844A /* InteractiveShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveShell.swift; sourceTree = "<group>"; };
+		78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionModelTests.swift; sourceTree = "<group>"; };
+		7A4CC05A3A4E1897A4F52A56 /* TerminalContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalContainerView.swift; sourceTree = "<group>"; };
+		7C93770B5585296FFD2F1C9E /* GlassdeckAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassdeckAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D0020F203A8B8772184F0D1 /* RemoteControlSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlSupport.swift; sourceTree = "<group>"; };
+		8418D705452033F873CEF199 /* GlassdeckPlatformShim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassdeckPlatformShim.swift; sourceTree = "<group>"; };
+		872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDisplaySceneDelegate.swift; sourceTree = "<group>"; };
+		8A9DC70802E4D701B6E71614 /* SFTPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPManager.swift; sourceTree = "<group>"; };
+		962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlStateTests.swift; sourceTree = "<group>"; };
+		9E0D826DED51A49CB3D0B278 /* GlassdeckAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassdeckAppUITests.swift; sourceTree = "<group>"; };
+		A1818040EBC65B6B4002B52D /* SessionKeyboardInputHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKeyboardInputHost.swift; sourceTree = "<group>"; };
+		A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManagerTests.swift; sourceTree = "<group>"; };
+		AAEA7042758FD9637994E45A /* TerminalConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfiguration.swift; sourceTree = "<group>"; };
+		B43E247EDE97B43ACE6C6311 /* GlassdeckApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GlassdeckApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadScreenshotUITests.swift; sourceTree = "<group>"; };
+		BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalView.swift; sourceTree = "<group>"; };
+		C181B166BD2A79C753076DF3 /* UITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
+		C3105D44E097230A7374ACEC /* RemoteControlMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlMode.swift; sourceTree = "<group>"; };
+		C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CGhosttyVT.xcframework; path = Frameworks/CGhosttyVT.xcframework; sourceTree = "<group>"; };
+		D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTTypes.swift; sourceTree = "<group>"; };
+		D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManager.swift; sourceTree = "<group>"; };
+		DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPManagerTests.swift; sourceTree = "<group>"; };
+		E110E69F51C992B909FD3F4E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		E3647E6D1BA75126F5047157 /* TerminalViewProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalViewProtocol.swift; sourceTree = "<group>"; };
+		E834C2043B25F09FF46E75D3 /* AppChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppChrome.swift; sourceTree = "<group>"; };
+		ED3686A208098920A06115A0 /* GlassdeckCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GlassdeckCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0848B319DEEE53AB0D6B6AA /* SSHKeyImportValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHKeyImportValidator.swift; sourceTree = "<group>"; };
+		F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHCoreTests.swift; sourceTree = "<group>"; };
+		F5628E8E8CD7EDDA4235BFCD /* SSHClientInteractiveShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHClientInteractiveShell.swift; sourceTree = "<group>"; };
+		F70D15BB314CA4F2DD7B78F8 /* SFTPBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPBrowserView.swift; sourceTree = "<group>"; };
+		FA2CF4A869284921964E6599 /* InputCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputCoordinator.swift; sourceTree = "<group>"; };
+		FDC49790314EB278D4F06E53 /* GlassdeckAppUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassdeckAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4AAF8AE2FD59B7A13D4D58D5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D2FF02B43A760FE684E8EB3E /* CGhosttyVT.xcframework in Frameworks */,
+				D5E29A59037E517DF350DCD5 /* NIOSSH in Frameworks */,
+				D210599485BA66D3F7D966A8 /* SSHClient in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F88127EE06465ACABC217D7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				131E3D6DF8E11DEBCEEB7C97 /* GlassdeckCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED2777F0D3EAFBBEB6B47650 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E50D7EFEAF56DBE4009853A2 /* GlassdeckCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0046AC4DF5FFBF88C93B7406 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */,
+				E3647E6D1BA75126F5047157 /* TerminalViewProtocol.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+		0276D6F90CFF966BF5FCEE4F /* Remote */ = {
+			isa = PBXGroup;
+			children = (
+				7D0020F203A8B8772184F0D1 /* RemoteControlSupport.swift */,
+				314D2F8ADC57EFF45DF89639 /* RemoteTrackpadCoordinator.swift */,
+			);
+			path = Remote;
+			sourceTree = "<group>";
+		};
+		047461F7213C7C7ADE621279 /* GlassdeckHostIntegrationTests */ = {
+			isa = PBXGroup;
+			children = (
+				DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */,
+				3EB6CF6F229C898018461F96 /* SSHConnectionManagerLiveDockerTests.swift */,
+				44F3882C1AF2363E996FA14E /* SSHPTYBridgeTests.swift */,
+			);
+			path = GlassdeckHostIntegrationTests;
+			sourceTree = "<group>";
+		};
+		111E60095DF5F3BC80C492E8 /* SSH */ = {
+			isa = PBXGroup;
+			children = (
+				06C0E8BDE6FB844C55279C64 /* HostKeyVerifier.swift */,
+				7197037A07EEDF4779EC844A /* InteractiveShell.swift */,
+				8A9DC70802E4D701B6E71614 /* SFTPManager.swift */,
+				498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */,
+				F5628E8E8CD7EDDA4235BFCD /* SSHClientInteractiveShell.swift */,
+				0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */,
+				F0848B319DEEE53AB0D6B6AA /* SSHKeyImportValidator.swift */,
+				1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */,
+				29BBC3E86CE1C00CA623A96D /* SSHPTYBridge.swift */,
+				D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */,
+			);
+			path = SSH;
+			sourceTree = "<group>";
+		};
+		14D27717859BC6B91D1F93ED /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */,
+				D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */,
+				AAEA7042758FD9637994E45A /* TerminalConfiguration.swift */,
+				6A41F781492401F7FB04B39F /* TerminalIO.swift */,
+				36286365FB2BA217E77A74F1 /* TerminalTypes.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+		1CBA9F8C4852FC83CD7E5585 /* Scenes */ = {
+			isa = PBXGroup;
+			children = (
+				872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */,
+				3E86628142C521FB3A885ED2 /* MainSceneDelegate.swift */,
+			);
+			path = Scenes;
+			sourceTree = "<group>";
+		};
+		4AACB15870CDE448E72E6B6A /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				FA2CF4A869284921964E6599 /* InputCoordinator.swift */,
+				2726D79F764F8BC99E7FFC03 /* KeyboardInputHandler.swift */,
+				20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */,
+				A1818040EBC65B6B4002B52D /* SessionKeyboardInputHost.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		4ADC0C9E661A5D0776311DFB /* GlassdeckAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */,
+			);
+			path = GlassdeckAppTests;
+			sourceTree = "<group>";
+		};
+		548A42458AB12AA1332046D6 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				E110E69F51C992B909FD3F4E /* AppSettings.swift */,
+				21009691205AE27E102D8B7C /* ConnectionProfile.swift */,
+				5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */,
+				C3105D44E097230A7374ACEC /* RemoteControlMode.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		5581796B5C7E10FEFAE4D119 /* GlassdeckCore */ = {
+			isa = PBXGroup;
+			children = (
+				548A42458AB12AA1332046D6 /* Models */,
+				111E60095DF5F3BC80C492E8 /* SSH */,
+				14D27717859BC6B91D1F93ED /* Terminal */,
+			);
+			path = GlassdeckCore;
+			sourceTree = "<group>";
+		};
+		55934EBE2911F0F1BF87EC1A /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				4ADC0C9E661A5D0776311DFB /* GlassdeckAppTests */,
+				8656E458568ACBF343F9268D /* GlassdeckAppUITests */,
+				7E739F3115057D0256C0D5A8 /* GlassdeckCoreTests */,
+				047461F7213C7C7ADE621279 /* GlassdeckHostIntegrationTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		7E739F3115057D0256C0D5A8 /* GlassdeckCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */,
+				68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */,
+				F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */,
+				A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */,
+			);
+			path = GlassdeckCoreTests;
+			sourceTree = "<group>";
+		};
+		81C09AD83E84E16394593843 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		83E61C8F54C75DCBD61B6432 /* SSH */ = {
+			isa = PBXGroup;
+			children = (
+				6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */,
+			);
+			path = SSH;
+			sourceTree = "<group>";
+		};
+		8656E458568ACBF343F9268D /* GlassdeckAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */,
+				9E0D826DED51A49CB3D0B278 /* GlassdeckAppUITests.swift */,
+				BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */,
+				C181B166BD2A79C753076DF3 /* UITestSupport.swift */,
+			);
+			path = GlassdeckAppUITests;
+			sourceTree = "<group>";
+		};
+		94D894FC57A12C3AB9A7D595 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B43E247EDE97B43ACE6C6311 /* GlassdeckApp.app */,
+				7C93770B5585296FFD2F1C9E /* GlassdeckAppTests.xctest */,
+				FDC49790314EB278D4F06E53 /* GlassdeckAppUITests.xctest */,
+				ED3686A208098920A06115A0 /* GlassdeckCore.framework */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		9E4ED1FEE7111647D04C9098 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				3AB4D260FBCF1015AC9C2233 /* SessionManager.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A4B6686F51D8A7B2EB0E6F25 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				404A49CDA64B96BA2EBA72F5 /* swift-ssh-client */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		A57FEE0D180A82DDB3BBAE06 = {
+			isa = PBXGroup;
+			children = (
+				A9681897B0E1B0C8EA19C21F /* Glassdeck */,
+				5581796B5C7E10FEFAE4D119 /* GlassdeckCore */,
+				A4B6686F51D8A7B2EB0E6F25 /* Packages */,
+				55934EBE2911F0F1BF87EC1A /* Tests */,
+				BE8FB6B28A69D44009E90589 /* Frameworks */,
+				94D894FC57A12C3AB9A7D595 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A9681897B0E1B0C8EA19C21F /* Glassdeck */ = {
+			isa = PBXGroup;
+			children = (
+				8418D705452033F873CEF199 /* GlassdeckPlatformShim.swift */,
+				DEDF667E680F15C81536E016 /* App */,
+				4AACB15870CDE448E72E6B6A /* Input */,
+				9E4ED1FEE7111647D04C9098 /* Models */,
+				0276D6F90CFF966BF5FCEE4F /* Remote */,
+				81C09AD83E84E16394593843 /* Resources */,
+				1CBA9F8C4852FC83CD7E5585 /* Scenes */,
+				83E61C8F54C75DCBD61B6432 /* SSH */,
+				0046AC4DF5FFBF88C93B7406 /* Terminal */,
+				BB0767A28FE79AA3A3ABED36 /* Views */,
+			);
+			path = Glassdeck;
+			sourceTree = "<group>";
+		};
+		BB0767A28FE79AA3A3ABED36 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				E834C2043B25F09FF46E75D3 /* AppChrome.swift */,
+				702A42675CA14F0EA26EA4ED /* ConnectionFormView.swift */,
+				3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */,
+				5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */,
+				3B9DCE8C3DACD9233C06208D /* HelpBrowserView.swift */,
+				50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */,
+				044C1023D42EC76E628CD06D /* SessionTabView.swift */,
+				F70D15BB314CA4F2DD7B78F8 /* SFTPBrowserView.swift */,
+				7A4CC05A3A4E1897A4F52A56 /* TerminalContainerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		BE8FB6B28A69D44009E90589 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DEDF667E680F15C81536E016 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				240707A2CC1ADF499F20C22D /* AppDelegate.swift */,
+				70392DFE68FDADDEBF93A9F2 /* GlassdeckApp.swift */,
+				025660FB2C230BA04A599321 /* GlassdeckEnvironment.swift */,
+				0AFC9B6AF63BC559E5A43A39 /* UITestLaunchSupport.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		23F6A6B171C5AF045C8793D9 /* GlassdeckApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0D3B0656306317838ED269F9 /* Build configuration list for PBXNativeTarget "GlassdeckApp" */;
+			buildPhases = (
+				D6939D1BC15A09733DBD4FFD /* Sources */,
+				8F88127EE06465ACABC217D7 /* Frameworks */,
+				C67616A3CCD62074FA384BF6 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				302003B0DF1FC451D9902EC6 /* PBXTargetDependency */,
+			);
+			name = GlassdeckApp;
+			packageProductDependencies = (
+			);
+			productName = GlassdeckApp;
+			productReference = B43E247EDE97B43ACE6C6311 /* GlassdeckApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		6121DEE5151A73B41FA342EE /* GlassdeckCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 057C39F23A7DB090BF3D432C /* Build configuration list for PBXNativeTarget "GlassdeckCore" */;
+			buildPhases = (
+				341C06B40E4E9B1D57D583E4 /* Sources */,
+				4AAF8AE2FD59B7A13D4D58D5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GlassdeckCore;
+			packageProductDependencies = (
+				E42CC0280A1E0E604DC0D9C3 /* NIOSSH */,
+				2106CF0362740D6BD93337A5 /* SSHClient */,
+			);
+			productName = GlassdeckCore;
+			productReference = ED3686A208098920A06115A0 /* GlassdeckCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		747394F6748EC9C4C147F4B8 /* GlassdeckAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 363F5C7DA80B9B241F4E3BCF /* Build configuration list for PBXNativeTarget "GlassdeckAppUITests" */;
+			buildPhases = (
+				F612EFC7585F8930CBD609B9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F75C08F4B63AE805D0CF78D3 /* PBXTargetDependency */,
+			);
+			name = GlassdeckAppUITests;
+			packageProductDependencies = (
+			);
+			productName = GlassdeckAppUITests;
+			productReference = FDC49790314EB278D4F06E53 /* GlassdeckAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		D2E19D6AD237B0EE3338DFE2 /* GlassdeckAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8013B4FD3094FDF7C233F1D9 /* Build configuration list for PBXNativeTarget "GlassdeckAppTests" */;
+			buildPhases = (
+				E974B7C50EBE7D821018E7E3 /* Sources */,
+				ED2777F0D3EAFBBEB6B47650 /* Frameworks */,
+				C51A1FF86AA7BFF43767A03B /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				990E83F2F097ECCDDFF6A433 /* PBXTargetDependency */,
+				49158628C18ACC7C98BD0DB1 /* PBXTargetDependency */,
+			);
+			name = GlassdeckAppTests;
+			packageProductDependencies = (
+			);
+			productName = GlassdeckAppTests;
+			productReference = 7C93770B5585296FFD2F1C9E /* GlassdeckAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		49846D4FEB4B003271AA3A50 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					23F6A6B171C5AF045C8793D9 = {
+						DevelopmentTeam = D3GFBGHCB7;
+						ProvisioningStyle = Automatic;
+					};
+					6121DEE5151A73B41FA342EE = {
+						DevelopmentTeam = D3GFBGHCB7;
+						ProvisioningStyle = Automatic;
+					};
+					747394F6748EC9C4C147F4B8 = {
+						DevelopmentTeam = D3GFBGHCB7;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 23F6A6B171C5AF045C8793D9;
+					};
+					D2E19D6AD237B0EE3338DFE2 = {
+						DevelopmentTeam = D3GFBGHCB7;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 14B83C583189B18933B6B809 /* Build configuration list for PBXProject "GlassdeckApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A57FEE0D180A82DDB3BBAE06;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				12CDCD1B0FBE96C402925EC5 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */,
+				61D34A5AE2F2EAF5445DFEEF /* XCLocalSwiftPackageReference "Vendor/swift-ssh-client" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 94D894FC57A12C3AB9A7D595 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				23F6A6B171C5AF045C8793D9 /* GlassdeckApp */,
+				D2E19D6AD237B0EE3338DFE2 /* GlassdeckAppTests */,
+				747394F6748EC9C4C147F4B8 /* GlassdeckAppUITests */,
+				6121DEE5151A73B41FA342EE /* GlassdeckCore */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		341C06B40E4E9B1D57D583E4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5DB4B3F84B79B402AAFE96AB /* AppSettings.swift in Sources */,
+				1661B8ADE4D9B9DE6F9154F7 /* ConnectionProfile.swift in Sources */,
+				45631027515F25DDDE00D894 /* ConnectionStore.swift in Sources */,
+				C30CA3444947ABF8B76B16C0 /* GhosttyVTBindings.swift in Sources */,
+				21ED504312C7033EA00337C0 /* GhosttyVTTypes.swift in Sources */,
+				1CFC0247F93C87A78D1471E1 /* HostKeyVerifier.swift in Sources */,
+				B9238B2A05296209F5F4A9C9 /* InteractiveShell.swift in Sources */,
+				8F1CBE6B51107A060C37C69F /* RemoteControlMode.swift in Sources */,
+				A7BE3A32809E925DFA396F8B /* SFTPManager.swift in Sources */,
+				B50F17463B3EA1EAF79C43A8 /* SSHAuthenticator.swift in Sources */,
+				53437FB7C871DCB65B8A51EB /* SSHClientInteractiveShell.swift in Sources */,
+				238456104395F3D1E0677A22 /* SSHConnectionManager.swift in Sources */,
+				58065A8C1341F7B10B297E4B /* SSHKeyImportValidator.swift in Sources */,
+				4CD0812DA8161FDAED02F689 /* SSHKeyManager.swift in Sources */,
+				13DC2A8B327222C369BE1635 /* SSHPTYBridge.swift in Sources */,
+				81A4566DAF3E90F9337870D4 /* SSHReconnectManager.swift in Sources */,
+				9EEB5408D5480B7A67A48E3A /* TerminalConfiguration.swift in Sources */,
+				1370592A0BF881763A97EB60 /* TerminalIO.swift in Sources */,
+				1AD85BA84B4CF6D1C17B5985 /* TerminalTypes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6939D1BC15A09733DBD4FFD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF914286741A1D00D74BB5C0 /* AppChrome.swift in Sources */,
+				B09C93F4EB70032DD152954A /* AppDelegate.swift in Sources */,
+				9886DFAB02094EA6EA2FEABF /* ConnectionFormView.swift in Sources */,
+				6F7FA86F088FF746A5721929 /* ConnectionListView.swift in Sources */,
+				86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */,
+				59147CEDC7E11F0E371FFA08 /* ExternalTerminalView.swift in Sources */,
+				4D39521E309D66B02163B6AF /* GhosttyTerminalView.swift in Sources */,
+				8A9CD3DA1EECC95D2D41DA4C /* GlassdeckApp.swift in Sources */,
+				E69B87144634AFD2108CB61B /* GlassdeckEnvironment.swift in Sources */,
+				94A25079A13308C0A32580ED /* GlassdeckPlatformShim.swift in Sources */,
+				9DF55CDB5F60A7B2268C5032 /* HelpBrowserView.swift in Sources */,
+				23E2FD7ED2F5433A0789C115 /* InputCoordinator.swift in Sources */,
+				98B6D1350DC0EFC5751A240E /* KeyboardInputHandler.swift in Sources */,
+				ADCF756264146F9287ACAEB5 /* MainSceneDelegate.swift in Sources */,
+				C3F1F893FF605228DDF16520 /* PointerInputHandler.swift in Sources */,
+				E3B0F60EDDEA3E62A03BF57A /* RemoteControlSupport.swift in Sources */,
+				A5FC60E9ACD6DCD48608CB49 /* RemoteTrackpadCoordinator.swift in Sources */,
+				1A26E9797AF482E3591E0DBE /* RemoteTrackpadView.swift in Sources */,
+				AE57B3ADE1CD18036DB6FC93 /* SFTPBrowserView.swift in Sources */,
+				D1964747F9CF8E51F7DFD01E /* SSHSessionModel.swift in Sources */,
+				495D4E93F2ED1B79FE99E218 /* SessionKeyboardInputHost.swift in Sources */,
+				AE2E81E494B8F9C720CC5D92 /* SessionManager.swift in Sources */,
+				ACB698F2AE1745C3A59421B3 /* SessionTabView.swift in Sources */,
+				C7D5DDC6609F76479E9A47E6 /* TerminalContainerView.swift in Sources */,
+				18D8F9722B62D58F3B595B9A /* TerminalViewProtocol.swift in Sources */,
+				4F53994BA80B871E7633BA26 /* UITestLaunchSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E974B7C50EBE7D821018E7E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10173DBC0E9259E14E27EF09 /* ConnectionModelTests.swift in Sources */,
+				10EB1C42BD0813571ECF9291 /* GhosttyVTPlatformTests.swift in Sources */,
+				598BCD44FE9D6F0306092196 /* RemoteControlStateTests.swift in Sources */,
+				D2AC0FBEB4FBF562A58E08CA /* SFTPManagerTests.swift in Sources */,
+				32F9D3FC5C7BAF26589C3735 /* SSHConnectionManagerLiveDockerTests.swift in Sources */,
+				C51405D26C0AA665BE8FE928 /* SSHCoreTests.swift in Sources */,
+				9CB2F2526348F91CCBB53AA8 /* SSHPTYBridgeTests.swift in Sources */,
+				DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F612EFC7585F8930CBD609B9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */,
+				92B3AE8BCF98BA568F85486C /* GlassdeckAppUITests.swift in Sources */,
+				FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */,
+				D0FFE6D936A614F8D29DC84A /* UITestSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		302003B0DF1FC451D9902EC6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6121DEE5151A73B41FA342EE /* GlassdeckCore */;
+			targetProxy = 0A4EDACDDC4CD6BBDABB178C /* PBXContainerItemProxy */;
+		};
+		49158628C18ACC7C98BD0DB1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 23F6A6B171C5AF045C8793D9 /* GlassdeckApp */;
+			targetProxy = 24C8BB593BD74D6D318A621A /* PBXContainerItemProxy */;
+		};
+		990E83F2F097ECCDDFF6A433 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6121DEE5151A73B41FA342EE /* GlassdeckCore */;
+			targetProxy = 0D524B6567D1D7BC0BB2E3A7 /* PBXContainerItemProxy */;
+		};
+		F75C08F4B63AE805D0CF78D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 23F6A6B171C5AF045C8793D9 /* GlassdeckApp */;
+			targetProxy = F24197AD99647E4053A731B2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		30BCB0EB8DB8D7ED81009363 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Glassdeck/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.atjsh.GlassdeckDev;
+				PRODUCT_NAME = Glassdeck;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4C150AB0BEEAD2F91394E4F2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = D3GFBGHCB7;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		5798DC8A69CF311C3AB5C839 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckAppUITests;
+				PRODUCT_NAME = GlassdeckAppUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GlassdeckApp;
+			};
+			name = Release;
+		};
+		59414257978B819771CBDB0A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = D3GFBGHCB7;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		6054D4D5B9FF991E5C5D598B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckAppUITests;
+				PRODUCT_NAME = GlassdeckAppUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GlassdeckApp;
+			};
+			name = Debug;
+		};
+		90329AD4310EE460356D04C8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Frameworks\"",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckCore;
+				PRODUCT_NAME = GlassdeckCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		A11A6D9C71654E56F88E9FD6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckAppTests;
+				PRODUCT_NAME = GlassdeckAppTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glassdeck.app/Glassdeck";
+			};
+			name = Debug;
+		};
+		A4903C362D2AE9A9A3CEB6C0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Frameworks\"",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckCore;
+				PRODUCT_NAME = GlassdeckCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		BB579FBEBA33222C7371C111 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Glassdeck/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.atjsh.GlassdeckDev;
+				PRODUCT_NAME = Glassdeck;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CF9402582F877511EC0F6AFF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = glassdeck.GlassdeckAppTests;
+				PRODUCT_NAME = GlassdeckAppTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glassdeck.app/Glassdeck";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		057C39F23A7DB090BF3D432C /* Build configuration list for PBXNativeTarget "GlassdeckCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A4903C362D2AE9A9A3CEB6C0 /* Debug */,
+				90329AD4310EE460356D04C8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		0D3B0656306317838ED269F9 /* Build configuration list for PBXNativeTarget "GlassdeckApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB579FBEBA33222C7371C111 /* Debug */,
+				30BCB0EB8DB8D7ED81009363 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		14B83C583189B18933B6B809 /* Build configuration list for PBXProject "GlassdeckApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				59414257978B819771CBDB0A /* Debug */,
+				4C150AB0BEEAD2F91394E4F2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		363F5C7DA80B9B241F4E3BCF /* Build configuration list for PBXNativeTarget "GlassdeckAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6054D4D5B9FF991E5C5D598B /* Debug */,
+				5798DC8A69CF311C3AB5C839 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8013B4FD3094FDF7C233F1D9 /* Build configuration list for PBXNativeTarget "GlassdeckAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A11A6D9C71654E56F88E9FD6 /* Debug */,
+				CF9402582F877511EC0F6AFF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		61D34A5AE2F2EAF5445DFEEF /* XCLocalSwiftPackageReference "Vendor/swift-ssh-client" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Vendor/swift-ssh-client";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		12CDCD1B0FBE96C402925EC5 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio-ssh.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2106CF0362740D6BD93337A5 /* SSHClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 61D34A5AE2F2EAF5445DFEEF /* XCLocalSwiftPackageReference "Vendor/swift-ssh-client" */;
+			productName = SSHClient;
+		};
+		E42CC0280A1E0E604DC0D9C3 /* NIOSSH */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 12CDCD1B0FBE96C402925EC5 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */;
+			productName = NIOSSH;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 49846D4FEB4B003271AA3A50 /* Project object */;
+}

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 import SwiftUI
 
@@ -13,12 +14,18 @@ class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         let externalView = ExternalTerminalView()
+            .environment(GlassdeckEnvironment.sessionManager)
+            .environment(GlassdeckEnvironment.connectionStore)
+            .environment(GlassdeckEnvironment.appSettings)
         window.rootViewController = UIHostingController(rootView: externalView)
         self.window = window
         window.makeKeyAndVisible()
+        GlassdeckEnvironment.sessionManager.setExternalDisplayConnected(true)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
+        GlassdeckEnvironment.sessionManager.setExternalDisplayConnected(false)
         window = nil
     }
 }
+#endif

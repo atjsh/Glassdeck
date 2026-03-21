@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import Foundation
-import SSHClient
+import GlassdeckCore
+import Observation
 
 /// Represents an active SSH session's state.
 ///
@@ -11,21 +13,40 @@ final class SSHSessionModel: Identifiable {
     let profile: ConnectionProfile
 
     // Connection lifecycle
-    nonisolated(unsafe) var status: SessionStatus = .disconnected
-    nonisolated(unsafe) var connectionError: String?
-    nonisolated(unsafe) var connectedAt: Date?
+    var status: SessionStatus = .disconnected
+    var connectionError: String?
+    var connectedAt: Date?
+    var reconnectState: ReconnectState = .idle
 
     // SSH internals (managed by SessionManager)
-    nonisolated(unsafe) var connectionID: UUID?
-    nonisolated(unsafe) var bridge: SSHPTYBridge?
+    var connectionID: UUID?
+    var bridge: SSHPTYBridge?
+    var surface: GhosttySurface?
+    var requestedManualDisconnect = false
+    var connectionPassword: String?
 
     // Terminal state
-    nonisolated(unsafe) var terminalTitle: String?
-    nonisolated(unsafe) var terminalSize: TerminalSize = TerminalSize(columns: 80, rows: 24)
-    nonisolated(unsafe) var scrollbackLines: Int = 0
+    var terminalTitle: String?
+    var terminalSize: TerminalSize = TerminalSize(columns: 80, rows: 24)
+    var terminalPixelSize: TerminalPixelSize?
+    var scrollbackLines: Int = 0
+    var terminalIsHealthy = true
+    var terminalRenderFailureReason: String?
+    var terminalVisibleTextSummary = ""
+    var terminalInteractionGeometry: RemoteTerminalGeometry = .zero
+    var terminalInteractionCapabilities = GhosttyVTInteractionCapabilities(
+        supportsMousePlacement: false,
+        supportsScrollReporting: false
+    )
 
     // Display routing
-    nonisolated(unsafe) var isOnExternalDisplay: Bool = false
+    var isOnExternalDisplay: Bool = false
+    var remoteControlMode: RemoteControlMode = .cursor
+    var remotePointerOverlayState: RemotePointerOverlayState = .hidden
+    var remoteControlUnsupportedMessage: String?
+    var remoteControlShowsLocalTerminal = false
+    var remoteControlKeyboardFocused = false
+    var remoteControlSoftwareKeyboardPresented = false
 
     var displayName: String {
         terminalTitle ?? "\(profile.username)@\(profile.host)"
@@ -40,9 +61,38 @@ final class SSHSessionModel: Identifiable {
         return false
     }
 
+    var isLiveForRemoteControl: Bool {
+        switch status {
+        case .connected, .reconnecting:
+            return true
+        default:
+            return false
+        }
+    }
+
     init(id: UUID = UUID(), profile: ConnectionProfile) {
         self.id = id
         self.profile = profile
+    }
+
+    enum ReconnectState: Sendable, Equatable {
+        case idle
+        case attempting(attempt: Int, maxAttempts: Int)
+        case reconnected
+        case gaveUp(attempts: Int)
+
+        var label: String? {
+            switch self {
+            case .idle:
+                nil
+            case .attempting(let attempt, let maxAttempts):
+                "Reconnecting (\(attempt)/\(maxAttempts))…"
+            case .reconnected:
+                "Reconnected"
+            case .gaveUp(let attempts):
+                "Reconnect failed after \(attempts) attempts"
+            }
+        }
     }
 
     enum SessionStatus: Sendable, Equatable {
@@ -74,3 +124,4 @@ final class SSHSessionModel: Identifiable {
         }
     }
 }
+#endif

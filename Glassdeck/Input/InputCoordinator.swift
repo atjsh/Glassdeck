@@ -1,8 +1,11 @@
+#if canImport(UIKit)
 import Foundation
+import Observation
 
 /// Coordinates input from all sources (keyboard, mouse/trackpad, on-screen)
 /// and dispatches to the active terminal session.
 @Observable
+@MainActor
 final class InputCoordinator {
     let keyboardHandler = KeyboardInputHandler()
     let pointerHandler = PointerInputHandler()
@@ -26,3 +29,4 @@ final class InputCoordinator {
         sendInput(Data(text.utf8))
     }
 }
+#endif

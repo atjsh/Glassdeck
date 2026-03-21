@@ -1,0 +1,2 @@
+GLASSDECK_NESTED_OK
+This nested file confirms directory traversal through the SFTP browser.

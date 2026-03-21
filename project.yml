@@ -1,0 +1,104 @@
+name: GlassdeckApp
+options:
+  createIntermediateGroups: true
+  defaultConfig: Debug
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    DEVELOPMENT_TEAM: D3GFBGHCB7
+    CODE_SIGN_STYLE: Automatic
+packages:
+  swift-nio-ssh:
+    url: https://github.com/apple/swift-nio-ssh.git
+    from: 0.12.0
+  swift-ssh-client:
+    path: Vendor/swift-ssh-client
+targets:
+  GlassdeckCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: GlassdeckCore
+    dependencies:
+      - framework: Frameworks/CGhosttyVT.xcframework
+      - package: swift-nio-ssh
+        product: NIOSSH
+      - package: swift-ssh-client
+        product: SSHClient
+    settings:
+      base:
+        PRODUCT_NAME: GlassdeckCore
+        PRODUCT_BUNDLE_IDENTIFIER: glassdeck.GlassdeckCore
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        BUILD_LIBRARY_FOR_DISTRIBUTION: NO
+  GlassdeckApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    scheme:
+      testTargets:
+        - GlassdeckAppTests
+        - GlassdeckAppUITests
+    sources:
+      - path: Glassdeck
+        excludes:
+          - App/Info.plist
+          - App/LaunchScreen.storyboard
+          - Resources/Assets.xcassets
+    resources:
+      - path: Glassdeck/Resources/Assets.xcassets
+      - path: Glassdeck/App/LaunchScreen.storyboard
+    dependencies:
+      - target: GlassdeckCore
+    settings:
+      base:
+        PRODUCT_NAME: Glassdeck
+        PRODUCT_BUNDLE_IDENTIFIER: com.atjsh.GlassdeckDev
+        ENABLE_DEBUG_DYLIB: NO
+        INFOPLIST_FILE: Glassdeck/App/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+        TARGETED_DEVICE_FAMILY: "1,2"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+  GlassdeckAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    hostApplication: GlassdeckApp
+    sources:
+      - path: Tests/GlassdeckCoreTests
+      - path: Tests/GlassdeckHostIntegrationTests
+      - path: Tests/GlassdeckAppTests
+    dependencies:
+      - target: GlassdeckCore
+      - target: GlassdeckApp
+    settings:
+      base:
+        PRODUCT_NAME: GlassdeckAppTests
+        PRODUCT_BUNDLE_IDENTIFIER: glassdeck.GlassdeckAppTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Glassdeck.app/Glassdeck"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+  GlassdeckAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Tests/GlassdeckAppUITests
+    dependencies:
+      - target: GlassdeckApp
+    settings:
+      base:
+        PRODUCT_NAME: GlassdeckAppUITests
+        PRODUCT_BUNDLE_IDENTIFIER: glassdeck.GlassdeckAppUITests
+        GENERATE_INFOPLIST_FILE: YES

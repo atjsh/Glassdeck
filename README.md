@@ -1,151 +1,99 @@
 # Glassdeck
 
-**A native iOS 26 SSH client for iPhone 15 Pro** — powered by GhosttyKit terminal emulation, USB-C external display support, hardware input, and on-device AI assistance.
+English | [한국어](README-ko.md)
 
-> Built for iOS 26 · iPhone 15 Pro · SwiftUI · Liquid Glass · Sideloading
+Glassdeck is an experimental SSH client for iOS 26 built with SwiftUI. The repository is aimed at an iPhone-first terminal experience with session management, external display routing, hardware input support, and hooks for on-device AI features.
 
----
+## Overview
 
-## Features
+- SwiftUI app structure for connection management and multi-session terminal workflows
+- SSH connection and session scaffolding built on `swift-nio-ssh` and `swift-ssh-client`
+- External display scene support, keyboard and pointer input handlers, and terminal configuration models
+- AI assistant UI and service placeholders intended for Foundation Models integration
 
-### 🖥️ Terminal
-- **GhosttyKit** — GPU-accelerated terminal rendering via Metal 4
-- Full **xterm-256color** support with scrollback buffer
-- 8 built-in color schemes (Solarized, Dracula, Tokyo Night, etc.)
-- Configurable fonts and cursor styles
-- Swappable backend: GhosttyKit ↔ SwiftTerm via `TerminalEngine` protocol
+## Highlights
 
-### 🔐 SSH
-- **Password & SSH key** authentication (Ed25519, P256/ECDSA)
-- Key generation, import, and Keychain-secure storage
-- OpenSSH PEM key parsing
-- Powered by **SwiftNIO SSH** + **swift-ssh-client** + **swift-crypto**
-- Actor-isolated connection manager with async/await
+### In the Repository Today
 
-### 📺 External Display (USB-C)
-- Dedicated full-screen terminal on external monitors
-- Route any session to the external display
-- Independent resolution scaling per display
-- Minimal glass-effect HUD overlay on external screen
+- Saved connection profiles with search, create/edit flows, and local persistence via `UserDefaults`
+- Session management for connect, open shell, disconnect, and multi-session routing
+- External display scene support with a dedicated routing picker and separate terminal view
+- Terminal configuration models for themes, font size, cursor style, and scrollback settings
+- SSH key storage helpers backed by Keychain, plus password and key-based auth models
+- Built-in help browser and AI assistant sheet wired into the main app shell
 
-### ⌨️ Hardware Input
-- **External keyboard**: Full `UIKeyCommand` mapping — Ctrl+a-z, arrows with modifiers, function keys, escape sequences
-- **Mouse/trackpad**: `UIPointerInteraction` with SGR mouse encoding for terminal apps (vim, tmux, etc.)
-- **Touch**: Software keyboard fallback with tap-to-click
+### Gated or Partial
 
-### 🤖 AI Assistant (Foundation Models)
-- **Explain errors** — select terminal output, get AI explanation with severity
-- **Suggest commands** — natural language → shell command with risk assessment
-- **Summarize output** — condense long command output to key points
-- Fully on-device via `SystemLanguageModel.default` — no cloud, fully private
-- `@Generable` structs for structured AI responses
+- `GhosttyKit` integration is scaffolded in `Glassdeck/Terminal/GhosttyTerminalView.swift`, but the framework is not vendored in this repo and the bridging code is still commented out
+- Foundation Models-backed AI is not active yet; `AIAssistant` currently returns placeholder responses until framework integration is completed
+- Some SSH and terminal behaviors are still TODO-backed, including PTY resize plumbing, host key verification wiring, and parts of the SSH key import/export experience
+- Persistence currently uses `UserDefaults`; code comments indicate a later move to SwiftData
 
-### 🪟 iOS 26 Liquid Glass Design
-- Floating `GlassEffectContainer` toolbar with tinted action buttons
-- Glass-effect connection status pill overlays
-- Enhanced `TabView` with minimize-on-scroll session tabs
-- Section-indexed connection list with alphabetical jump-bar
-- Native SwiftUI `WebView` for in-app SSH documentation
+## Current Status
 
----
+- Public work in progress, not a finished production client
+- Requires Xcode 26 and the iOS 26 SDK to work on the current codebase
+- The supported developer workflow is opening the package in Xcode and running it against an iOS target from there
+- `swift build` is not currently a supported default path; the package still hits a platform compatibility issue against its SSH dependencies when built from the CLI
+- Optional integrations such as GhosttyKit and Foundation Models require additional setup or unfinished implementation work
 
-## Architecture
+## Requirements
 
-```
-SwiftUI App (iOS 26 Liquid Glass)
-├── ConnectionListView — saved hosts with section indexes
-├── TerminalContainerView — GhosttySurface + floating glass toolbar
-├── SessionTabView — multi-session tabs (minimize-on-scroll)
-├── ExternalTerminalView — USB-C external monitor scene
-└── AIOverlayView — Foundation Models AI assistant sheet
+- macOS with Xcode 26 beta and the iOS 26 SDK
+- iPhone 15 Pro is the intended device target for the current product direction
+- Apple Intelligence-capable hardware if you want to finish and test the on-device AI path
+- Optional `GhosttyKit.xcframework` if you want to work on the Ghostty-backed terminal integration
 
-SSH Layer (Swift 6 actors)
-├── SSHConnectionManager — connection lifecycle (actor-isolated)
-├── SSHAuthenticator — password + key auth (NIOSSHPrivateKey, CryptoKit)
-├── SSHPTYBridge — SSH shell ↔ terminal I/O bridge (AsyncThrowingStream)
-├── SSHKeyManager — Keychain CRUD for SSH keys
-└── SSHSessionModel — per-session state tracking
+## Build and Run
 
-Terminal Engine
-├── GhosttyTerminalView — UIViewRepresentable wrapping CAMetalLayer surface
-├── GhosttyApp — ghostty_app_t lifecycle + runtime callbacks
-├── TerminalEngine protocol — swappable backend (GhosttyKit ↔ SwiftTerm)
-└── TerminalConfiguration — color schemes, fonts, cursor settings
-
-Input Handling
-├── KeyboardInputHandler — UIKeyCommand responder chain
-├── PointerInputHandler — UIPointerInteraction + SGR mouse encoding
-└── InputCoordinator — unified input dispatch to terminal
-```
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| UI | SwiftUI (iOS 26) + Liquid Glass |
-| Terminal | GhosttyKit (libghostty) + Metal 4 |
-| SSH | SwiftNIO SSH + swift-ssh-client |
-| Crypto | swift-crypto (Ed25519, P256) |
-| AI | Foundation Models framework |
-| Persistence | UserDefaults (SwiftData planned) |
-| Min iOS | 26 |
-| Min Device | iPhone 15 Pro (A17 Pro) |
-
----
-
-## Building
-
-Requires **Xcode 26** beta with iOS 26 SDK.
+Use Xcode as the primary workflow for this repository.
 
 ```bash
-# Clone
-git clone https://github.com/atjsh/Glassdeck.git
+git clone git@github-atjsh:atjsh/Glassdeck
 cd Glassdeck
-
-# Resolve SPM dependencies
 swift package resolve
-
-# Open in Xcode 26
 open Package.swift
-
-# Build for iPhone 15 Pro (arm64) — Cmd+R
 ```
 
-### GhosttyKit Setup (Optional)
-The terminal engine uses GhosttyKit for GPU-accelerated rendering. Without it, the app falls back gracefully (placeholder terminal view).
+Then:
 
-To build GhosttyKit.xcframework from [Ghostty](https://github.com/ghostty-org/ghostty):
-1. Install Zig toolchain
-2. `./macos/build.nu --scheme Ghostty-iOS --configuration Release --action build`
-3. Place `GhosttyKit.xcframework` in `Frameworks/`
-4. Uncomment `import GhosttyKit` in `GhosttyTerminalView.swift`
+1. Open the package in Xcode 26.
+2. Select an iOS 26 target device.
+3. Build and run from Xcode.
 
-### SPM Dependencies
-- [swift-nio-ssh](https://github.com/apple/swift-nio-ssh) — SSH transport
-- [swift-ssh-client](https://github.com/gaetanzanella/swift-ssh-client) — high-level SSH API
-- [swift-crypto](https://github.com/apple/swift-crypto) — Ed25519/P256 key operations
+Do not treat `swift build` as the primary verification step until the package platform metadata is corrected for CLI builds.
 
----
+### Optional GhosttyKit Setup
 
-## Project Structure
+If you want to continue the Ghostty-backed terminal path:
 
-```
+1. Build `GhosttyKit.xcframework` from [Ghostty](https://github.com/ghostty-org/ghostty) using `./macos/build.nu --scheme Ghostty-iOS --configuration Release --action build`.
+2. Place the framework in `Frameworks/`.
+3. Uncomment `import GhosttyKit` and the related bridge code in `Glassdeck/Terminal/GhosttyTerminalView.swift`.
+4. Verify the terminal surface lifecycle and rendering paths against the vendored framework.
+
+## Architecture Snapshot
+
+```text
 Glassdeck/
-├── App/          — @main entry, AppDelegate, Info.plist
-├── Scenes/       — Main + external display scene delegates
-├── Views/        — SwiftUI views (connections, terminal, settings, AI)
-├── Terminal/     — GhosttyKit integration, terminal protocol
-├── SSH/          — Connection manager, auth, PTY bridge, key manager
-├── AI/           — Foundation Models assistant, overlay UI
-├── Input/        — Keyboard, mouse/trackpad handlers
-├── Models/       — ConnectionProfile, AppSettings, SessionManager
-└── Resources/    — Assets, launch screen
+├── App/        App entry point, app delegate, Info.plist
+├── Scenes/     Main and external display scene delegates
+├── Views/      SwiftUI flows for connections, terminal UI, settings, and help
+├── Models/     Connection profiles, app settings, and session state
+├── SSH/        Connection lifecycle, auth, PTY bridge, and key storage
+├── Terminal/   Terminal surface wrappers, configuration, and protocols
+├── Input/      Keyboard and pointer input handling
+└── AI/         AI assistant actor and overlay UI scaffolding
 ```
 
----
+## Roadmap / Known Gaps
+
+- Finish the GhosttyKit rendering bridge and remove placeholder terminal behavior
+- Replace AI placeholder responses with real Foundation Models availability checks and generation flows
+- Complete SSH ergonomics such as host key verification wiring, terminal resize requests, and richer key import/export UX
+- Revisit package metadata so CLI builds can become a documented and supported path
+- Evaluate the planned move from `UserDefaults` persistence to SwiftData
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

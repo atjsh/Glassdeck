@@ -4,8 +4,8 @@ import Foundation
 
 @MainActor
 enum GlassdeckEnvironment {
-    static let sessionManager = SessionManager()
-    static let connectionStore = ConnectionStore()
     static let appSettings = AppSettings()
+    static let sessionManager = SessionManager(appSettings: appSettings)
+    static let connectionStore = ConnectionStore()
 }
 #endif

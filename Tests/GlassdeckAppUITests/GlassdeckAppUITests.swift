@@ -52,6 +52,29 @@ final class GlassdeckAppUITests: XCTestCase {
         )
     }
 
+    func testSessionScenarioHonorsSeededLightTerminalTheme() {
+        let app = launchApp(
+            scenario: "sessions",
+            openActiveSession: true,
+            additionalEnvironment: [
+                "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME": "Default Light"
+            ]
+        )
+
+        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: 3))
+        waitForTerminalRenderSummary(
+            containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
+            in: app
+        )
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        assertScreenshotHasAverageBrightness(
+            of: terminalSurface,
+            named: "session-terminal-light-theme",
+            minimumAverageBrightness: 150
+        )
+    }
+
     func testAnimationScenarioAdvancesFramesAndRendersTerminal() {
         let app = launchApp(
             scenario: "animation",

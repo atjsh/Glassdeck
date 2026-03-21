@@ -32,6 +32,11 @@ final class SessionManager {
 
     private let connectionManager = SSHConnectionManager()
     private let reconnectManager = SSHReconnectManager()
+    @ObservationIgnored private let appSettings: AppSettings
+
+    init(appSettings: AppSettings = AppSettings()) {
+        self.appSettings = appSettings
+    }
 
     var activeSession: SSHSessionModel? {
         sessions.first { $0.id == activeSessionID }
@@ -420,8 +425,9 @@ final class SessionManager {
         }
 
         do {
+            let resolvedConfiguration = configuration ?? appSettings.terminalConfig
             let surface = try GhosttySurface(
-                configuration: configuration ?? TerminalConfiguration(),
+                configuration: resolvedConfiguration,
                 metricsPreset: metricsPreset
             )
             session.surface = surface

@@ -40,6 +40,7 @@ extension XCTestCase {
         let effectiveColorCount: Int
         let chromaticSampleCount: Int
         let opaqueSampleCount: Int
+        let averageBrightness: Double
     }
 
     private struct ScreenshotPixelBuffer {
@@ -179,6 +180,39 @@ extension XCTestCase {
 
         XCTFail(
             "Expected '\(name)' to contain visible chromatic pixels; sampled \(analysis.chromaticSampleCount) chromatic pixels from \(analysis.opaqueSampleCount) opaque samples.",
+            file: file,
+            line: line
+        )
+    }
+
+    func assertScreenshotHasAverageBrightness(
+        of element: XCUIElement,
+        named name: String,
+        minimumAverageBrightness: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let screenshot = captureElementScreenshot(
+            of: element,
+            named: name,
+            file: file,
+            line: line
+        )
+
+        guard let buffer = Self.decodeScreenshotPixelBuffer(screenshot) else {
+            XCTFail(
+                "Failed to decode screenshot for '\(name)'.",
+                file: file,
+                line: line
+            )
+            return
+        }
+
+        let analysis = Self.analyze(buffer, minimumChannelDelta: 18)
+        XCTAssertGreaterThanOrEqual(
+            analysis.averageBrightness,
+            minimumAverageBrightness,
+            "Expected '\(name)' to be visibly light; sampled average brightness \(analysis.averageBrightness).",
             file: file,
             line: line
         )
@@ -440,6 +474,7 @@ extension XCTestCase {
         var sampledColors = Set<UInt32>()
         var chromaticSampleCount = 0
         var opaqueSampleCount = 0
+        var totalBrightness = 0.0
 
         for y in stride(from: 0, to: buffer.height, by: step) {
             for x in stride(from: 0, to: buffer.width, by: step) {
@@ -454,6 +489,7 @@ extension XCTestCase {
 
                 sampledColors.insert(quantizedColor)
                 opaqueSampleCount += 1
+                totalBrightness += (0.2126 * Double(red)) + (0.7152 * Double(green)) + (0.0722 * Double(blue))
 
                 let channelDelta = Int(max(red, green, blue) - min(red, green, blue))
                 if channelDelta >= minimumChannelDelta {
@@ -465,7 +501,8 @@ extension XCTestCase {
         return ScreenshotAnalysis(
             effectiveColorCount: sampledColors.count,
             chromaticSampleCount: chromaticSampleCount,
-            opaqueSampleCount: opaqueSampleCount
+            opaqueSampleCount: opaqueSampleCount,
+            averageBrightness: opaqueSampleCount > 0 ? totalBrightness / Double(opaqueSampleCount) : 0
         )
     }
 

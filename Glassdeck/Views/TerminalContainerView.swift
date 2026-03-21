@@ -66,6 +66,7 @@ private struct SessionDetailContent: View {
     @Binding var activeSheet: SessionPresentationSheet?
 
     @Environment(SessionManager.self) private var sessionManager
+    @Environment(AppSettings.self) private var appSettings
 
     private var exposesRenderSummaryForUITests: Bool {
         UITestLaunchSupport.exposesTerminalRenderSummary
@@ -73,6 +74,15 @@ private struct SessionDetailContent: View {
 
     private var showingRemoteTrackpad: Bool {
         sessionManager.shouldShowRemoteTrackpad(for: session)
+    }
+
+    private var terminalBackgroundColor: Color {
+        let theme = (session.surface?.terminalConfiguration ?? appSettings.terminalConfig).colorScheme.theme
+        return Color(
+            red: Double(theme.background.r) / 255,
+            green: Double(theme.background.g) / 255,
+            blue: Double(theme.background.b) / 255
+        )
     }
 
     private var terminalRenderSummaryValue: String {
@@ -108,7 +118,7 @@ private struct SessionDetailContent: View {
                 .padding(24)
             }
         }
-        .background(showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : Color.black)
+        .background(showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : terminalBackgroundColor)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarBackground(showingRemoteTrackpad ? .regularMaterial : .ultraThinMaterial, for: .navigationBar)
@@ -397,14 +407,56 @@ struct DisplayRoutingPicker: View {
 
 struct TerminalSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var config = TerminalConfiguration()
+    @Environment(AppSettings.self) private var appSettings
     @State private var showHelpBrowser = false
+
+    private var colorSchemeBinding: Binding<TerminalColorScheme> {
+        Binding(
+            get: { appSettings.terminalConfig.colorScheme },
+            set: { appSettings.terminalConfig.colorScheme = $0 }
+        )
+    }
+
+    private var fontSizeBinding: Binding<Double> {
+        Binding(
+            get: { appSettings.terminalConfig.fontSize },
+            set: { appSettings.terminalConfig.fontSize = $0 }
+        )
+    }
+
+    private var cursorStyleBinding: Binding<TerminalConfiguration.CursorStyle> {
+        Binding(
+            get: { appSettings.terminalConfig.cursorStyle },
+            set: { appSettings.terminalConfig.cursorStyle = $0 }
+        )
+    }
+
+    private var cursorBlinkBinding: Binding<Bool> {
+        Binding(
+            get: { appSettings.terminalConfig.cursorBlink },
+            set: { appSettings.terminalConfig.cursorBlink = $0 }
+        )
+    }
+
+    private var scrollbackLinesBinding: Binding<Int> {
+        Binding(
+            get: { appSettings.terminalConfig.scrollbackLines },
+            set: { appSettings.terminalConfig.scrollbackLines = $0 }
+        )
+    }
+
+    private var bellSoundBinding: Binding<Bool> {
+        Binding(
+            get: { appSettings.terminalConfig.bellSound },
+            set: { appSettings.terminalConfig.bellSound = $0 }
+        )
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Appearance") {
-                    Picker("Color Scheme", selection: $config.colorScheme) {
+                Section {
+                    Picker("Color Scheme", selection: colorSchemeBinding) {
                         ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
                             HStack {
                                 Circle()
@@ -423,30 +475,43 @@ struct TerminalSettingsView: View {
                     HStack {
                         Text("Font Size")
                         Spacer()
-                        Text("\(Int(config.fontSize))pt")
+                        Text("\(Int(appSettings.terminalConfig.fontSize))pt")
                             .foregroundStyle(.secondary)
-                        Stepper("", value: $config.fontSize, in: 8...32, step: 1)
+                        Stepper("", value: fontSizeBinding, in: 8...32, step: 1)
                             .labelsHidden()
                     }
 
-                    Picker("Cursor", selection: $config.cursorStyle) {
+                    Picker("Cursor", selection: cursorStyleBinding) {
                         ForEach(TerminalConfiguration.CursorStyle.allCases, id: \.self) { style in
                             Text(style.rawValue.capitalized).tag(style)
                         }
                     }
 
-                    Toggle("Cursor Blink", isOn: $config.cursorBlink)
+                    Toggle("Cursor Blink", isOn: cursorBlinkBinding)
+                } header: {
+                    Text("Appearance")
                 }
 
-                Section("Behavior") {
+                Section {
                     HStack {
                         Text("Scrollback Lines")
                         Spacer()
-                        Text("\(config.scrollbackLines)")
+                        Text("\(appSettings.terminalConfig.scrollbackLines)")
                             .foregroundStyle(.secondary)
+                        Stepper(
+                            "",
+                            value: scrollbackLinesBinding,
+                            in: 1_000...100_000,
+                            step: 1_000
+                        )
+                        .labelsHidden()
                     }
 
-                    Toggle("Bell Sound", isOn: $config.bellSound)
+                    Toggle("Bell Sound", isOn: bellSoundBinding)
+                } header: {
+                    Text("Behavior")
+                } footer: {
+                    Text("Changes apply to new and reconnected sessions.")
                 }
 
                 Section {

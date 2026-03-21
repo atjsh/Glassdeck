@@ -16,6 +16,7 @@ enum UITestLaunchSupport {
     private static let previewTerminalMarker = "GLASSDECK_KEY_OK"
     private static let remotePreviewTerminalMarker = "GLASSDECK_PASSWORD_OK"
     private static let animationFramesEnvironmentKey = "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
+    private static let terminalColorSchemeEnvironmentKey = "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME"
     private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
 
     static var currentScenario: Scenario? {
@@ -50,7 +51,9 @@ enum UITestLaunchSupport {
 
         resetPersistentTestState()
         seedClipboardIfNeeded()
+        appSettings.resetTerminalConfig()
         appSettings.remoteTrackpadLastMode = .cursor
+        applyTerminalSettingsOverrides(appSettings)
 
         switch scenario {
         case .empty:
@@ -354,6 +357,17 @@ enum UITestLaunchSupport {
         }
 
         UIPasteboard.general.string = string
+    }
+
+    private static func applyTerminalSettingsOverrides(_ appSettings: AppSettings) {
+        guard
+            let rawValue = ProcessInfo.processInfo.environment[terminalColorSchemeEnvironmentKey],
+            let scheme = TerminalColorScheme(rawValue: rawValue)
+        else {
+            return
+        }
+
+        appSettings.terminalConfig.colorScheme = scheme
     }
 }
 #endif

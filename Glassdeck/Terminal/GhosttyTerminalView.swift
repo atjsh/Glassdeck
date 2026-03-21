@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import AudioToolbox
 import CoreImage
 import Foundation
 import GlassdeckCore
@@ -25,7 +26,12 @@ struct GhosttySurfaceMetricsPreset: Equatable {
     let accentForegroundColor: GhosttyVTColor?
 }
 
+@MainActor
 final class GhosttySurface: UIView, UIKeyInput {
+    private static let cursorBlinkInterval: TimeInterval = 0.6
+    private static let bellSoundID: SystemSoundID = 1103
+
+    private let configuration: TerminalConfiguration
     private let engine: GhosttyVTTerminalEngine
     private let renderer: GhosttyMetalRenderer
     private let softwareMirrorView = UIImageView()
@@ -42,6 +48,8 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var latestProjectionForState: GhosttyVTRenderProjection?
     private var currentAnimationProgress: GhosttyHomeAnimationProgress?
     private var currentAnimationAccentColumnsByRow: [Int: IndexSet]?
+    private var cursorBlinkTimer: Timer?
+    private var cursorBlinkPhaseVisible = true
     private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,
         supportsScrollReporting: false
@@ -54,6 +62,9 @@ final class GhosttySurface: UIView, UIKeyInput {
     var onStateChange: ((GhosttySurfaceState) -> Void)?
     var hasSoftwareMirrorImage: Bool {
         softwareMirrorView.image != nil
+    }
+    var terminalConfiguration: TerminalConfiguration {
+        configuration
     }
 
     override class var layerClass: AnyClass {
@@ -133,6 +144,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         configuration: TerminalConfiguration = TerminalConfiguration(),
         metricsPreset: GhosttySurfaceMetricsPreset? = nil
     ) throws {
+        self.configuration = configuration
         self.engine = try GhosttyVTTerminalEngine(
             options: GhosttyVTTerminalOptions(
                 columns: 80,
@@ -169,6 +181,9 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func writeToTerminal(_ data: Data) {
+        if configuration.bellSound, data.contains(0x07) {
+            AudioServicesPlaySystemSound(Self.bellSoundID)
+        }
         engine.write(data)
         render(clearDirty: true)
     }
@@ -196,6 +211,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         if let data = try? engine.encodeFocus(focused), !data.isEmpty {
             outputHandler?(data)
         }
+        updateCursorBlinkTimer()
         render(clearDirty: true)
         publishState()
     }
@@ -226,6 +242,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         if window != nil {
             updateLayout()
         }
+        updateCursorBlinkTimer()
     }
 
     func insertText(_ text: String) {
@@ -286,7 +303,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     private func setupView() {
-        backgroundColor = .black
+        backgroundColor = Self.color(for: configuration.colorScheme.theme.background)
         clipsToBounds = true
         isAccessibilityElement = true
         accessibilityIdentifier = "ghostty-terminal-surface"
@@ -412,6 +429,7 @@ final class GhosttySurface: UIView, UIKeyInput {
                 bounds: bounds,
                 metrics: currentMetrics,
                 focused: terminalIsFocused,
+                cursorBlinkPhaseVisible: cursorBlinkPhaseVisible,
                 accentColumnsByRow: currentAnimationAccentColumnsByRow
             )
             if Self.usesSoftwareMirrorPresentation {
@@ -419,14 +437,48 @@ final class GhosttySurface: UIView, UIKeyInput {
             }
             isHealthy = true
             currentRenderFailureReason = nil
+            updateCursorBlinkTimer()
         } catch {
             isHealthy = false
             if Self.usesSoftwareMirrorPresentation {
                 softwareMirrorView.image = nil
             }
             currentRenderFailureReason = Self.renderFailureReason(from: error)
+            updateCursorBlinkTimer()
         }
         publishState()
+    }
+
+    private func updateCursorBlinkTimer() {
+        let shouldBlink =
+            configuration.cursorBlink
+            && terminalIsFocused
+            && window != nil
+            && latestProjectionForState?.cursor.visible == true
+
+        guard shouldBlink else {
+            cursorBlinkTimer?.invalidate()
+            cursorBlinkTimer = nil
+            cursorBlinkPhaseVisible = true
+            return
+        }
+
+        guard cursorBlinkTimer == nil else { return }
+        cursorBlinkPhaseVisible = true
+        let timer = Timer(
+            timeInterval: Self.cursorBlinkInterval,
+            target: self,
+            selector: #selector(handleCursorBlinkTimer(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+        cursorBlinkTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    @objc private func handleCursorBlinkTimer(_ timer: Timer) {
+        cursorBlinkPhaseVisible.toggle()
+        render(clearDirty: false)
     }
 
     private func publishState() {
@@ -467,6 +519,15 @@ final class GhosttySurface: UIView, UIKeyInput {
             return description
         }
         return String(describing: error)
+    }
+
+    private static func color(for color: GhosttyVTColor) -> UIColor {
+        UIColor(
+            red: CGFloat(color.r) / 255,
+            green: CGFloat(color.g) / 255,
+            blue: CGFloat(color.b) / 255,
+            alpha: 1
+        )
     }
 
     func sendRemoteMouse(
@@ -888,6 +949,7 @@ private final class GhosttyMetalRenderer {
         bounds: CGRect,
         metrics: Metrics,
         focused: Bool,
+        cursorBlinkPhaseVisible: Bool,
         accentColumnsByRow: [Int: IndexSet]?
     ) {
         guard bounds.width > 0, bounds.height > 0 else { return }
@@ -902,6 +964,7 @@ private final class GhosttyMetalRenderer {
         format.opaque = true
         let imageRenderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
 
+        let projection = themedProjection(from: projection)
         let shouldReuseFrame = projection.dirtyState == .partial && cachedFrame != nil
         let dirtyRows = Set(projection.dirtyRows)
 
@@ -935,7 +998,8 @@ private final class GhosttyMetalRenderer {
             drawCursor(
                 projection: projection,
                 metrics: metrics,
-                focused: focused
+                focused: focused,
+                cursorBlinkPhaseVisible: cursorBlinkPhaseVisible
             )
         }
 
@@ -1197,9 +1261,11 @@ private final class GhosttyMetalRenderer {
     private func drawCursor(
         projection: GhosttyVTRenderProjection,
         metrics: Metrics,
-        focused: Bool
+        focused: Bool,
+        cursorBlinkPhaseVisible: Bool
     ) {
         guard projection.cursor.visible else { return }
+        guard !configuration.cursorBlink || cursorBlinkPhaseVisible else { return }
         guard let cursorX = projection.cursor.x, let cursorY = projection.cursor.y else { return }
 
         let rect = cellRect(
@@ -1212,7 +1278,7 @@ private final class GhosttyMetalRenderer {
         color.withAlphaComponent(focused ? 0.85 : 0.45).setFill()
         color.setStroke()
 
-        switch projection.cursor.visualStyle {
+        switch cursorVisualStyle {
         case .bar:
             UIBezierPath(rect: CGRect(x: rect.minX, y: rect.minY, width: 2, height: rect.height)).fill()
         case .underline:
@@ -1266,6 +1332,27 @@ private final class GhosttyMetalRenderer {
         }
 
         return (foreground, background)
+    }
+
+    private var cursorVisualStyle: GhosttyVTCursorVisualStyle {
+        switch configuration.cursorStyle {
+        case .block:
+            return .block
+        case .underline:
+            return .underline
+        case .bar:
+            return .bar
+        }
+    }
+
+    private func themedProjection(from projection: GhosttyVTRenderProjection) -> GhosttyVTRenderProjection {
+        let theme = configuration.colorScheme.theme
+        var projection = projection
+        projection.backgroundColor = theme.background
+        projection.foregroundColor = theme.foreground
+        projection.cursorColor = theme.cursor
+        projection.palette = theme.palette
+        return projection
     }
 
     private func color(for color: GhosttyVTColor) -> UIColor {

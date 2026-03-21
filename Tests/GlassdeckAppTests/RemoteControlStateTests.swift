@@ -130,6 +130,103 @@ final class RemoteControlStateTests: XCTestCase {
         XCTAssertEqual(session.scrollbackLines, 12)
     }
 
+    func testSyntheticSurfaceUsesAppTerminalConfigurationByDefault() {
+        let appSettings = AppSettings()
+        appSettings.terminalConfig = TerminalConfiguration(
+            fontSize: 19,
+            colorScheme: .defaultLight,
+            scrollbackLines: 24_000,
+            cursorStyle: .bar,
+            cursorBlink: false,
+            bellSound: false
+        )
+
+        let sessionManager = SessionManager(appSettings: appSettings)
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+
+        let didSeedSurface = sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "tester@example.com",
+                transcript: "",
+                terminalSize: TerminalSize(columns: 90, rows: 24)
+            )
+        )
+
+        XCTAssertTrue(didSeedSurface)
+        XCTAssertEqual(session.surface?.terminalConfiguration.fontSize, 19)
+        XCTAssertEqual(session.surface?.terminalConfiguration.colorScheme, .defaultLight)
+        XCTAssertEqual(session.surface?.terminalConfiguration.scrollbackLines, 24_000)
+        XCTAssertEqual(session.surface?.terminalConfiguration.cursorStyle, .bar)
+        XCTAssertEqual(session.surface?.terminalConfiguration.cursorBlink, false)
+        XCTAssertEqual(session.surface?.terminalConfiguration.bellSound, false)
+    }
+
+    func testSyntheticSurfacePrefersExplicitSeedTerminalConfiguration() {
+        let appSettings = AppSettings()
+        appSettings.terminalConfig = TerminalConfiguration(colorScheme: .defaultLight)
+
+        let sessionManager = SessionManager(appSettings: appSettings)
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+
+        let seedConfiguration = TerminalConfiguration(
+            fontSize: 12,
+            colorScheme: .tokyoNight,
+            scrollbackLines: 6_000,
+            cursorStyle: .underline,
+            cursorBlink: true,
+            bellSound: true
+        )
+
+        let didSeedSurface = sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "preview",
+                transcript: "",
+                terminalConfiguration: seedConfiguration
+            )
+        )
+
+        XCTAssertTrue(didSeedSurface)
+        XCTAssertEqual(session.surface?.terminalConfiguration, seedConfiguration)
+    }
+
+    func testRecreatedSyntheticSurfaceUsesUpdatedAppTerminalConfiguration() {
+        let appSettings = AppSettings()
+        appSettings.terminalConfig = TerminalConfiguration(colorScheme: .defaultDark)
+
+        let sessionManager = SessionManager(appSettings: appSettings)
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+
+        XCTAssertTrue(sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "session",
+                transcript: ""
+            )
+        ))
+        let firstSurface = session.surface
+        XCTAssertEqual(firstSurface?.terminalConfiguration.colorScheme, .defaultDark)
+
+        session.surface = nil
+        appSettings.terminalConfig = TerminalConfiguration(colorScheme: .defaultLight)
+
+        XCTAssertTrue(sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "session",
+                transcript: ""
+            )
+        ))
+
+        XCTAssertNotNil(session.surface)
+        XCTAssertFalse(firstSurface === session.surface)
+        XCTAssertEqual(session.surface?.terminalConfiguration.colorScheme, .defaultLight)
+    }
+
     private func configuredSession(
         supportsMousePlacement: Bool = true
     ) -> SSHSessionModel {

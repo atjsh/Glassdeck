@@ -54,6 +54,7 @@ struct TerminalSurfaceView: View {
                         surface: surface,
                         isFocused: !exposesUITestInputProxy
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .ignoresSafeArea()
                 }
 
@@ -190,14 +191,51 @@ struct GhosttyTerminalViewWrapper: UIViewRepresentable {
     let surface: GhosttySurface
     let isFocused: Bool
 
-    func makeUIView(context: Context) -> GhosttySurface {
-        surface.setFocused(isFocused)
-        return surface
+    func makeUIView(context: Context) -> GhosttyTerminalHostingView {
+        let hostingView = GhosttyTerminalHostingView()
+        hostingView.update(surface: surface, isFocused: isFocused)
+        return hostingView
     }
 
-    func updateUIView(_ uiView: GhosttySurface, context: Context) {
-        uiView.setFocused(isFocused)
+    func updateUIView(_ uiView: GhosttyTerminalHostingView, context: Context) {
+        uiView.update(surface: surface, isFocused: isFocused)
     }
+}
+
+final class GhosttyTerminalHostingView: UIView {
+    private weak var hostedSurface: GhosttySurface?
+
+    func update(surface: GhosttySurface, isFocused: Bool) {
+        backgroundColor = terminalThemeColor(for: surface.terminalConfiguration.colorScheme)
+        if hostedSurface !== surface {
+            hostedSurface?.removeFromSuperview()
+            hostedSurface = surface
+
+            surface.removeFromSuperview()
+            surface.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(surface)
+            NSLayoutConstraint.activate([
+                surface.leadingAnchor.constraint(equalTo: leadingAnchor),
+                surface.trailingAnchor.constraint(equalTo: trailingAnchor),
+                surface.topAnchor.constraint(equalTo: topAnchor),
+                surface.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+
+        surface.setFocused(isFocused)
+        surface.setNeedsLayout()
+        surface.layoutIfNeeded()
+    }
+}
+
+private func terminalThemeColor(for colorScheme: TerminalColorScheme) -> UIColor {
+    let background = colorScheme.theme.background
+    return UIColor(
+        red: CGFloat(background.r) / 255,
+        green: CGFloat(background.g) / 255,
+        blue: CGFloat(background.b) / 255,
+        alpha: 1
+    )
 }
 
 struct GhosttyPositionedTerminalView: View {

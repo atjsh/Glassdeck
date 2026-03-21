@@ -13,6 +13,8 @@ final class SessionManager {
     struct SyntheticTerminalSeed {
         let title: String
         let transcript: String
+        var terminalConfiguration: TerminalConfiguration?
+        var terminalMetricsPreset: GhosttySurfaceMetricsPreset?
         var terminalSize: TerminalSize?
         var terminalPixelSize: TerminalPixelSize?
         var scrollbackLines: Int?
@@ -273,7 +275,16 @@ final class SessionManager {
         to session: SSHSessionModel,
         seed: SyntheticTerminalSeed
     ) -> Bool {
-        guard prepareSurface(for: session), let surface = session.surface else { return false }
+        guard
+            prepareSurface(
+                for: session,
+                configuration: seed.terminalConfiguration,
+                metricsPreset: seed.terminalMetricsPreset
+            ),
+            let surface = session.surface
+        else {
+            return false
+        }
 
         applySyntheticPreviewLayout(to: surface, seed: seed)
         surface.title = seed.title
@@ -383,11 +394,10 @@ final class SessionManager {
                 height: max(CGFloat(pixelSize.height) / scale, 1)
             )
         } else if let terminalSize = seed.terminalSize {
-            bounds = CGRect(
-                x: 0,
-                y: 0,
-                width: max(CGFloat(terminalSize.columns * 10), 1),
-                height: max(CGFloat(terminalSize.rows * 20), 1)
+            bounds = GhosttySurface.previewBounds(
+                for: terminalSize,
+                configuration: seed.terminalConfiguration ?? TerminalConfiguration(),
+                metricsPreset: seed.terminalMetricsPreset
             )
         } else {
             bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
@@ -398,7 +408,11 @@ final class SessionManager {
         surface.layoutIfNeeded()
     }
 
-    private func prepareSurface(for session: SSHSessionModel) -> Bool {
+    private func prepareSurface(
+        for session: SSHSessionModel,
+        configuration: TerminalConfiguration? = nil,
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) -> Bool {
         if let surface = session.surface {
             bind(surface: surface, to: session)
             applySurfaceState(surface.stateSnapshot, to: session)
@@ -406,7 +420,10 @@ final class SessionManager {
         }
 
         do {
-            let surface = try GhosttySurface()
+            let surface = try GhosttySurface(
+                configuration: configuration ?? TerminalConfiguration(),
+                metricsPreset: metricsPreset
+            )
             session.surface = surface
             bind(surface: surface, to: session)
             applySurfaceState(surface.stateSnapshot, to: session)
@@ -427,6 +444,7 @@ final class SessionManager {
             session?.terminalIsHealthy = state.isHealthy
             session?.terminalRenderFailureReason = state.renderFailureReason
             session?.terminalVisibleTextSummary = state.visibleTextSummary
+            session?.terminalAnimationProgress = state.animationProgress
             session?.terminalInteractionGeometry = state.interactionGeometry
             session?.terminalInteractionCapabilities = state.interactionCapabilities
         }
@@ -440,6 +458,7 @@ final class SessionManager {
         session.terminalIsHealthy = state.isHealthy
         session.terminalRenderFailureReason = state.renderFailureReason
         session.terminalVisibleTextSummary = state.visibleTextSummary
+        session.terminalAnimationProgress = state.animationProgress
         session.terminalInteractionGeometry = state.interactionGeometry
         session.terminalInteractionCapabilities = state.interactionCapabilities
     }

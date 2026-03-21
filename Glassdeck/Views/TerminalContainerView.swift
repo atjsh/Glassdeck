@@ -85,6 +85,10 @@ private struct SessionDetailContent: View {
         return session.terminalVisibleTextSummary
     }
 
+    private var terminalAnimationProgressValue: String? {
+        session.terminalAnimationProgress?.accessibilityValue
+    }
+
     var body: some View {
         ZStack {
             sessionWorkspace
@@ -204,15 +208,28 @@ private struct SessionDetailContent: View {
         }
         .accessibilityElement(children: .contain)
         .overlay(alignment: .bottomTrailing) {
-            if exposesRenderSummaryForUITests {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: 1, height: 1)
-                    .clipped()
-                    .allowsHitTesting(false)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityIdentifier("terminal-render-summary")
-                    .accessibilityValue(terminalRenderSummaryValue)
+            ZStack {
+                if exposesRenderSummaryForUITests {
+                    Rectangle()
+                        .fill(.clear)
+                        .frame(width: 1, height: 1)
+                        .clipped()
+                        .allowsHitTesting(false)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityIdentifier("terminal-render-summary")
+                        .accessibilityValue(terminalRenderSummaryValue)
+                }
+
+                if let terminalAnimationProgressValue {
+                    Rectangle()
+                        .fill(.clear)
+                        .frame(width: 1, height: 1)
+                        .clipped()
+                        .allowsHitTesting(false)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityIdentifier("terminal-animation-progress")
+                        .accessibilityValue(terminalAnimationProgressValue)
+                }
             }
         }
     }
@@ -237,7 +254,6 @@ private struct SessionDetailContent: View {
                         .padding(.top, 12)
                 }
             }
-            .accessibilityIdentifier("terminal-surface-view")
         }
     }
 

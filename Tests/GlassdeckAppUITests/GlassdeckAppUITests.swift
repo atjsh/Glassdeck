@@ -36,6 +36,41 @@ final class GlassdeckAppUITests: XCTestCase {
         )
     }
 
+    func testSessionScenarioTerminalScreenshotIsNotBlank() {
+        let app = launchApp(scenario: "sessions", openActiveSession: true)
+
+        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: 3))
+        waitForTerminalRenderSummary(
+            containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
+            in: app
+        )
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        assertScreenshotIsNotBlank(
+            of: terminalSurface,
+            named: "session-terminal-surface"
+        )
+    }
+
+    func testAnimationScenarioAdvancesFramesAndRendersTerminal() {
+        let app = launchApp(
+            scenario: "animation",
+            openActiveSession: true,
+            additionalEnvironment: [
+                "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH": homeAnimationFramesPath()
+            ]
+        )
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        XCTAssertTrue(terminalSurface.waitForExistence(timeout: 5))
+        let firstFrame = waitForAnimationProgress(pastFrame: 16, in: app)
+        let secondFrame = waitForAnimationProgress(pastFrame: firstFrame + 10, in: app)
+        XCTAssertGreaterThan(secondFrame, firstFrame)
+
+        let thirdFrame = waitForAnimationProgress(pastFrame: secondFrame + 10, in: app)
+        XCTAssertGreaterThan(thirdFrame, secondFrame)
+    }
+
     func testRemoteScenarioAutoEntersTrackpadView() {
         let app = launchApp(scenario: "remote", openActiveSession: true)
 
@@ -71,7 +106,8 @@ final class GlassdeckAppUITests: XCTestCase {
     private func launchApp(
         scenario: String,
         openActiveSession: Bool = false,
-        additionalArguments: [String] = []
+        additionalArguments: [String] = [],
+        additionalEnvironment: [String: String] = [:]
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -84,6 +120,7 @@ final class GlassdeckAppUITests: XCTestCase {
             app.launchArguments.append("-uiTestOpenActiveSession")
         }
         app.launchArguments.append(contentsOf: additionalArguments)
+        app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
         app.launch()
         return app
     }

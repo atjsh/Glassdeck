@@ -14,8 +14,15 @@ struct GhosttySurfaceState: Sendable, Equatable {
     let isHealthy: Bool
     let renderFailureReason: String?
     let visibleTextSummary: String
+    let animationProgress: GhosttyHomeAnimationProgress?
     let interactionGeometry: RemoteTerminalGeometry
     let interactionCapabilities: GhosttyVTInteractionCapabilities
+}
+
+struct GhosttySurfaceMetricsPreset: Equatable {
+    let cellSize: CGSize
+    let padding: UIEdgeInsets
+    let accentForegroundColor: GhosttyVTColor?
 }
 
 final class GhosttySurface: UIView, UIKeyInput {
@@ -32,6 +39,9 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var currentScrollbackLines = 0
     private var currentRenderFailureReason: String?
     private var currentVisibleTextSummary = ""
+    private var latestProjectionForState: GhosttyVTRenderProjection?
+    private var currentAnimationProgress: GhosttyHomeAnimationProgress?
+    private var currentAnimationAccentColumnsByRow: [Int: IndexSet]?
     private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,
         supportsScrollReporting: false
@@ -42,6 +52,9 @@ final class GhosttySurface: UIView, UIKeyInput {
     var cellSize: CGSize = .zero
     var onResize: ((Int, Int, TerminalPixelSize) -> Void)?
     var onStateChange: ((GhosttySurfaceState) -> Void)?
+    var hasSoftwareMirrorImage: Bool {
+        softwareMirrorView.image != nil
+    }
 
     override class var layerClass: AnyClass {
         CAMetalLayer.self
@@ -68,16 +81,36 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     var stateSnapshot: GhosttySurfaceState {
-        GhosttySurfaceState(
+        let visibleTextSummary: String
+        if currentVisibleTextSummary.isEmpty, let latestProjectionForState {
+            visibleTextSummary = Self.visibleTextSummary(from: latestProjectionForState)
+        } else {
+            visibleTextSummary = currentVisibleTextSummary
+        }
+
+        return GhosttySurfaceState(
             title: title,
             terminalSize: currentTerminalSize,
             pixelSize: pixelSize,
             scrollbackLines: currentScrollbackLines,
             isHealthy: isHealthy,
             renderFailureReason: currentRenderFailureReason,
-            visibleTextSummary: currentVisibleTextSummary,
+            visibleTextSummary: visibleTextSummary,
+            animationProgress: currentAnimationProgress,
             interactionGeometry: interactionGeometry,
             interactionCapabilities: currentInteractionCapabilities
+        )
+    }
+
+    static func previewBounds(
+        for terminalSize: TerminalSize,
+        configuration: TerminalConfiguration = TerminalConfiguration(),
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) -> CGRect {
+        GhosttyMetalRenderer.previewBounds(
+            for: terminalSize,
+            configuration: configuration,
+            metricsPreset: metricsPreset
         )
     }
 
@@ -96,7 +129,10 @@ final class GhosttySurface: UIView, UIKeyInput {
         )
     }
 
-    init(configuration: TerminalConfiguration = TerminalConfiguration()) throws {
+    init(
+        configuration: TerminalConfiguration = TerminalConfiguration(),
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) throws {
         self.engine = try GhosttyVTTerminalEngine(
             options: GhosttyVTTerminalOptions(
                 columns: 80,
@@ -104,7 +140,10 @@ final class GhosttySurface: UIView, UIKeyInput {
                 scrollbackLines: configuration.scrollbackLines
             )
         )
-        self.renderer = try GhosttyMetalRenderer(configuration: configuration)
+        self.renderer = try GhosttyMetalRenderer(
+            configuration: configuration,
+            metricsPreset: metricsPreset
+        )
         super.init(frame: .zero)
         setupView()
     }
@@ -132,6 +171,16 @@ final class GhosttySurface: UIView, UIKeyInput {
     func writeToTerminal(_ data: Data) {
         engine.write(data)
         render(clearDirty: true)
+    }
+
+    func setAnimationAccentRows(_ accentColumnsByRow: [Int: IndexSet]?) {
+        currentAnimationAccentColumnsByRow = accentColumnsByRow
+    }
+
+    func setAnimationProgress(_ progress: GhosttyHomeAnimationProgress?) {
+        guard currentAnimationProgress != progress else { return }
+        currentAnimationProgress = progress
+        publishState()
     }
 
     func setFocused(_ focused: Bool) {
@@ -349,15 +398,21 @@ final class GhosttySurface: UIView, UIKeyInput {
     private func render(clearDirty: Bool) {
         do {
             let projection = try engine.snapshotProjection(clearDirty: clearDirty)
+            latestProjectionForState = projection
             currentInteractionCapabilities = try engine.interactionCapabilities()
             currentScrollbackLines = max(0, Int((projection.scrollbar?.total ?? 0)) - projection.rows)
-            currentVisibleTextSummary = Self.visibleTextSummary(from: projection)
+            if onStateChange != nil {
+                currentVisibleTextSummary = Self.visibleTextSummary(from: projection)
+            } else {
+                currentVisibleTextSummary = ""
+            }
             renderer.render(
                 projection: projection,
                 in: metalLayer,
                 bounds: bounds,
                 metrics: currentMetrics,
-                focused: terminalIsFocused
+                focused: terminalIsFocused,
+                accentColumnsByRow: currentAnimationAccentColumnsByRow
             )
             if Self.usesSoftwareMirrorPresentation {
                 softwareMirrorView.image = renderer.cachedFrameImage
@@ -644,6 +699,9 @@ private final class GhosttyMetalRenderer {
     private let commandQueue: MTLCommandQueue
     private let ciContext: CIContext
     private let configuration: TerminalConfiguration
+    private let metricsPreset: GhosttySurfaceMetricsPreset?
+    private let regularFont: UIFont
+    private let boldFont: UIFont
 
     private var cachedFrame: UIImage?
 
@@ -651,7 +709,10 @@ private final class GhosttyMetalRenderer {
         cachedFrame
     }
 
-    init(configuration: TerminalConfiguration) throws {
+    init(
+        configuration: TerminalConfiguration,
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) throws {
         guard let device = MTLCreateSystemDefaultDevice(),
               let commandQueue = device.makeCommandQueue() else {
             throw GhosttyVTError.unavailable
@@ -661,31 +722,94 @@ private final class GhosttyMetalRenderer {
         self.commandQueue = commandQueue
         self.ciContext = CIContext(mtlDevice: device)
         self.configuration = configuration
+        self.metricsPreset = metricsPreset
+        self.regularFont = UIFont.monospacedSystemFont(
+            ofSize: configuration.fontSize,
+            weight: .regular
+        )
+        self.boldFont = UIFont.monospacedSystemFont(
+            ofSize: configuration.fontSize,
+            weight: .bold
+        )
     }
 
     func metrics(for bounds: CGRect, scale: CGFloat) -> Metrics {
-        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
-        let characterSize = ("W" as NSString).size(withAttributes: [.font: font])
-        let cellWidth = max(8, ceil(characterSize.width + 1))
-        let cellHeight = max(12, ceil(font.lineHeight * 1.15))
+        Self.metrics(
+            for: bounds,
+            scale: scale,
+            configuration: configuration,
+            metricsPreset: metricsPreset
+        )
+    }
 
-        let horizontalInset = max(8, floor(bounds.width * 0.015))
-        let verticalInset = max(8, floor(bounds.height * 0.02))
-        let usableWidth = max(1, bounds.width - (horizontalInset * 2))
-        let usableHeight = max(1, bounds.height - (verticalInset * 2))
+    static func previewBounds(
+        for terminalSize: TerminalSize,
+        configuration: TerminalConfiguration,
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) -> CGRect {
+        let cellSize = Self.cellSize(
+            for: configuration,
+            metricsPreset: metricsPreset
+        )
 
-        let columns = max(2, Int(usableWidth / cellWidth))
-        let rows = max(2, Int(usableHeight / cellHeight))
+        let width: CGFloat
+        let height: CGFloat
+        if let metricsPreset {
+            width = ceil(
+                CGFloat(terminalSize.columns) * cellSize.width
+                + metricsPreset.padding.left
+                + metricsPreset.padding.right
+            )
+            height = ceil(
+                CGFloat(terminalSize.rows) * cellSize.height
+                + metricsPreset.padding.top
+                + metricsPreset.padding.bottom
+            )
+        } else {
+            width = Self.dimension(
+                for: terminalSize.columns,
+                cellExtent: cellSize.width,
+                insetFraction: 0.015
+            )
+            height = Self.dimension(
+                for: terminalSize.rows,
+                cellExtent: cellSize.height,
+                insetFraction: 0.02
+            )
+        }
 
-        let contentWidth = CGFloat(columns) * cellWidth
-        let contentHeight = CGFloat(rows) * cellHeight
-        let leftPadding = max(horizontalInset, floor((bounds.width - contentWidth) / 2))
-        let topPadding = max(verticalInset, floor((bounds.height - contentHeight) / 2))
+        return CGRect(x: 0, y: 0, width: width, height: height)
+    }
+
+    private static func metrics(
+        for bounds: CGRect,
+        scale: CGFloat,
+        configuration: TerminalConfiguration,
+        metricsPreset: GhosttySurfaceMetricsPreset?
+    ) -> Metrics {
+        let cellSize = Self.cellSize(
+            for: configuration,
+            metricsPreset: metricsPreset
+        )
+        let basePadding = Self.basePadding(
+            for: bounds,
+            metricsPreset: metricsPreset
+        )
+        let usableWidth = max(1, bounds.width - basePadding.left - basePadding.right)
+        let usableHeight = max(1, bounds.height - basePadding.top - basePadding.bottom)
+
+        let columns = max(2, Int(usableWidth / cellSize.width))
+        let rows = max(2, Int(usableHeight / cellSize.height))
+
+        let contentWidth = CGFloat(columns) * cellSize.width
+        let contentHeight = CGFloat(rows) * cellSize.height
+        let extraHorizontal = max(0, bounds.width - basePadding.left - basePadding.right - contentWidth)
+        let extraVertical = max(0, bounds.height - basePadding.top - basePadding.bottom - contentHeight)
         let padding = UIEdgeInsets(
-            top: topPadding,
-            left: leftPadding,
-            bottom: max(verticalInset, ceil(bounds.height - contentHeight - topPadding)),
-            right: max(horizontalInset, ceil(bounds.width - contentWidth - leftPadding))
+            top: basePadding.top + floor(extraVertical / 2),
+            left: basePadding.left + floor(extraHorizontal / 2),
+            bottom: basePadding.bottom + ceil(extraVertical / 2),
+            right: basePadding.right + ceil(extraHorizontal / 2)
         )
 
         return Metrics(
@@ -694,14 +818,68 @@ private final class GhosttyMetalRenderer {
                 width: Int((bounds.width * scale).rounded()),
                 height: Int((bounds.height * scale).rounded())
             ),
-            cellSize: CGSize(width: cellWidth, height: cellHeight),
+            cellSize: cellSize,
             cellPixelSize: TerminalPixelSize(
-                width: max(1, Int((cellWidth * scale).rounded())),
-                height: max(1, Int((cellHeight * scale).rounded()))
+                width: max(1, Int((cellSize.width * scale).rounded())),
+                height: max(1, Int((cellSize.height * scale).rounded()))
             ),
             padding: padding,
             displayScale: scale
         )
+    }
+
+    private static func cellSize(
+        for configuration: TerminalConfiguration,
+        metricsPreset: GhosttySurfaceMetricsPreset?
+    ) -> CGSize {
+        if let metricsPreset {
+            return metricsPreset.cellSize
+        }
+
+        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
+        let characterSize = ("W" as NSString).size(withAttributes: [.font: font])
+        return CGSize(
+            width: max(8, ceil(characterSize.width + 1)),
+            height: max(12, ceil(font.lineHeight * 1.15))
+        )
+    }
+
+    private static func basePadding(
+        for bounds: CGRect,
+        metricsPreset: GhosttySurfaceMetricsPreset?
+    ) -> UIEdgeInsets {
+        if let metricsPreset {
+            return metricsPreset.padding
+        }
+
+        let horizontalInset = max(8, floor(bounds.width * 0.015))
+        let verticalInset = max(8, floor(bounds.height * 0.02))
+        return UIEdgeInsets(
+            top: verticalInset,
+            left: horizontalInset,
+            bottom: verticalInset,
+            right: horizontalInset
+        )
+    }
+
+    private static func dimension(
+        for cellCount: Int,
+        cellExtent: CGFloat,
+        insetFraction: CGFloat
+    ) -> CGFloat {
+        let minimumDimension = CGFloat(cellCount) * cellExtent
+        var dimension = ceil(minimumDimension)
+
+        while dimension < minimumDimension + 512 {
+            let inset = max(8, floor(dimension * insetFraction))
+            let resolvedCount = Int(max(1, dimension - (inset * 2)) / cellExtent)
+            if resolvedCount == cellCount {
+                return dimension
+            }
+            dimension += 1
+        }
+
+        return ceil(minimumDimension + 64)
     }
 
     func render(
@@ -709,10 +887,15 @@ private final class GhosttyMetalRenderer {
         in layer: CAMetalLayer,
         bounds: CGRect,
         metrics: Metrics,
-        focused: Bool
+        focused: Bool,
+        accentColumnsByRow: [Int: IndexSet]?
     ) {
         guard bounds.width > 0, bounds.height > 0 else { return }
+        #if targetEnvironment(simulator)
+        let drawable: CAMetalDrawable? = nil
+        #else
         guard let drawable = layer.nextDrawable() else { return }
+        #endif
 
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = layer.contentsScale
@@ -722,6 +905,7 @@ private final class GhosttyMetalRenderer {
         let shouldReuseFrame = projection.dirtyState == .partial && cachedFrame != nil
         let dirtyRows = Set(projection.dirtyRows)
 
+        let accentForegroundColor = metricsPreset?.accentForegroundColor.map(color(for:))
         let image = imageRenderer.image { context in
             if shouldReuseFrame, let cachedFrame {
                 cachedFrame.draw(in: bounds)
@@ -738,7 +922,14 @@ private final class GhosttyMetalRenderer {
             }
 
             for row in rowsToDraw {
-                draw(row: row, projection: projection, metrics: metrics)
+                draw(
+                    row: row,
+                    projection: projection,
+                    metrics: metrics,
+                    fillsDefaultBackground: shouldReuseFrame,
+                    accentColumns: accentColumnsByRow?[row.index],
+                    accentForegroundColor: accentForegroundColor
+                )
             }
 
             drawCursor(
@@ -749,6 +940,8 @@ private final class GhosttyMetalRenderer {
         }
 
         cachedFrame = image
+
+        #if !targetEnvironment(simulator)
         guard let cgImage = image.cgImage else { return }
 
         let ciImage = CIImage(cgImage: cgImage)
@@ -763,48 +956,242 @@ private final class GhosttyMetalRenderer {
         )
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        #endif
     }
 
     private func draw(
         row: GhosttyVTRowProjection,
         projection: GhosttyVTRenderProjection,
-        metrics: Metrics
+        metrics: Metrics,
+        fillsDefaultBackground: Bool,
+        accentColumns: IndexSet?,
+        accentForegroundColor: UIColor?
     ) {
-        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
+        let defaultBackground = color(for: projection.backgroundColor)
+        if drawAttributedNarrowRowIfPossible(
+            row: row,
+            projection: projection,
+            metrics: metrics,
+            fillsDefaultBackground: fillsDefaultBackground,
+            accentColumns: accentColumns
+        ) {
+            return
+        }
 
-        for cell in row.cells {
-            let rect = cellRect(
-                column: cell.column,
-                row: row.index,
-                width: cell.width == .wide ? 2 : 1,
-                metrics: metrics
-            )
+        var runStartColumn: Int?
+        var runText = ""
+        var runWidth = 0
+        var runStyle: GhosttyVTTextStyle?
+        var runUsesAccent = false
 
-            let colors = resolvedColors(for: cell.style, projection: projection)
-            colors.background.setFill()
-            UIBezierPath(rect: rect).fill()
-
-            switch cell.width {
-            case .spacerHead, .spacerTail:
-                continue
-            case .narrow, .wide:
-                break
+        func flushRun() {
+            guard
+                let startColumn = runStartColumn,
+                let style = runStyle
+            else {
+                return
             }
 
-            guard !cell.text.isEmpty, !cell.style.invisible else { continue }
-
-            let drawRect = rect.insetBy(
-                dx: 1,
-                dy: max(0, floor((rect.height - font.lineHeight) / 2))
+            drawTextRun(
+                text: runText,
+                style: style,
+                startColumn: startColumn,
+                width: runWidth,
+                rowIndex: row.index,
+                projection: projection,
+                metrics: metrics,
+                fillsDefaultBackground: fillsDefaultBackground,
+                defaultBackground: defaultBackground,
+                accentForegroundColor: runUsesAccent ? accentForegroundColor : nil
             )
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: colors.foreground.withAlphaComponent(cell.style.faint ? 0.6 : 1.0),
-                .underlineStyle: cell.style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
-                .strikethroughStyle: cell.style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
-            ]
-            (cell.text as NSString).draw(in: drawRect, withAttributes: attributes)
+
+            runStartColumn = nil
+            runText = ""
+            runWidth = 0
+            runStyle = nil
+            runUsesAccent = false
         }
+
+        for cell in row.cells {
+            let cellUsesAccent = accentColumns?.contains(cell.column) == true
+            switch cell.width {
+            case .spacerHead, .spacerTail:
+                flushRun()
+                continue
+            case .wide:
+                flushRun()
+                drawCell(
+                    cell,
+                    rowIndex: row.index,
+                    projection: projection,
+                    metrics: metrics,
+                    fillsDefaultBackground: fillsDefaultBackground,
+                    defaultBackground: defaultBackground,
+                    accentForegroundColor: cellUsesAccent ? accentForegroundColor : nil
+                )
+            case .narrow:
+                if runStartColumn == nil {
+                    runStartColumn = cell.column
+                    runStyle = cell.style
+                    runUsesAccent = cellUsesAccent
+                } else if runStyle != cell.style || runUsesAccent != cellUsesAccent {
+                    flushRun()
+                    runStartColumn = cell.column
+                    runStyle = cell.style
+                    runUsesAccent = cellUsesAccent
+                }
+
+                runWidth += 1
+                runText.append(cell.text.isEmpty ? " " : cell.text)
+            }
+        }
+
+        flushRun()
+    }
+
+    private func drawAttributedNarrowRowIfPossible(
+        row: GhosttyVTRowProjection,
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics,
+        fillsDefaultBackground: Bool,
+        accentColumns: IndexSet?
+    ) -> Bool {
+        guard !fillsDefaultBackground else { return false }
+        guard accentColumns?.isEmpty != false else { return false }
+
+        let cells = row.cells.sorted { $0.column < $1.column }
+        guard cells.allSatisfy({ $0.width == .narrow }) else { return false }
+        guard cells.allSatisfy({ styleUsesDefaultBackground($0.style) }) else { return false }
+
+        let lineRect = cellRect(
+            column: 0,
+            row: row.index,
+            width: cells.count,
+            metrics: metrics
+        )
+        let drawPoint = CGPoint(
+            x: lineRect.minX + 1,
+            y: lineRect.minY + max(0, floor((lineRect.height - regularFont.lineHeight) / 2))
+        )
+
+        let attributed = NSMutableAttributedString()
+        var runStyle: GhosttyVTTextStyle?
+        var runText = ""
+
+        func flushRun() {
+            guard let style = runStyle, !runText.isEmpty else {
+                runText = ""
+                return
+            }
+
+            let colors = resolvedColors(for: style, projection: projection)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: style.bold ? boldFont : regularFont,
+                .foregroundColor: colors.foreground.withAlphaComponent(style.faint ? 0.6 : 1.0),
+                .underlineStyle: style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
+                .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+            ]
+            attributed.append(NSAttributedString(string: runText, attributes: attributes))
+            runText = ""
+        }
+
+        for cell in cells {
+            if runStyle == nil {
+                runStyle = cell.style
+            } else if runStyle != cell.style {
+                flushRun()
+                runStyle = cell.style
+            }
+
+            runText.append(cell.text.isEmpty ? " " : cell.text)
+        }
+
+        flushRun()
+        guard attributed.length > 0 else { return false }
+
+        attributed.draw(at: drawPoint)
+        return true
+    }
+
+    private func styleUsesDefaultBackground(_ style: GhosttyVTTextStyle) -> Bool {
+        style.background == .none && !style.inverse
+    }
+
+    private func drawTextRun(
+        text: String,
+        style: GhosttyVTTextStyle,
+        startColumn: Int,
+        width: Int,
+        rowIndex: Int,
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics,
+        fillsDefaultBackground: Bool,
+        defaultBackground: UIColor,
+        accentForegroundColor: UIColor?
+    ) {
+        guard width > 0 else { return }
+
+        let rect = cellRect(
+            column: startColumn,
+            row: rowIndex,
+            width: width,
+            metrics: metrics
+        )
+        let colors = resolvedColors(for: style, projection: projection)
+        if fillsDefaultBackground || colors.background != defaultBackground {
+            colors.background.setFill()
+            UIRectFill(rect)
+        }
+
+        guard !text.isEmpty, !style.invisible else { return }
+        let font = style.bold ? boldFont : regularFont
+        let drawRect = rect.insetBy(
+            dx: 1,
+            dy: max(0, floor((rect.height - font.lineHeight) / 2))
+        )
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(style.faint ? 0.6 : 1.0),
+            .underlineStyle: style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
+            .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+        ]
+        (text as NSString).draw(in: drawRect, withAttributes: attributes)
+    }
+
+    private func drawCell(
+        _ cell: GhosttyVTCellProjection,
+        rowIndex: Int,
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics,
+        fillsDefaultBackground: Bool,
+        defaultBackground: UIColor,
+        accentForegroundColor: UIColor?
+    ) {
+        let rect = cellRect(
+            column: cell.column,
+            row: rowIndex,
+            width: cell.width == .wide ? 2 : 1,
+            metrics: metrics
+        )
+        let colors = resolvedColors(for: cell.style, projection: projection)
+        if fillsDefaultBackground || colors.background != defaultBackground {
+            colors.background.setFill()
+            UIRectFill(rect)
+        }
+
+        guard !cell.text.isEmpty, !cell.style.invisible else { return }
+        let font = cell.style.bold ? boldFont : regularFont
+        let drawRect = rect.insetBy(
+            dx: 1,
+            dy: max(0, floor((rect.height - font.lineHeight) / 2))
+        )
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(cell.style.faint ? 0.6 : 1.0),
+            .underlineStyle: cell.style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
+            .strikethroughStyle: cell.style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+        ]
+        (cell.text as NSString).draw(in: drawRect, withAttributes: attributes)
     }
 
     private func drawCursor(
@@ -872,6 +1259,10 @@ private final class GhosttyMetalRenderer {
 
         if style.inverse {
             swap(&foreground, &background)
+        }
+
+        if let accentForegroundColor = metricsPreset?.accentForegroundColor, style.bold {
+            foreground = color(for: accentForegroundColor)
         }
 
         return (foreground, background)

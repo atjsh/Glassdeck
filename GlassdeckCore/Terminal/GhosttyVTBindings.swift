@@ -683,10 +683,10 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private func value<T>(
+    private func value(
         for data: GhosttyRenderStateData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: Bool
+    ) throws -> Bool {
         guard let renderState else {
             throw GhosttyVTError.unavailable
         }
@@ -699,11 +699,59 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private func rowValue<T>(
+    private func value(
+        for data: GhosttyRenderStateData,
+        default defaultValue: UInt16
+    ) throws -> UInt16 {
+        guard let renderState else {
+            throw GhosttyVTError.unavailable
+        }
+        var value = defaultValue
+        let result = ghostty_render_state_get(renderState, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private func value(
+        for data: GhosttyRenderStateData,
+        default defaultValue: GhosttyRenderStateDirty
+    ) throws -> GhosttyRenderStateDirty {
+        guard let renderState else {
+            throw GhosttyVTError.unavailable
+        }
+        var value = defaultValue
+        let result = ghostty_render_state_get(renderState, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private func value(
+        for data: GhosttyRenderStateData,
+        default defaultValue: GhosttyRenderStateCursorVisualStyle
+    ) throws -> GhosttyRenderStateCursorVisualStyle {
+        guard let renderState else {
+            throw GhosttyVTError.unavailable
+        }
+        var value = defaultValue
+        let result = ghostty_render_state_get(renderState, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private func rowValue(
         iterator: GhosttyRenderStateRowIterator,
         data: GhosttyRenderStateRowData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: Bool
+    ) throws -> Bool {
         var value = defaultValue
         let result = ghostty_render_state_row_get(iterator, data, &value)
         if result == GHOSTTY_INVALID_VALUE {
@@ -713,11 +761,25 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private func cellValue<T>(
+    private func rowValue(
+        iterator: GhosttyRenderStateRowIterator,
+        data: GhosttyRenderStateRowData,
+        default defaultValue: GhosttyRow
+    ) throws -> GhosttyRow {
+        var value = defaultValue
+        let result = ghostty_render_state_row_get(iterator, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private func cellValue(
         cells: GhosttyRenderStateRowCells,
         data: GhosttyRenderStateRowCellsData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: UInt32
+    ) throws -> UInt32 {
         var value = defaultValue
         let result = ghostty_render_state_row_cells_get(cells, data, &value)
         if result == GHOSTTY_INVALID_VALUE {
@@ -727,11 +789,25 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private static func terminalValue<T>(
+    private func cellValue(
+        cells: GhosttyRenderStateRowCells,
+        data: GhosttyRenderStateRowCellsData,
+        default defaultValue: GhosttyCell
+    ) throws -> GhosttyCell {
+        var value = defaultValue
+        let result = ghostty_render_state_row_cells_get(cells, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private static func terminalValue(
         _ terminal: GhosttyTerminal,
         data: GhosttyTerminalData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: UInt16
+    ) throws -> UInt16 {
         var value = defaultValue
         let result = ghostty_terminal_get(terminal, data, &value)
         if result == GHOSTTY_INVALID_VALUE {
@@ -741,11 +817,25 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private static func rowInfo<T>(
+    private static func terminalValue(
+        _ terminal: GhosttyTerminal,
+        data: GhosttyTerminalData,
+        default defaultValue: GhosttyTerminalScrollbar
+    ) throws -> GhosttyTerminalScrollbar {
+        var value = defaultValue
+        let result = ghostty_terminal_get(terminal, data, &value)
+        if result == GHOSTTY_INVALID_VALUE {
+            return defaultValue
+        }
+        try Self.check(result)
+        return value
+    }
+
+    private static func rowInfo(
         _ row: GhosttyRow,
         _ data: GhosttyRowData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: Bool
+    ) throws -> Bool {
         var value = defaultValue
         let result = ghostty_row_get(row, data, &value)
         if result == GHOSTTY_INVALID_VALUE {
@@ -755,11 +845,11 @@ public final class GhosttyVTTerminalEngine {
         return value
     }
 
-    private static func cellInfo<T>(
+    private static func cellInfo(
         _ cell: GhosttyCell,
         _ data: GhosttyCellData,
-        default defaultValue: T
-    ) throws -> T {
+        default defaultValue: GhosttyCellWide
+    ) throws -> GhosttyCellWide {
         var value = defaultValue
         let result = ghostty_cell_get(cell, data, &value)
         if result == GHOSTTY_INVALID_VALUE {

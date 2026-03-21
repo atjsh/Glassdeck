@@ -21,12 +21,7 @@ final class GhosttyVTPlatformTests: XCTestCase {
         )
 
         engine.write(Data("abc".utf8))
-        let projection: GhosttyVTRenderProjection
-        do {
-            projection = try engine.snapshotProjection(clearDirty: false)
-        } catch {
-            throw XCTSkip("Current simulator CGhosttyVT build cannot snapshot render state after writes: \(error.localizedDescription)")
-        }
+        let projection = try engine.snapshotProjection(clearDirty: false)
 
         XCTAssertEqual(projection.columns, 8)
         XCTAssertEqual(projection.rows, 4)

@@ -33,6 +33,7 @@ final class SSHSessionModel: Identifiable {
     var terminalIsHealthy = true
     var terminalRenderFailureReason: String?
     var terminalVisibleTextSummary = ""
+    var terminalAnimationProgress: GhosttyHomeAnimationProgress?
     var terminalInteractionGeometry: RemoteTerminalGeometry = .zero
     var terminalInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,

@@ -10,10 +10,25 @@ enum UITestLaunchSupport {
         case connections
         case sessions
         case remote
+        case animation
     }
 
     private static let previewTerminalMarker = "GLASSDECK_KEY_OK"
     private static let remotePreviewTerminalMarker = "GLASSDECK_PASSWORD_OK"
+    private static let animationFramesEnvironmentKey = "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
+    private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
+
+    static var currentScenario: Scenario? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let scenarioIndex = arguments.firstIndex(of: "-uiTestScenario"),
+            arguments.indices.contains(arguments.index(after: scenarioIndex))
+        else {
+            return nil
+        }
+
+        return Scenario(rawValue: arguments[arguments.index(after: scenarioIndex)])
+    }
 
     static var exposesTerminalRenderSummary: Bool {
         ProcessInfo.processInfo.arguments.contains("-uiTestExposeTerminalRenderSummary")
@@ -29,11 +44,7 @@ enum UITestLaunchSupport {
             UserDefaults.standard.set(false, forKey: "UIViewAnimationEnabled")
         }
 
-        guard
-            let scenarioIndex = arguments.firstIndex(of: "-uiTestScenario"),
-            arguments.indices.contains(arguments.index(after: scenarioIndex)),
-            let scenario = Scenario(rawValue: arguments[arguments.index(after: scenarioIndex)])
-        else {
+        guard let scenario = currentScenario else {
             return
         }
 
@@ -81,6 +92,20 @@ enum UITestLaunchSupport {
                 externalDisplaySessionID: session.id,
                 hasExternalDisplayConnected: true
             )
+        case .animation:
+            let connection = previewConnections()[0]
+            let session = previewAnimationSession(
+                using: connection,
+                sessionManager: sessionManager
+            )
+            connectionStore.replaceAll(with: [connection])
+            sessionManager.replaceSessionsForPreview(
+                [session],
+                activeSessionID: session.id,
+                externalDisplaySessionID: nil,
+                hasExternalDisplayConnected: false
+            )
+            startAnimationPlaybackIfPossible(for: session)
         }
     }
 
@@ -196,6 +221,39 @@ enum UITestLaunchSupport {
         return session
     }
 
+    private static func previewAnimationSession(
+        using profile: ConnectionProfile,
+        sessionManager: SessionManager
+    ) -> SSHSessionModel {
+        let session = SSHSessionModel(
+            id: UUID(uuidString: "55555555-5555-5555-5555-555555555555") ?? UUID(),
+            profile: profile
+        )
+        session.status = .connected
+        session.connectedAt = .now.addingTimeInterval(-31)
+
+        let didSeedSurface = sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "Ghostty Home Animation",
+                transcript: "",
+                terminalConfiguration: GhosttyHomeAnimationSequence.testingTerminalConfiguration,
+                terminalMetricsPreset: GhosttyHomeAnimationSequence.testingMetricsPreset,
+                terminalSize: TerminalSize(
+                    columns: GhosttyHomeAnimationSequence.expectedColumns,
+                    rows: GhosttyHomeAnimationSequence.expectedRows
+                ),
+                terminalPixelSize: nil,
+                scrollbackLines: GhosttyHomeAnimationSequence.expectedFrameCount * GhosttyHomeAnimationSequence.expectedRows
+            )
+        )
+        assert(
+            didSeedSurface,
+            "Animation preview sessions must have a synthetic GhosttySurface."
+        )
+        return session
+    }
+
     private static func connectedPreviewSession(
         id: UUID,
         profile: ConnectionProfile,
@@ -252,9 +310,37 @@ enum UITestLaunchSupport {
     }
 
     private static func resetPersistentTestState() {
+        activeAnimationPlayer?.stop()
+        activeAnimationPlayer = nil
         UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
         for keyID in SSHKeyManager.shared.listKeys() {
             try? SSHKeyManager.shared.deleteKey(id: keyID)
+        }
+    }
+
+    private static func startAnimationPlaybackIfPossible(for session: SSHSessionModel) {
+        guard let surface = session.surface else {
+            session.status = .failed("Animation scenario is missing a terminal surface.")
+            session.connectionError = "Animation scenario is missing a terminal surface."
+            return
+        }
+
+        guard let framesPath = ProcessInfo.processInfo.environment[animationFramesEnvironmentKey], !framesPath.isEmpty else {
+            session.status = .failed("Set \(animationFramesEnvironmentKey) to launch the animation scenario.")
+            session.connectionError = "Set \(animationFramesEnvironmentKey) to launch the animation scenario."
+            return
+        }
+
+        do {
+            let sequence = try GhosttyHomeAnimationSequence.load(
+                from: URL(fileURLWithPath: framesPath, isDirectory: true)
+            )
+            let player = GhosttyHomeAnimationPlayer(surface: surface, sequence: sequence)
+            activeAnimationPlayer = player
+            try player.start()
+        } catch {
+            session.status = .failed(error.localizedDescription)
+            session.connectionError = error.localizedDescription
         }
     }
 

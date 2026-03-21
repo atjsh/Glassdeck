@@ -79,6 +79,8 @@ targets:
       - path: Tests/GlassdeckCoreTests
       - path: Tests/GlassdeckHostIntegrationTests
       - path: Tests/GlassdeckAppTests
+    resources:
+      - path: Tests/Fixtures/GhosttyHomeAnimationFrames
     dependencies:
       - target: GlassdeckCore
       - target: GlassdeckApp

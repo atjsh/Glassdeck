@@ -23,6 +23,10 @@ struct TerminalSurfaceView: View {
         UITestLaunchSupport.exposesTerminalRenderSummary
     }
 
+    private var usesAnimationTerminalPresentation: Bool {
+        UITestLaunchSupport.currentScenario == .animation
+    }
+
     var body: some View {
         let connectedSurfaceInvariantBroken = session.isConnected && session.surface == nil
         let terminalRenderFailureReason = session.terminalRenderFailureReason
@@ -33,11 +37,25 @@ struct TerminalSurfaceView: View {
 
         ZStack {
             if let surface = session.surface {
-                GhosttyTerminalViewWrapper(
-                    surface: surface,
-                    isFocused: !exposesUITestInputProxy
-                )
+                if usesAnimationTerminalPresentation {
+                    GhosttyPositionedTerminalView(
+                        surface: surface,
+                        isFocused: !exposesUITestInputProxy,
+                        terminalSize: TerminalSize(
+                            columns: GhosttyHomeAnimationSequence.expectedColumns,
+                            rows: GhosttyHomeAnimationSequence.expectedRows
+                        ),
+                        configuration: GhosttyHomeAnimationSequence.testingTerminalConfiguration,
+                        metricsPreset: GhosttyHomeAnimationSequence.testingMetricsPreset
+                    )
                     .ignoresSafeArea()
+                } else {
+                    GhosttyTerminalViewWrapper(
+                        surface: surface,
+                        isFocused: !exposesUITestInputProxy
+                    )
+                        .ignoresSafeArea()
+                }
 
                 if let terminalRenderFailureReason, session.isConnected {
                     terminalUnavailableOverlay(reason: terminalRenderFailureReason)
@@ -179,6 +197,44 @@ struct GhosttyTerminalViewWrapper: UIViewRepresentable {
 
     func updateUIView(_ uiView: GhosttySurface, context: Context) {
         uiView.setFocused(isFocused)
+    }
+}
+
+struct GhosttyPositionedTerminalView: View {
+    let surface: GhosttySurface
+    let isFocused: Bool
+    let terminalSize: TerminalSize
+    let configuration: TerminalConfiguration
+    let metricsPreset: GhosttySurfaceMetricsPreset?
+
+    private var naturalBounds: CGRect {
+        GhosttySurface.previewBounds(
+            for: terminalSize,
+            configuration: configuration,
+            metricsPreset: metricsPreset
+        )
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+
+                GhosttyTerminalViewWrapper(
+                    surface: surface,
+                    isFocused: isFocused
+                )
+                .frame(
+                    width: naturalBounds.width,
+                    height: naturalBounds.height
+                )
+                .position(
+                    x: geometry.size.width / 2,
+                    y: geometry.size.height / 2
+                )
+            }
+            .clipped()
+        }
     }
 }
 #endif

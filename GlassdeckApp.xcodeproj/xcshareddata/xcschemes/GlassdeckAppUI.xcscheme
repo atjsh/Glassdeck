@@ -29,20 +29,6 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D2E19D6AD237B0EE3338DFE2"
-               BuildableName = "GlassdeckAppTests.xctest"
-               BlueprintName = "GlassdeckAppTests"
-               ReferencedContainer = "container:GlassdeckApp.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "747394F6748EC9C4C147F4B8"
                BuildableName = "GlassdeckAppUITests.xctest"
                BlueprintName = "GlassdeckAppUITests"
@@ -67,17 +53,6 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D2E19D6AD237B0EE3338DFE2"
-               BuildableName = "GlassdeckAppTests.xctest"
-               BlueprintName = "GlassdeckAppTests"
-               ReferencedContainer = "container:GlassdeckApp.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
          <TestableReference
             skipped = "NO"
             parallelizable = "NO">

@@ -58,12 +58,14 @@ Glassdeck/
 
 ```bash
 ./Scripts/run-ios-sim.sh
+./Scripts/run-ios-sim.sh --clean
 ```
 
 ### 시뮬레이터 XCTest 실행
 
 ```bash
 ./Scripts/test-ios-sim.sh
+./Scripts/test-ios-sim.sh --clean
 ```
 
 직접 `xcodebuild` 플래그를 조합하지 않고 단일 테스트만 실행하려면:
@@ -108,18 +110,19 @@ Docker 타깃을 중지하려면:
 ./Scripts/run-ios-sim.sh --logs
 ```
 
-XCTest 실행 스크립트는 기본적으로 조용한 출력을 사용합니다. 각 실행은 raw `xcodebuild` 로그를 `.build/TestLogs/`에, `xcresult` 번들을 `.build/TestResults/`에 저장합니다.
+시뮬레이터 실행과 XCTest 스크립트는 기본적으로 증분 빌드를 사용합니다. 깨끗한 빌드 그래프가 필요하면 `--clean` 또는 `--rebuild`를 사용하세요. 각 XCTest 실행은 raw `xcodebuild` 로그를 `.build/TestLogs/`에, `xcresult` 번들을 `.build/TestResults/`에 저장합니다.
 
 기존처럼 raw `xcodebuild` 스트림이 필요하면 `--verbose` 또는 `GLASSDECK_VERBOSE=1`을 사용하면 됩니다.
 
 ```bash
 ./Scripts/test-ios-sim.sh --verbose
+./Scripts/run-ios-sim.sh --verbose
 GLASSDECK_VERBOSE=1 ./Scripts/test-live-docker-ssh.sh
 ```
 
 기본 시뮬레이터 타깃은 최신 설치 iOS runtime의 `iPhone 17`입니다.
 
-시뮬레이터 실행 경로는 생성된 `GlassdeckApp.xcodeproj`와 `GlassdeckApp` scheme을 사용합니다. 특정 시뮬레이터를 직접 지정하려면 `SIMULATOR_ID`를 설정하고, 그렇지 않으면 스크립트가 사용 가능한 최신 `iPhone 17`을 자동으로 선택합니다. `project.yml`이 더 최신이면 저장소 스크립트가 `./Scripts/generate-xcodeproj.sh`로 프로젝트를 다시 생성합니다.
+시뮬레이터 실행 경로는 생성된 `GlassdeckApp.xcodeproj`와 `GlassdeckApp` scheme을 사용합니다. 시뮬레이터 단위 테스트 스크립트는 기본적으로 `GlassdeckAppUnit`, Docker UI 스크린샷 스크립트는 `GlassdeckAppUI`를 사용하므로 unit-only 실행에서 `GlassdeckAppUITests`를 다시 컴파일하지 않습니다. 특정 시뮬레이터를 직접 지정하려면 `SIMULATOR_ID`를 설정하고, 그렇지 않으면 스크립트가 사용 가능한 최신 `iPhone 17`을 자동으로 선택합니다. `project.yml`이 더 최신이면 저장소 스크립트가 `./Scripts/generate-xcodeproj.sh`로 프로젝트를 다시 생성합니다.
 
 현재 Glassdeck의 지원 플랫폼은 iOS만입니다. 기본 개발 경로는 생성된 Xcode 프로젝트와 위의 시뮬레이터 스크립트입니다.
 

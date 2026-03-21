@@ -58,12 +58,14 @@ Defaults:
 
 ```bash
 ./Scripts/run-ios-sim.sh
+./Scripts/run-ios-sim.sh --clean
 ```
 
 ### Run simulator XCTest
 
 ```bash
 ./Scripts/test-ios-sim.sh
+./Scripts/test-ios-sim.sh --clean
 ```
 
 Run a single test target without hand-writing `xcodebuild` flags:
@@ -108,18 +110,19 @@ Optional live log tail:
 ./Scripts/run-ios-sim.sh --logs
 ```
 
-The XCTest runner scripts default to quiet output. Each run saves the raw `xcodebuild` log under `.build/TestLogs/` and the `xcresult` bundle under `.build/TestResults/`.
+The simulator and XCTest runner scripts are incremental by default. Use `--clean` or `--rebuild` when you need a fresh build graph. Each XCTest run saves the raw `xcodebuild` log under `.build/TestLogs/` and the `xcresult` bundle under `.build/TestResults/`.
 
 If you want the raw `xcodebuild` stream back, use `--verbose` or `GLASSDECK_VERBOSE=1`:
 
 ```bash
 ./Scripts/test-ios-sim.sh --verbose
+./Scripts/run-ios-sim.sh --verbose
 GLASSDECK_VERBOSE=1 ./Scripts/test-live-docker-ssh.sh
 ```
 
 The expected local simulator target is `iPhone 17` on the latest installed iOS runtime.
 
-The simulator run path uses the generated `GlassdeckApp.xcodeproj` and scheme `GlassdeckApp`. Set `SIMULATOR_ID` to target a specific booted or available simulator directly; otherwise the scripts resolve the latest available `iPhone 17`. If `project.yml` is newer than the project, the repo scripts regenerate it with `./Scripts/generate-xcodeproj.sh`.
+The simulator run path uses the generated `GlassdeckApp.xcodeproj` and scheme `GlassdeckApp`. Simulator unit-test runners default to `GlassdeckAppUnit`, and Docker UI screenshot runners default to `GlassdeckAppUI`, so unit-only runs do not compile `GlassdeckAppUITests`. Set `SIMULATOR_ID` to target a specific booted or available simulator directly; otherwise the scripts resolve the latest available `iPhone 17`. If `project.yml` is newer than the project, the repo scripts regenerate it with `./Scripts/generate-xcodeproj.sh`.
 
 Glassdeck is currently supported on iOS only. The canonical local workflow is the generated Xcode project plus the simulator scripts above.
 

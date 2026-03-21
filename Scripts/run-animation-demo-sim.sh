@@ -5,46 +5,47 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT/GlassdeckApp.xcodeproj"
 PROJECT_SPEC="$ROOT/project.yml"
 GENERATE_SCRIPT="$ROOT/Scripts/generate-xcodeproj.sh"
+# shellcheck source=Scripts/xcode-test-common.sh
+source "$ROOT/Scripts/xcode-test-common.sh"
+
 SCHEME="${SCHEME:-GlassdeckApp}"
 APP_NAME="${APP_NAME:-Glassdeck}"
 SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
-DERIVED_DATA="${DERIVED_DATA:-$ROOT/.build/DerivedData-AnimationDemo}"
+DERIVED_DATA="${DERIVED_DATA:-$XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-$ROOT/.build/TestLogs}"
 FIXTURES_DIR="${FIXTURES_DIR:-$ROOT/Tests/Fixtures/GhosttyHomeAnimationFrames}"
 ENV_KEY="GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
+RUNNER_NAME="run-animation-demo-sim"
+XCODE_ACTION_ARGS=()
 
-if ! command -v xcodebuild >/dev/null 2>&1; then
-  echo "xcodebuild is required." >&2
-  exit 1
-fi
+reset_xcode_action_mode
+while [[ $# -gt 0 ]]; do
+  if handle_xcode_action_arg "$1"; then
+    shift
+    continue
+  fi
 
-if ! command -v xcrun >/dev/null 2>&1; then
-  echo "xcrun is required." >&2
-  exit 1
-fi
+  case "$1" in
+    --verbose)
+      GLASSDECK_VERBOSE=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+ensure_xcode_test_tools
 
 if [[ ! -d "$FIXTURES_DIR" ]]; then
   echo "Animation fixtures not found at $FIXTURES_DIR" >&2
   exit 1
 fi
 
-if [[ ! -d "$PROJECT" ]] || [[ "$PROJECT_SPEC" -nt "$PROJECT/project.pbxproj" ]]; then
-  "$GENERATE_SCRIPT"
-fi
-
-SIMULATOR_ID="$(
-  xcrun simctl list devices available \
-    | awk -F '[()]' -v name="$SIMULATOR_NAME" '
-        $1 ~ "^[[:space:]]*" name "[[:space:]]*$" {
-          print $2
-        }
-      ' \
-    | tail -n 1
-)"
-
-if [[ -z "$SIMULATOR_ID" ]]; then
-  echo "No available simulator named '$SIMULATOR_NAME' was found." >&2
-  exit 1
-fi
+ensure_generated_project "$PROJECT" "$PROJECT_SPEC" "$GENERATE_SCRIPT"
+SIMULATOR_ID="$(resolve_simulator_id "$SIMULATOR_NAME")"
 
 clear_animation_env() {
   xcrun simctl spawn "$SIMULATOR_ID" launchctl unsetenv "$ENV_KEY" >/dev/null 2>&1 || true
@@ -52,17 +53,20 @@ clear_animation_env() {
 
 trap clear_animation_env EXIT
 
-open -a Simulator >/dev/null 2>&1 || true
-xcrun simctl boot "$SIMULATOR_ID" >/dev/null 2>&1 || true
-xcrun simctl bootstatus "$SIMULATOR_ID" -b
+boot_simulator "$SIMULATOR_ID"
+append_xcode_action_args XCODE_ACTION_ARGS build
 
-xcodebuild \
-  -project "$PROJECT" \
-  -scheme "$SCHEME" \
-  -configuration Debug \
-  -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-  -derivedDataPath "$DERIVED_DATA" \
-  clean build
+XCODE_ACTION_QUIET=0 XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_action \
+  "$RUNNER_NAME" \
+  "$PROJECT" \
+  "$SCHEME" \
+  "$DERIVED_DATA" \
+  "platform=iOS Simulator,id=$SIMULATOR_ID" \
+  "build" \
+  "" \
+  "$TEST_LOGS_DIR" \
+  -- \
+  "${XCODE_ACTION_ARGS[@]}"
 
 APP_PATH="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
 if [[ ! -d "$APP_PATH" ]]; then

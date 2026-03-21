@@ -16,6 +16,48 @@ packages:
     from: 0.12.0
   swift-ssh-client:
     path: Vendor/swift-ssh-client
+schemes:
+  GlassdeckApp:
+    build:
+      targets:
+        GlassdeckApp: all
+        GlassdeckAppTests: [test]
+        GlassdeckAppUITests: [test]
+    run:
+      executable: GlassdeckApp
+    test:
+      macroExpansion: GlassdeckApp
+      targets:
+        - GlassdeckAppTests
+        - GlassdeckAppUITests
+    profile:
+      executable: GlassdeckApp
+  GlassdeckAppUnit:
+    build:
+      targets:
+        GlassdeckApp: all
+        GlassdeckAppTests: [test]
+    run:
+      executable: GlassdeckApp
+    test:
+      macroExpansion: GlassdeckApp
+      targets:
+        - GlassdeckAppTests
+    profile:
+      executable: GlassdeckApp
+  GlassdeckAppUI:
+    build:
+      targets:
+        GlassdeckApp: all
+        GlassdeckAppUITests: [test]
+    run:
+      executable: GlassdeckApp
+    test:
+      macroExpansion: GlassdeckApp
+      targets:
+        - GlassdeckAppUITests
+    profile:
+      executable: GlassdeckApp
 targets:
   GlassdeckCore:
     type: framework
@@ -40,10 +82,6 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "26.0"
-    scheme:
-      testTargets:
-        - GlassdeckAppTests
-        - GlassdeckAppUITests
     sources:
       - path: Glassdeck
         excludes:

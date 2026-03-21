@@ -10,6 +10,26 @@ SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
 SCREENSHOT_DIR="${SCREENSHOT_DIR:-$ROOT/.build/AnimationDemoVisible}"
 FRAME_A_PATH="$SCREENSHOT_DIR/frame-a.png"
 FRAME_B_PATH="$SCREENSHOT_DIR/frame-b.png"
+RUN_DEMO_ARGS=()
+RUN_DEMO_SUPPRESS_OUTPUT=1
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --clean|--rebuild)
+      RUN_DEMO_ARGS+=("$1")
+      shift
+      ;;
+    --verbose)
+      RUN_DEMO_ARGS+=("$1")
+      RUN_DEMO_SUPPRESS_OUTPUT=0
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 ensure_xcode_test_tools
 
@@ -17,7 +37,11 @@ mkdir -p "$SCREENSHOT_DIR"
 
 SIMULATOR_ID="$(resolve_simulator_id "$SIMULATOR_NAME")"
 
-"$RUN_DEMO_SCRIPT" >/dev/null
+if [[ "$RUN_DEMO_SUPPRESS_OUTPUT" == "1" ]]; then
+  "$RUN_DEMO_SCRIPT" "${RUN_DEMO_ARGS[@]}" >/dev/null
+else
+  "$RUN_DEMO_SCRIPT" "${RUN_DEMO_ARGS[@]}"
+fi
 
 sleep 4
 xcrun simctl io "$SIMULATOR_ID" screenshot "$FRAME_A_PATH" >/dev/null

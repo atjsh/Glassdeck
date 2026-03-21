@@ -3,10 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT/GlassdeckApp.xcodeproj"
+PROJECT_SPEC="$ROOT/project.yml"
 GENERATE_SCRIPT="$ROOT/Scripts/generate-xcodeproj.sh"
-SCHEME="${SCHEME:-GlassdeckApp}"
+SCHEME="${SCHEME:-GlassdeckAppUI}"
 SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
-DERIVED_DATA="${DERIVED_DATA:-$ROOT/.build/DerivedData-DockerUITests}"
 RESULTS_DIR="${RESULTS_DIR:-$ROOT/.build/TestResults}"
 TEST_LOGS_DIR="${TEST_LOGS_DIR:-$ROOT/.build/TestLogs}"
 ARTIFACTS_ROOT="${ARTIFACTS_ROOT:-$ROOT/.build/TestArtifacts/docker-ui}"
@@ -16,13 +16,22 @@ TEST_FILTERS=(
   "GlassdeckAppUITests/DockerLiveUITests"
   "GlassdeckAppUITests/RemoteTrackpadScreenshotUITests"
 )
+XCODE_ACTION_ARGS=()
 
 # shellcheck source=Scripts/docker/common.sh
 source "$ROOT/Scripts/docker/common.sh"
 # shellcheck source=Scripts/xcode-test-common.sh
 source "$ROOT/Scripts/xcode-test-common.sh"
 
+DERIVED_DATA="${DERIVED_DATA:-$XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA}"
+
+reset_xcode_action_mode
 while [[ $# -gt 0 ]]; do
+  if handle_xcode_action_arg "$1"; then
+    shift
+    continue
+  fi
+
   case "$1" in
     --verbose)
       GLASSDECK_VERBOSE=1
@@ -37,7 +46,7 @@ done
 
 ensure_xcode_test_tools
 
-"$GENERATE_SCRIPT"
+ensure_generated_project "$PROJECT" "$PROJECT_SPEC" "$GENERATE_SCRIPT"
 "$ROOT/Scripts/docker/smoke-test-ssh.sh"
 
 SIMULATOR_ID="$(resolve_simulator_id "$SIMULATOR_NAME")"
@@ -63,6 +72,7 @@ clear_simulator_env() {
 }
 
 trap clear_simulator_env EXIT
+append_xcode_action_args XCODE_ACTION_ARGS test
 
 xcrun simctl spawn "$SIMULATOR_ID" launchctl setenv GLASSDECK_LIVE_SSH_ENABLED 1
 xcrun simctl spawn "$SIMULATOR_ID" launchctl setenv GLASSDECK_LIVE_SSH_HOST "$TEST_HOST"
@@ -72,13 +82,13 @@ xcrun simctl spawn "$SIMULATOR_ID" launchctl setenv GLASSDECK_LIVE_SSH_PASSWORD 
 xcrun simctl spawn "$SIMULATOR_ID" launchctl setenv GLASSDECK_LIVE_SSH_KEY_PATH "$GLASSDECK_TEST_SSH_KEY"
 xcrun simctl spawn "$SIMULATOR_ID" launchctl setenv GLASSDECK_UI_SCREENSHOT_CAPTURE 1
 
-XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_test \
+XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_action \
   "$RUNNER_NAME" \
   "$PROJECT" \
   "$SCHEME" \
   "$DERIVED_DATA" \
-  "$SIMULATOR_ID" \
-  "$FILTER_DESCRIPTION" \
+  "platform=iOS Simulator,id=$SIMULATOR_ID" \
+  "tests (filters: $FILTER_DESCRIPTION)" \
   "$RESULTS_DIR" \
   "$TEST_LOGS_DIR" \
   "GLASSDECK_LIVE_SSH_ENABLED=1" \
@@ -96,7 +106,7 @@ XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_test \
   "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_KEY_PATH=$GLASSDECK_TEST_SSH_KEY" \
   "SIMCTL_CHILD_GLASSDECK_UI_SCREENSHOT_CAPTURE=1" \
   -- \
-  clean test \
+  "${XCODE_ACTION_ARGS[@]}" \
   "-only-testing:${TEST_FILTERS[0]}" \
   "-only-testing:${TEST_FILTERS[1]}"
 

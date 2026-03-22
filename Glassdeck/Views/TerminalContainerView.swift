@@ -212,7 +212,7 @@ private struct SessionDetailContent: View {
                     .presentationDetents([.medium, .large])
             case .settings:
                 TerminalSettingsView()
-                    .presentationDetents([.large])
+                    .presentationDetents([.medium, .large])
             case .help:
                 HelpBrowserView()
                     .presentationDetents([.large])

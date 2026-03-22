@@ -176,7 +176,7 @@ struct ConnectionsRootView: View {
                 .presentationDetents([.large])
             case .settings:
                 TerminalSettingsView()
-                    .presentationDetents([.large])
+                    .presentationDetents([.medium, .large])
             case .help:
                 HelpBrowserView()
                     .presentationDetents([.large])

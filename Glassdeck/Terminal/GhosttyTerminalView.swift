@@ -1052,8 +1052,17 @@ private final class GhosttyMetalRenderer {
         let shouldReuseFrame = projection.dirtyState == .partial && cachedFrame != nil
         let dirtyRows = Set(projection.dirtyRows)
 
-        // Update VT cursor style from terminal state (DECSCUSR)
-        _vtCursorVisualStyle = projection.cursor.visualStyle
+        // Update VT cursor style from terminal state (DECSCUSR).
+        // Only activate VT override when the engine reports a style change,
+        // indicating a program sent DECSCUSR. Otherwise use user config.
+        let vtStyle = projection.cursor.visualStyle
+        if vtStyle != _lastVtCursorStyle {
+            _vtCursorStyleOverrideActive = true
+            _lastVtCursorStyle = vtStyle
+        }
+        if _vtCursorStyleOverrideActive {
+            _vtCursorVisualStyle = vtStyle
+        }
 
         // Manage text blink timer
         let anyBlinkCells = projection.rowsProjection.contains { row in
@@ -1292,6 +1301,11 @@ private final class GhosttyMetalRenderer {
             y: lineRect.minY + max(0, floor((lineRect.height - regularFont.lineHeight) / 2))
         )
 
+        // Compute kern correction once from the regular font so all runs
+        // (bold and regular) advance by exactly cellSize.width per character.
+        let naturalAdvance = ("W" as NSString).size(withAttributes: [.font: regularFont]).width
+        let kernCorrection = metrics.cellSize.width - naturalAdvance
+
         let attributed = NSMutableAttributedString()
         var runStyle: GhosttyVTTextStyle?
         var runText = ""
@@ -1307,7 +1321,7 @@ private final class GhosttyMetalRenderer {
                 .font: resolvedFont(for: style, regular: regularFont, bold: boldFont),
                 .foregroundColor: colors.foreground.withAlphaComponent(style.faint ? 0.6 : 1.0),
                 .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0,
-                .kern: 0.0,
+                .kern: kernCorrection,
                 .ligature: 0
             ]
             if let uStyle = underlineStyle(for: style.underline) {
@@ -1567,6 +1581,9 @@ private final class GhosttyMetalRenderer {
 
     /// VT-resolved cursor style from the terminal (set via DECSCUSR sequences).
     private var _vtCursorVisualStyle: GhosttyVTCursorVisualStyle?
+    /// Tracks whether DECSCUSR has actively changed the cursor style.
+    private var _vtCursorStyleOverrideActive = false
+    private var _lastVtCursorStyle: GhosttyVTCursorVisualStyle = .block
 
     private var configuredCursorVisualStyle: GhosttyVTCursorVisualStyle {
         switch configuration.cursorStyle {

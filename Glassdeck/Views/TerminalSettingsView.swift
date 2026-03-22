@@ -90,76 +90,6 @@ struct TerminalSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Auto-Reconnect", isOn: autoReconnectBinding)
-
-                    HStack {
-                        Text("Reconnect Delay")
-                        Spacer()
-                        Text(reconnectDelayText)
-                            .foregroundStyle(.secondary)
-                        Stepper(
-                            "",
-                            value: reconnectDelayBinding,
-                            in: 0.5...30,
-                            step: 0.5
-                        )
-                        .labelsHidden()
-                    }
-
-                    HStack {
-                        Text("Max Attempts")
-                        Spacer()
-                        Text("\(appSettings.maxReconnectAttempts)")
-                            .foregroundStyle(.secondary)
-                        Stepper(
-                            "",
-                            value: maxReconnectAttemptsBinding,
-                            in: 1...20
-                        )
-                        .labelsHidden()
-                    }
-                } header: {
-                    Text("Session Persistence")
-                } footer: {
-                    Text("Dropped sessions are restored on foreground return, using the saved reconnect policy below.")
-                }
-
-                Section {
-                    Toggle(
-                        "Keep Live Sessions Active in Background",
-                        isOn: backgroundPersistenceEnabledBinding
-                    )
-
-                    LabeledContent(
-                        "Location Services",
-                        value: backgroundPersistenceController.isLocationServicesEnabled ? "Available" : "Unavailable"
-                    )
-
-                    LabeledContent(
-                        "Runtime",
-                        value: backgroundPersistenceController.isRuntimeActive ? "Active" : "Inactive"
-                    )
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(backgroundPersistenceController.authorizationDescription)
-                        Text(backgroundPersistenceController.statusMessage)
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                    if appSettings.backgroundPersistenceEnabled,
-                       backgroundPersistenceController.authorizationStatus == .notDetermined {
-                        Button("Request Location Permission") {
-                            lifecycleCoordinator.refreshSettingsDrivenRuntime()
-                        }
-                    }
-                } header: {
-                    Text("Background Persistence")
-                } footer: {
-                    Text("Uses Core Location background activity only while live sessions exist. This is best-effort and may affect battery life.")
-                }
-
-                Section {
                     Picker("Target", selection: $selectedDisplayTarget) {
                         ForEach(TerminalDisplayTarget.allCases) { target in
                             Text(target.label).tag(target)
@@ -234,6 +164,76 @@ struct TerminalSettingsView: View {
                     Text("Behavior")
                 } footer: {
                     Text("Applying a profile live preserves the SSH connection, but the visible terminal view may be recreated.")
+                }
+
+                Section {
+                    Toggle("Auto-Reconnect", isOn: autoReconnectBinding)
+
+                    HStack {
+                        Text("Reconnect Delay")
+                        Spacer()
+                        Text(reconnectDelayText)
+                            .foregroundStyle(.secondary)
+                        Stepper(
+                            "",
+                            value: reconnectDelayBinding,
+                            in: 0.5...30,
+                            step: 0.5
+                        )
+                        .labelsHidden()
+                    }
+
+                    HStack {
+                        Text("Max Attempts")
+                        Spacer()
+                        Text("\(appSettings.maxReconnectAttempts)")
+                            .foregroundStyle(.secondary)
+                        Stepper(
+                            "",
+                            value: maxReconnectAttemptsBinding,
+                            in: 1...20
+                        )
+                        .labelsHidden()
+                    }
+                } header: {
+                    Text("Session Persistence")
+                } footer: {
+                    Text("Dropped sessions are restored on foreground return, using the saved reconnect policy below.")
+                }
+
+                Section {
+                    Toggle(
+                        "Keep Live Sessions Active in Background",
+                        isOn: backgroundPersistenceEnabledBinding
+                    )
+
+                    LabeledContent(
+                        "Location Services",
+                        value: backgroundPersistenceController.isLocationServicesEnabled ? "Available" : "Unavailable"
+                    )
+
+                    LabeledContent(
+                        "Runtime",
+                        value: backgroundPersistenceController.isRuntimeActive ? "Active" : "Inactive"
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(backgroundPersistenceController.authorizationDescription)
+                        Text(backgroundPersistenceController.statusMessage)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    if appSettings.backgroundPersistenceEnabled,
+                       backgroundPersistenceController.authorizationStatus == .notDetermined {
+                        Button("Request Location Permission") {
+                            lifecycleCoordinator.refreshSettingsDrivenRuntime()
+                        }
+                    }
+                } header: {
+                    Text("Background Persistence")
+                } footer: {
+                    Text("Uses Core Location background activity only while live sessions exist. This is best-effort and may affect battery life.")
                 }
 
                 Section {

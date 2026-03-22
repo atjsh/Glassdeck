@@ -19,7 +19,7 @@ LOCAL_PACKAGE_SECTION = re.compile(
 )
 
 PRODUCT_DEPENDENCY_SECTION = re.compile(
-    r'(?P<uuid>[A-F0-9]{24}) /\* (?P<label>[^*]+?) \*/ = \{\n'
+    r"(?P<uuid>[A-F0-9]{24}) /\* (?P<label>[^*]+?) \*/ = \{\n"
     r"\s*isa = XCSwiftPackageProductDependency;\n"
     r"(?P<body>(?:\s*.*\n)*?)"
     r"\s*productName = (?P<product_name>[^;]+);\n"
@@ -43,7 +43,7 @@ PBX_RESOURCES_SECTION = re.compile(
 )
 
 RESOURCES_GROUP = re.compile(
-    r'(?P<uuid>[A-F0-9]{24}) /\* Resources \*/ = \{\n'
+    r"(?P<uuid>[A-F0-9]{24}) /\* Resources \*/ = \{\n"
     r"\s*isa = PBXGroup;\n"
     r"\s*children = \(\n"
     r"(?P<body>.*?)"
@@ -55,7 +55,7 @@ RESOURCES_GROUP = re.compile(
 )
 
 APP_TARGET = re.compile(
-    r'(?P<uuid>[A-F0-9]{24}) /\* GlassdeckApp \*/ = \{\n'
+    r"(?P<uuid>[A-F0-9]{24}) /\* GlassdeckApp \*/ = \{\n"
     r"\s*isa = PBXNativeTarget;\n"
     r"(?P<body>.*?)"
     r"\s*productType = \"com\.apple\.product-type\.application\";\n"
@@ -83,8 +83,12 @@ RESOURCE_PHASE_UUID = "A112B0F00C0DEBEEF0011001"
 RESOURCE_PHASE_LABEL = "Resources"
 
 APP_RESOURCES = (
-    ResourceSpec("Assets.xcassets", "folder.assetcatalog", "Glassdeck/Resources/Assets.xcassets"),
-    ResourceSpec("AppIcon.icon", "folder.iconcomposer.icon", "Glassdeck/Resources/AppIcon.icon"),
+    ResourceSpec(
+        "Assets.xcassets", "folder.assetcatalog", "Glassdeck/Resources/Assets.xcassets"
+    ),
+    ResourceSpec(
+        "AppIcon.icon", "folder.iconcomposer.icon", "Glassdeck/Resources/AppIcon.icon"
+    ),
 )
 
 
@@ -135,13 +139,17 @@ def product_matches(text: str, product_name: str) -> list[re.Match[str]]:
     ]
 
 
-def patch_product_dependency(text: str, package_match: re.Match[str], product_match: re.Match[str]) -> str:
+def patch_product_dependency(
+    text: str, package_match: re.Match[str], product_match: re.Match[str]
+) -> str:
     product_block = product_match.group(0)
     package_uuid = package_match.group("uuid")
     package_label = package_match.group("label")
     package_line = f'\t\t\tpackage = {package_uuid} /* XCLocalSwiftPackageReference "{package_label}" */;\n'
 
-    if re.search(r"\n\s*package = [A-F0-9]{24} /\* XCLocalSwiftPackageReference ", product_block):
+    if re.search(
+        r"\n\s*package = [A-F0-9]{24} /\* XCLocalSwiftPackageReference ", product_block
+    ):
         patched_block = re.sub(
             r'\n\s*package = [A-F0-9]{24} /\* XCLocalSwiftPackageReference "[^"]+" \*/;\n',
             "\n" + package_line,
@@ -152,7 +160,9 @@ def patch_product_dependency(text: str, package_match: re.Match[str], product_ma
         insertion_marker = "\t\t\tproductName = "
         if insertion_marker not in product_block:
             fail("product dependency block does not contain a productName line.")
-        patched_block = product_block.replace(insertion_marker, package_line + insertion_marker, 1)
+        patched_block = product_block.replace(
+            insertion_marker, package_line + insertion_marker, 1
+        )
 
     return text.replace(product_block, patched_block, 1)
 
@@ -192,8 +202,8 @@ def ensure_file_reference_entries(text: str) -> str:
         if marker in body:
             continue
         additions.append(
-            f'\t\t{resource.file_ref_uuid} /* {resource.label} */ = '
-            f'{{isa = PBXFileReference; lastKnownFileType = {resource.file_type}; '
+            f"\t\t{resource.file_ref_uuid} /* {resource.label} */ = "
+            f"{{isa = PBXFileReference; lastKnownFileType = {resource.file_type}; "
             f'name = {resource.label}; path = "{resource.path}"; sourceTree = SOURCE_ROOT; }};\n'
         )
 
@@ -268,7 +278,7 @@ def ensure_app_target_resources_phase(text: str) -> str:
         re.DOTALL,
     )
     if not build_phases_match:
-        fail('GlassdeckApp target buildPhases list not found.')
+        fail("GlassdeckApp target buildPhases list not found.")
 
     body = build_phases_match.group("body")
     entry = f"\t\t\t\t{RESOURCE_PHASE_UUID} /* {RESOURCE_PHASE_LABEL} */,\n"
@@ -313,7 +323,7 @@ def verify_resources(text: str) -> None:
 
     target_match = APP_TARGET.search(text)
     if not target_match or RESOURCE_PHASE_UUID not in target_match.group(0):
-        fail('GlassdeckApp target does not reference the Resources build phase.')
+        fail("GlassdeckApp target does not reference the Resources build phase.")
 
     for resource in APP_RESOURCES:
         if resource.file_ref_uuid not in text:
@@ -341,7 +351,9 @@ def main() -> None:
             f'expected exactly one package product dependency for "{args.product_name}", found {len(product_match_list)}.'
         )
 
-    patched_text = patch_product_dependency(text, package_match_list[0], product_match_list[0])
+    patched_text = patch_product_dependency(
+        text, package_match_list[0], product_match_list[0]
+    )
     patched_text = ensure_build_file_entries(patched_text)
     patched_text = ensure_file_reference_entries(patched_text)
     patched_text = ensure_resources_group_children(patched_text)

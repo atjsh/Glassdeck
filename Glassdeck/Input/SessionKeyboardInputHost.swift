@@ -32,7 +32,7 @@ final class SessionKeyboardHostView: UIView, UITextInput, UITextInputTraits {
     var smartDashesType: UITextSmartDashesType = .no
     var smartInsertDeleteType: UITextSmartInsertDeleteType = .no
     var smartQuotesType: UITextSmartQuotesType = .no
-    var keyboardType: UIKeyboardType = .asciiCapable
+    var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
     var returnKeyType: UIReturnKeyType = .default
     var enablesReturnKeyAutomatically: Bool = false

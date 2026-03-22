@@ -124,7 +124,9 @@ final class SessionManager {
     }
 
     func isTerminalPresentationReady(for session: SSHSessionModel) -> Bool {
-        session.surface != nil && session.terminalHasRenderedFrame
+        session.surface != nil
+            && session.terminalHasRenderedFrame
+            && (session.isConnected || !session.terminalVisibleTextSummary.isEmpty)
     }
 
     func isSessionDetailPresentable(for session: SSHSessionModel) -> Bool {

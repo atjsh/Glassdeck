@@ -131,7 +131,10 @@ private struct SessionDetailContent: View {
                 .padding(24)
             }
         }
-        .background(showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : terminalBackgroundColor)
+        .background {
+            (showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : terminalBackgroundColor)
+                .ignoresSafeArea()
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarBackground(showingRemoteTrackpad ? .regularMaterial : .ultraThinMaterial, for: .navigationBar)

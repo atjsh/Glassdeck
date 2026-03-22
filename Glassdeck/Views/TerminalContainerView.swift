@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import GlassdeckCore
+import UIKit
 import SwiftUI
 
 private enum SessionPresentationSheet: Identifiable {
@@ -135,9 +136,10 @@ private struct SessionDetailContent: View {
             (showingRemoteTrackpad ? Color(uiColor: .systemGroupedBackground) : terminalBackgroundColor)
                 .ignoresSafeArea()
         }
+        .background(SessionDetailNavigationBarClearAppearance())
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(showingRemoteTrackpad ? .regularMaterial : .ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(.clear, for: .navigationBar)
         .toolbarColorScheme(showingRemoteTrackpad ? .light : .dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -313,6 +315,72 @@ private struct SessionDetailContent: View {
         case .connected, .connecting, .authenticating, .reconnecting:
             nil
         }
+    }
+}
+
+private struct SessionDetailNavigationBarClearAppearance: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        UIViewController()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        guard let navigationBar = uiViewController.navigationController?.navigationBar else {
+            return
+        }
+
+        if context.coordinator.stashedStandard == nil {
+            context.coordinator.stashedStandard = navigationBar.standardAppearance
+            context.coordinator.stashedScrollEdge = navigationBar.scrollEdgeAppearance
+            context.coordinator.stashedCompact = navigationBar.compactAppearance
+            if #available(iOS 15.0, *) {
+                context.coordinator.stashedCompactScrollEdge = navigationBar.compactScrollEdgeAppearance
+            }
+        }
+
+        let clearAppearance = UINavigationBarAppearance()
+        clearAppearance.configureWithTransparentBackground()
+        clearAppearance.backgroundColor = .clear
+        clearAppearance.shadowColor = .clear
+        navigationBar.standardAppearance = clearAppearance
+        navigationBar.scrollEdgeAppearance = clearAppearance
+        navigationBar.compactAppearance = clearAppearance
+        if #available(iOS 15.0, *) {
+            navigationBar.compactScrollEdgeAppearance = clearAppearance
+        }
+    }
+
+    static func dismantleUIViewController(
+        _ uiViewController: UIViewController,
+        coordinator: Coordinator
+    ) {
+        guard let navigationBar = uiViewController.navigationController?.navigationBar else {
+            return
+        }
+        if let stashedStandard = coordinator.stashedStandard {
+            navigationBar.standardAppearance = stashedStandard
+        }
+        if let stashedScrollEdge = coordinator.stashedScrollEdge {
+            navigationBar.scrollEdgeAppearance = stashedScrollEdge
+        }
+        if let stashedCompact = coordinator.stashedCompact {
+            navigationBar.compactAppearance = stashedCompact
+        }
+        if #available(iOS 15.0, *) {
+            if let stashedCompactScrollEdge = coordinator.stashedCompactScrollEdge {
+                navigationBar.compactScrollEdgeAppearance = stashedCompactScrollEdge
+            }
+        }
+    }
+
+    final class Coordinator {
+        var stashedStandard: UINavigationBarAppearance?
+        var stashedScrollEdge: UINavigationBarAppearance?
+        var stashedCompact: UINavigationBarAppearance?
+        var stashedCompactScrollEdge: UINavigationBarAppearance?
     }
 }
 

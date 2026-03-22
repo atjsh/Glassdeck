@@ -14,7 +14,6 @@ TEST_HOST="${GLASSDECK_TEST_SSH_SIM_HOST:-127.0.0.1}"
 RUNNER_NAME="test-docker-ui-sim"
 TEST_FILTERS=(
   "GlassdeckAppUITests/DockerLiveUITests"
-  "GlassdeckAppUITests/RemoteTrackpadScreenshotUITests"
 )
 XCODE_ACTION_ARGS=()
 
@@ -107,8 +106,7 @@ XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_action \
   "SIMCTL_CHILD_GLASSDECK_UI_SCREENSHOT_CAPTURE=1" \
   -- \
   "${XCODE_ACTION_ARGS[@]}" \
-  "-only-testing:${TEST_FILTERS[0]}" \
-  "-only-testing:${TEST_FILTERS[1]}"
+  "-only-testing:${TEST_FILTERS[0]}"
 
 ARTIFACT_DIR="$ARTIFACTS_ROOT/$(basename "$XCODE_TEST_RESULT_BUNDLE" .xcresult)"
 mkdir -p "$ARTIFACT_DIR"

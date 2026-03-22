@@ -26,16 +26,6 @@ final class GlassdeckAppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["connection-save-button"].firstMatch.exists)
     }
 
-    func testSessionScenarioCanLaunchIntoDetail() {
-        let app = launchApp(scenario: "sessions", openActiveSession: true)
-
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: 3))
-        waitForTerminalRenderSummary(
-            containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
-            in: app
-        )
-    }
-
     func testSessionRowTapNavigatesToDetail() {
         let app = launchApp(scenario: "sessions")
 

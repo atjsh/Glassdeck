@@ -1306,7 +1306,9 @@ private final class GhosttyMetalRenderer {
             var attributes: [NSAttributedString.Key: Any] = [
                 .font: resolvedFont(for: style, regular: regularFont, bold: boldFont),
                 .foregroundColor: colors.foreground.withAlphaComponent(style.faint ? 0.6 : 1.0),
-                .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+                .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0,
+                .kern: 0.0,
+                .ligature: 0
             ]
             if let uStyle = underlineStyle(for: style.underline) {
                 attributes[.underlineStyle] = uStyle.rawValue

@@ -20,12 +20,30 @@ struct SessionKeyboardInputHost: UIViewRepresentable {
     }
 }
 
-final class SessionKeyboardHostView: UIView, UITextInput {
+final class SessionKeyboardHostView: UIView, UITextInput, UITextInputTraits {
     private weak var surface: GhosttySurface?
     private let suppressedInputView = UIView(frame: .zero)
     private var softwareKeyboardPresented = false
     private var _markedText: String?
     private var _markedTextSelectedRange: NSRange = NSRange(location: NSNotFound, length: 0)
+    var autocapitalizationType: UITextAutocapitalizationType = .none
+    var autocorrectionType: UITextAutocorrectionType = .no
+    var spellCheckingType: UITextSpellCheckingType = .no
+    var smartDashesType: UITextSmartDashesType = .no
+    var smartInsertDeleteType: UITextSmartInsertDeleteType = .no
+    var smartQuotesType: UITextSmartQuotesType = .no
+    var keyboardType: UIKeyboardType = .asciiCapable
+    var textContentType: UITextContentType? = nil
+    var returnKeyType: UIReturnKeyType = .default
+    var enablesReturnKeyAutomatically: Bool = false
+    var keyboardAppearance: UIKeyboardAppearance = .default
+
+    override var inputAssistantItem: UITextInputAssistantItem {
+        let item = super.inputAssistantItem
+        item.leadingBarButtonGroups = []
+        item.trailingBarButtonGroups = []
+        return item
+    }
 
     // MARK: - UITextInput token/delegate support
 

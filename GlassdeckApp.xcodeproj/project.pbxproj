@@ -79,6 +79,7 @@
 		D91C292466C7379C3E509D27 /* GlassdeckCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */; };
 		DF914286741A1D00D74BB5C0 /* AppChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E834C2043B25F09FF46E75D3 /* AppChrome.swift */; };
+		E01D1526CE9FB9B41BB8268A /* TerminalRenderingConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C177AD1D58783D01618EAC18 /* TerminalRenderingConsistencyTests.swift */; };
 		E3B0F60EDDEA3E62A03BF57A /* RemoteControlSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0020F203A8B8772184F0D1 /* RemoteControlSupport.swift */; };
 		E50D7EFEAF56DBE4009853A2 /* GlassdeckCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; };
 		E69B87144634AFD2108CB61B /* GlassdeckEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025660FB2C230BA04A599321 /* GlassdeckEnvironment.swift */; };
@@ -204,6 +205,7 @@
 		B43E247EDE97B43ACE6C6311 /* GlassdeckApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GlassdeckApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadScreenshotUITests.swift; sourceTree = "<group>"; };
 		BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalView.swift; sourceTree = "<group>"; };
+		C177AD1D58783D01618EAC18 /* TerminalRenderingConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderingConsistencyTests.swift; sourceTree = "<group>"; };
 		C181B166BD2A79C753076DF3 /* UITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
 		C3105D44E097230A7374ACEC /* RemoteControlMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlMode.swift; sourceTree = "<group>"; };
 		C8B5CB256BA567E878E4D8D1 /* SessionPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceStore.swift; sourceTree = "<group>"; };
@@ -343,6 +345,7 @@
 				962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */,
 				91CE5CCAADE8E98F433CBF78 /* SessionKeyboardIMETests.swift */,
 				B2B0FD52A1FD108E8E0D2A46 /* SessionPersistenceTests.swift */,
+				C177AD1D58783D01618EAC18 /* TerminalRenderingConsistencyTests.swift */,
 			);
 			path = GlassdeckAppTests;
 			sourceTree = "<group>";
@@ -753,6 +756,7 @@
 				DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */,
 				7B7FCF2EB120FA268F20EC50 /* SessionKeyboardIMETests.swift in Sources */,
 				41DB6CE7DB830E5E94F8DD44 /* SessionPersistenceTests.swift in Sources */,
+				E01D1526CE9FB9B41BB8268A /* TerminalRenderingConsistencyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

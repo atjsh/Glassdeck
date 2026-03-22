@@ -1392,11 +1392,18 @@ private final class GhosttyMetalRenderer {
         let shouldHideForBlink = style.blink && !blinkPhaseVisible
         guard !shouldHideForBlink else { return }
         let font = resolvedFont(for: style, regular: regularFont, bold: boldFont)
-        let drawRect = GhosttySurfaceLayoutMetrics.textRect(for: rect, font: font)
+        let naturalAdvance = ("W" as NSString).size(withAttributes: [.font: regularFont]).width
+        let kernCorrection = metrics.cellSize.width - naturalAdvance
+        let drawPoint = CGPoint(
+            x: rect.minX,
+            y: rect.minY + max(0, floor((rect.height - regularFont.lineHeight) / 2))
+        )
         var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(style.faint ? 0.6 : 1.0),
-            .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
+            .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0,
+            .kern: kernCorrection,
+            .ligature: 0
         ]
         if let uStyle = underlineStyle(for: style.underline) {
             attributes[.underlineStyle] = uStyle.rawValue
@@ -1408,7 +1415,7 @@ private final class GhosttyMetalRenderer {
                 fallback: colors.foreground
             )
         }
-        (text as NSString).draw(in: drawRect, withAttributes: attributes)
+        (text as NSString).draw(at: drawPoint, withAttributes: attributes)
 
         // Draw overline
         if style.overline {

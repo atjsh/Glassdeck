@@ -34,6 +34,10 @@ struct LiveDockerUITestConfiguration {
     }
 }
 
+enum UITestEnvironmentKeys {
+    static let preserveHostBackedState = "GLASSDECK_UI_TEST_PRESERVE_HOST_STATE"
+}
+
 @MainActor
 extension XCTestCase {
     private struct ScreenshotAnalysis {
@@ -71,6 +75,24 @@ extension XCTestCase {
         return app
     }
 
+    @discardableResult
+    func launchHostBackedUITestApp(
+        openActiveSession: Bool = false,
+        additionalArguments: [String] = [],
+        additionalEnvironment: [String: String] = [:]
+    ) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTestDisableAnimations"]
+        if openActiveSession {
+            app.launchArguments.append("-uiTestOpenActiveSession")
+        }
+        app.launchArguments.append(contentsOf: additionalArguments)
+        app.launchEnvironment[UITestEnvironmentKeys.preserveHostBackedState] = "1"
+        app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
+        app.launch()
+        return app
+    }
+
     func captureScreenshot(
         named name: String,
         file: StaticString = #filePath,
@@ -93,6 +115,18 @@ extension XCTestCase {
         return screenshot
     }
 
+    func captureTextAttachment(
+        named name: String,
+        text: String
+    ) {
+        let attachment = XCTAttachment(
+            string: text.isEmpty ? "[empty]" : text
+        )
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     @discardableResult
     func captureElementScreenshot(
         of element: XCUIElement,
@@ -113,6 +147,65 @@ extension XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         return screenshot
+    }
+
+    @discardableResult
+    func captureElementScreenshotIfPresent(
+        of element: XCUIElement,
+        named name: String
+    ) -> XCUIScreenshot? {
+        guard element.exists else {
+            return nil
+        }
+
+        let screenshot = element.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        return screenshot
+    }
+
+    func captureTerminalDiagnostics(
+        in app: XCUIApplication,
+        named name: String
+    ) {
+        let screenName = "\(name)-screen"
+        _ = captureScreenScreenshot(named: screenName)
+
+        let sessionDetail = app.otherElements["session-detail-view"].firstMatch
+        _ = captureElementScreenshotIfPresent(
+            of: sessionDetail,
+            named: "\(name)-session-detail"
+        )
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        _ = captureElementScreenshotIfPresent(
+            of: terminalSurface,
+            named: "\(name)-terminal-surface"
+        )
+
+        let placeholder = app.otherElements["terminal-presentation-placeholder"].firstMatch
+        _ = captureElementScreenshotIfPresent(
+            of: placeholder,
+            named: "\(name)-terminal-placeholder"
+        )
+
+        let summaryElement = app.descendants(matching: .any)
+            .matching(identifier: "terminal-render-summary")
+            .firstMatch
+        if summaryElement.exists {
+            let summary = (summaryElement.value as? String) ?? summaryElement.label
+            captureTextAttachment(
+                named: "\(name)-terminal-summary",
+                text: summary
+            )
+        }
+
+        captureTextAttachment(
+            named: "\(name)-ui-debug-description",
+            text: app.debugDescription
+        )
     }
 
     func assertScreenshotIsNotBlank(
@@ -218,6 +311,37 @@ extension XCTestCase {
         )
     }
 
+    func assertScreenHasAverageBrightness(
+        named name: String,
+        minimumAverageBrightness: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let screenshot = captureScreenScreenshot(
+            named: name,
+            file: file,
+            line: line
+        )
+
+        guard let buffer = Self.decodeScreenshotPixelBuffer(screenshot) else {
+            XCTFail(
+                "Failed to decode screenshot for '\(name)'.",
+                file: file,
+                line: line
+            )
+            return
+        }
+
+        let analysis = Self.analyze(buffer, minimumChannelDelta: 18)
+        XCTAssertGreaterThanOrEqual(
+            analysis.averageBrightness,
+            minimumAverageBrightness,
+            "Expected '\(name)' to remain visibly light; sampled average brightness \(analysis.averageBrightness).",
+            file: file,
+            line: line
+        )
+    }
+
     func assertScreenshotsDiffer(
         _ first: XCUIScreenshot,
         _ second: XCUIScreenshot,
@@ -279,6 +403,10 @@ extension XCTestCase {
         }
 
         let currentSummary = (summaryElement.value as? String) ?? summaryElement.label
+        captureTerminalDiagnostics(
+            in: app,
+            named: "terminal-summary-timeout-\(accessibilitySlug(marker))"
+        )
         XCTFail(
             "Timed out waiting for terminal render summary to contain '\(marker)'. Current summary: \(currentSummary)",
             file: file,
@@ -315,6 +443,10 @@ extension XCTestCase {
         }
 
         let currentSummary = (summaryElement.value as? String) ?? summaryElement.label
+        captureTerminalDiagnostics(
+            in: app,
+            named: "terminal-summary-timeout-any-\(accessibilitySlug(markers.joined(separator: "-")))"
+        )
         XCTFail(
             "Timed out waiting for terminal render summary to contain any of: \(markers). Current summary: \(currentSummary)",
             file: file,
@@ -356,6 +488,41 @@ extension XCTestCase {
             line: line
         )
         return Self.animationFrameIndex(from: currentValue) ?? frame
+    }
+
+    func waitForTerminalKeyboardState(
+        presented: Bool,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 5,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let host = app.descendants(matching: .any)
+            .matching(identifier: "session-keyboard-host")
+            .firstMatch
+        XCTAssertTrue(
+            host.waitForExistence(timeout: 5),
+            "Expected the terminal keyboard host to exist.",
+            file: file,
+            line: line
+        )
+
+        let expectedValue = presented ? "presented" : "hidden"
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let currentValue = (host.value as? String) ?? host.label
+            if currentValue == expectedValue {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+
+        let currentValue = (host.value as? String) ?? host.label
+        XCTFail(
+            "Timed out waiting for terminal keyboard state to become \(expectedValue). Current state: \(currentValue)",
+            file: file,
+            line: line
+        )
     }
 
     func currentAnimationFrame(

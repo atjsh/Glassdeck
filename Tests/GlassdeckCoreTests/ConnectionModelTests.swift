@@ -45,7 +45,7 @@ final class ConnectionStoreTests: XCTestCase {
 }
 
 final class AppSettingsTests: XCTestCase {
-    func testAppSettingsPersistsTerminalConfiguration() {
+    func testAppSettingsPersistsTerminalConfigurationsIndependently() {
         let suiteName = "Glassdeck.AppSettingsTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -56,7 +56,7 @@ final class AppSettingsTests: XCTestCase {
             defaults: defaults,
             terminalConfigStorageKey: "terminal-config"
         )
-        settings.terminalConfig = TerminalConfiguration(
+        settings.iphoneTerminalConfig = TerminalConfiguration(
             fontSize: 18,
             colorScheme: .defaultLight,
             scrollbackLines: 24_000,
@@ -64,18 +64,98 @@ final class AppSettingsTests: XCTestCase {
             cursorBlink: false,
             bellSound: false
         )
+        settings.externalMonitorTerminalConfig = TerminalConfiguration(
+            fontSize: 24,
+            colorScheme: .tokyoNight,
+            scrollbackLines: 42_000,
+            cursorStyle: .underline,
+            cursorBlink: true,
+            bellSound: true
+        )
 
         let reloaded = AppSettings(
             defaults: defaults,
             terminalConfigStorageKey: "terminal-config"
         )
-        XCTAssertEqual(reloaded.terminalConfig.fontSize, 18)
-        XCTAssertEqual(reloaded.terminalConfig.colorScheme, .defaultLight)
-        XCTAssertEqual(reloaded.terminalConfig.scrollbackLines, 24_000)
-        XCTAssertEqual(reloaded.terminalConfig.cursorStyle, .bar)
-        XCTAssertFalse(reloaded.terminalConfig.cursorBlink)
-        XCTAssertFalse(reloaded.terminalConfig.bellSound)
+        XCTAssertEqual(reloaded.iphoneTerminalConfig.fontSize, 18)
+        XCTAssertEqual(reloaded.iphoneTerminalConfig.colorScheme, .defaultLight)
+        XCTAssertEqual(reloaded.iphoneTerminalConfig.scrollbackLines, 24_000)
+        XCTAssertEqual(reloaded.iphoneTerminalConfig.cursorStyle, .bar)
+        XCTAssertFalse(reloaded.iphoneTerminalConfig.cursorBlink)
+        XCTAssertFalse(reloaded.iphoneTerminalConfig.bellSound)
+        XCTAssertEqual(reloaded.externalMonitorTerminalConfig.fontSize, 24)
+        XCTAssertEqual(reloaded.externalMonitorTerminalConfig.colorScheme, .tokyoNight)
+        XCTAssertEqual(reloaded.externalMonitorTerminalConfig.scrollbackLines, 42_000)
+        XCTAssertEqual(reloaded.externalMonitorTerminalConfig.cursorStyle, .underline)
+        XCTAssertTrue(reloaded.externalMonitorTerminalConfig.cursorBlink)
+        XCTAssertTrue(reloaded.externalMonitorTerminalConfig.bellSound)
+        XCTAssertEqual(reloaded.terminalConfig, reloaded.iphoneTerminalConfig)
     }
+
+    func testAppSettingsMigratesLegacyTerminalConfigurationIntoDisplayProfiles() throws {
+        let suiteName = "Glassdeck.AppSettingsMigrationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let legacyConfiguration = TerminalConfiguration(
+            fontSize: 18,
+            colorScheme: .defaultLight,
+            scrollbackLines: 24_000,
+            cursorStyle: .bar,
+            cursorBlink: false,
+            bellSound: false
+        )
+        defaults.set(
+            try JSONEncoder().encode(legacyConfiguration),
+            forKey: "terminal-config"
+        )
+
+        let settings = AppSettings(
+            defaults: defaults,
+            terminalConfigStorageKey: "terminal-config"
+        )
+
+        XCTAssertEqual(settings.iphoneTerminalConfig, legacyConfiguration)
+        XCTAssertEqual(settings.externalMonitorTerminalConfig.colorScheme, .defaultLight)
+        XCTAssertEqual(settings.externalMonitorTerminalConfig.scrollbackLines, 24_000)
+        XCTAssertEqual(settings.externalMonitorTerminalConfig.cursorStyle, .bar)
+        XCTAssertFalse(settings.externalMonitorTerminalConfig.cursorBlink)
+        XCTAssertFalse(settings.externalMonitorTerminalConfig.bellSound)
+        XCTAssertEqual(
+            settings.externalMonitorTerminalConfig.fontSize,
+            max(legacyConfiguration.fontSize * 1.35, legacyConfiguration.fontSize + 4),
+            accuracy: 0.001
+        )
+        XCTAssertNotNil(defaults.data(forKey: "terminal-config.iphone"))
+        XCTAssertNotNil(defaults.data(forKey: "terminal-config.external-monitor"))
+    }
+
+    func testAppSettingsPersistsReconnectAndBackgroundPreferences() {
+        let suiteName = "Glassdeck.AppSettingsReconnectTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = AppSettings(defaults: defaults)
+        settings.autoReconnect = false
+        settings.reconnectDelay = 1.5
+        settings.maxReconnectAttempts = 9
+        settings.hapticFeedback = false
+        settings.remoteTrackpadLastMode = .mouse
+        settings.backgroundPersistenceEnabled = true
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertFalse(reloaded.autoReconnect)
+        XCTAssertEqual(reloaded.reconnectDelay, 1.5, accuracy: 0.001)
+        XCTAssertEqual(reloaded.maxReconnectAttempts, 9)
+        XCTAssertFalse(reloaded.hapticFeedback)
+        XCTAssertEqual(reloaded.remoteTrackpadLastMode, .mouse)
+        XCTAssertTrue(reloaded.backgroundPersistenceEnabled)
+    }
+
 }
 
 final class TerminalConfigurationTests: XCTestCase {

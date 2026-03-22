@@ -15,6 +15,11 @@ struct ExternalTerminalView: View {
                 TerminalSurfaceView(session: session)
                     .ignoresSafeArea()
 
+                if !sessionManager.isTerminalPresentationReady(for: session) {
+                    TerminalPresentationPlaceholderView(session: session)
+                        .ignoresSafeArea()
+                }
+
                 RemotePointerOverlay(session: session)
                     .allowsHitTesting(false)
 

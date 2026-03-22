@@ -15,15 +15,94 @@ struct GhosttySurfaceState: Sendable, Equatable {
     let isHealthy: Bool
     let renderFailureReason: String?
     let visibleTextSummary: String
+    let hasRenderedFrame: Bool
     let animationProgress: GhosttyHomeAnimationProgress?
     let interactionGeometry: RemoteTerminalGeometry
     let interactionCapabilities: GhosttyVTInteractionCapabilities
+    let softwareKeyboardPresented: Bool
 }
 
 struct GhosttySurfaceMetricsPreset: Equatable {
     let cellSize: CGSize
     let padding: UIEdgeInsets
     let accentForegroundColor: GhosttyVTColor?
+}
+
+enum GhosttySurfaceDisplayMode: Sendable, Equatable {
+    case standard
+    case externalDisplay
+}
+
+enum GhosttySurfaceLayoutMetrics {
+    @MainActor
+    static func displayMode(for windowScene: UIWindowScene?) -> GhosttySurfaceDisplayMode {
+        guard windowScene?.session.role == .windowExternalDisplayNonInteractive else {
+            return .standard
+        }
+        return .externalDisplay
+    }
+
+    static func fontSize(for configuration: TerminalConfiguration, mode: GhosttySurfaceDisplayMode) -> CGFloat {
+        CGFloat(configuration.fontSize)
+    }
+
+    static func cellSize(
+        for configuration: TerminalConfiguration,
+        mode: GhosttySurfaceDisplayMode,
+        metricsPreset: GhosttySurfaceMetricsPreset?
+    ) -> CGSize {
+        if let metricsPreset {
+            return metricsPreset.cellSize
+        }
+
+        let font = UIFont.monospacedSystemFont(
+            ofSize: fontSize(for: configuration, mode: mode),
+            weight: .regular
+        )
+        let characterSize = ("W" as NSString).size(withAttributes: [.font: font])
+        return CGSize(
+            width: max(8, ceil(characterSize.width)),
+            height: max(12, ceil(font.lineHeight * 1.15))
+        )
+    }
+
+    static func basePadding(
+        for bounds: CGRect,
+        mode: GhosttySurfaceDisplayMode,
+        metricsPreset: GhosttySurfaceMetricsPreset?
+    ) -> UIEdgeInsets {
+        if let metricsPreset {
+            return metricsPreset.padding
+        }
+
+        let horizontalInset: CGFloat
+        let verticalInset: CGFloat
+        switch mode {
+        case .standard:
+            horizontalInset = max(8, floor(bounds.width * 0.015))
+            verticalInset = max(8, floor(bounds.height * 0.02))
+        case .externalDisplay:
+            horizontalInset = max(12, floor(bounds.width * 0.02))
+            verticalInset = max(12, floor(bounds.height * 0.025))
+        }
+
+        return UIEdgeInsets(
+            top: verticalInset,
+            left: horizontalInset,
+            bottom: verticalInset,
+            right: horizontalInset
+        )
+    }
+
+    static func textRect(
+        for cellRect: CGRect,
+        font: UIFont
+    ) -> CGRect {
+        cellRect.insetBy(
+            dx: 0,
+            dy: max(0, floor((cellRect.height - font.lineHeight) / 2))
+        )
+    }
 }
 
 @MainActor
@@ -45,11 +124,13 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var currentScrollbackLines = 0
     private var currentRenderFailureReason: String?
     private var currentVisibleTextSummary = ""
+    private var currentHasRenderedFrame = false
     private var latestProjectionForState: GhosttyVTRenderProjection?
     private var currentAnimationProgress: GhosttyHomeAnimationProgress?
     private var currentAnimationAccentColumnsByRow: [Int: IndexSet]?
     private var cursorBlinkTimer: Timer?
     private var cursorBlinkPhaseVisible = true
+    private var currentSoftwareKeyboardPresented = false
     private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,
         supportsScrollReporting: false
@@ -60,6 +141,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     var cellSize: CGSize = .zero
     var onResize: ((Int, Int, TerminalPixelSize) -> Void)?
     var onStateChange: ((GhosttySurfaceState) -> Void)?
+    var onSoftwareKeyboardPresentationChange: ((Bool) -> Void)?
     var hasSoftwareMirrorImage: Bool {
         softwareMirrorView.image != nil
     }
@@ -107,9 +189,11 @@ final class GhosttySurface: UIView, UIKeyInput {
             isHealthy: isHealthy,
             renderFailureReason: currentRenderFailureReason,
             visibleTextSummary: visibleTextSummary,
+            hasRenderedFrame: currentHasRenderedFrame,
             animationProgress: currentAnimationProgress,
             interactionGeometry: interactionGeometry,
-            interactionCapabilities: currentInteractionCapabilities
+            interactionCapabilities: currentInteractionCapabilities,
+            softwareKeyboardPresented: currentSoftwareKeyboardPresented
         )
     }
 
@@ -164,13 +248,9 @@ final class GhosttySurface: UIView, UIKeyInput {
         fatalError("init(coder:) not supported")
     }
 
-    override var canBecomeFirstResponder: Bool {
-        true
-    }
+    override var canBecomeFirstResponder: Bool { false }
 
-    override var canResignFirstResponder: Bool {
-        true
-    }
+    override var canResignFirstResponder: Bool { false }
 
     var hasText: Bool {
         true
@@ -198,15 +278,16 @@ final class GhosttySurface: UIView, UIKeyInput {
         publishState()
     }
 
+    func setSoftwareKeyboardPresented(_ presented: Bool) {
+        guard currentSoftwareKeyboardPresented != presented else { return }
+        currentSoftwareKeyboardPresented = presented
+        onSoftwareKeyboardPresentationChange?(presented)
+        publishState()
+    }
+
     func setFocused(_ focused: Bool) {
         guard focused != terminalIsFocused else { return }
         terminalIsFocused = focused
-
-        if focused {
-            _ = becomeFirstResponder()
-        } else {
-            _ = resignFirstResponder()
-        }
 
         if let data = try? engine.encodeFocus(focused), !data.isEmpty {
             outputHandler?(data)
@@ -287,20 +368,13 @@ final class GhosttySurface: UIView, UIKeyInput {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         setFocused(true)
-        handleTouchMouse(touches, action: .press, button: .left)
     }
 
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        handleTouchMouse(touches, action: .motion, button: nil)
-    }
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {}
 
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        handleTouchMouse(touches, action: .release, button: .left)
-    }
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {}
 
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        handleTouchMouse(touches, action: .release, button: .left)
-    }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {}
 
     private func setupView() {
         backgroundColor = Self.color(for: configuration.colorScheme.theme.background)
@@ -368,6 +442,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         guard bounds.width > 0, bounds.height > 0 else { return }
 
         let scale = traitCollection.displayScale
+        let displayMode = GhosttySurfaceLayoutMetrics.displayMode(for: window?.windowScene)
         metalLayer.contentsScale = scale
         metalLayer.drawableSize = CGSize(
             width: bounds.width * scale,
@@ -376,7 +451,7 @@ final class GhosttySurface: UIView, UIKeyInput {
 
         let previousTerminalSize = currentTerminalSize
         let previousPixelSize = currentPixelSize
-        let metrics = renderer.metrics(for: bounds, scale: scale)
+        let metrics = renderer.metrics(for: bounds, scale: scale, displayMode: displayMode)
         currentMetrics = metrics
         cellSize = metrics.cellSize
 
@@ -436,6 +511,8 @@ final class GhosttySurface: UIView, UIKeyInput {
                 softwareMirrorView.image = renderer.cachedFrameImage
             }
             isHealthy = true
+            currentHasRenderedFrame = currentMetrics.pixelSize.width > 0
+                && currentMetrics.pixelSize.height > 0
             currentRenderFailureReason = nil
             updateCursorBlinkTimer()
         } catch {
@@ -732,6 +809,7 @@ private final class GhosttyMetalRenderer {
         var cellPixelSize: TerminalPixelSize
         var padding: UIEdgeInsets
         var displayScale: CGFloat
+        var displayMode: GhosttySurfaceDisplayMode
 
         static let zero = Metrics(
             terminalSize: TerminalSize(columns: 80, rows: 24),
@@ -739,7 +817,8 @@ private final class GhosttyMetalRenderer {
             cellSize: .zero,
             cellPixelSize: TerminalPixelSize(width: 0, height: 0),
             padding: .zero,
-            displayScale: 1
+            displayScale: 1,
+            displayMode: .standard
         )
 
         var mouseSizeContext: GhosttyVTMouseSizeContext {
@@ -761,8 +840,6 @@ private final class GhosttyMetalRenderer {
     private let ciContext: CIContext
     private let configuration: TerminalConfiguration
     private let metricsPreset: GhosttySurfaceMetricsPreset?
-    private let regularFont: UIFont
-    private let boldFont: UIFont
 
     private var cachedFrame: UIImage?
 
@@ -784,20 +861,17 @@ private final class GhosttyMetalRenderer {
         self.ciContext = CIContext(mtlDevice: device)
         self.configuration = configuration
         self.metricsPreset = metricsPreset
-        self.regularFont = UIFont.monospacedSystemFont(
-            ofSize: configuration.fontSize,
-            weight: .regular
-        )
-        self.boldFont = UIFont.monospacedSystemFont(
-            ofSize: configuration.fontSize,
-            weight: .bold
-        )
     }
 
-    func metrics(for bounds: CGRect, scale: CGFloat) -> Metrics {
+    func metrics(
+        for bounds: CGRect,
+        scale: CGFloat,
+        displayMode: GhosttySurfaceDisplayMode = .standard
+    ) -> Metrics {
         Self.metrics(
             for: bounds,
             scale: scale,
+            displayMode: displayMode,
             configuration: configuration,
             metricsPreset: metricsPreset
         )
@@ -808,8 +882,9 @@ private final class GhosttyMetalRenderer {
         configuration: TerminalConfiguration,
         metricsPreset: GhosttySurfaceMetricsPreset? = nil
     ) -> CGRect {
-        let cellSize = Self.cellSize(
+        let cellSize = GhosttySurfaceLayoutMetrics.cellSize(
             for: configuration,
+            mode: .standard,
             metricsPreset: metricsPreset
         )
 
@@ -845,15 +920,18 @@ private final class GhosttyMetalRenderer {
     private static func metrics(
         for bounds: CGRect,
         scale: CGFloat,
+        displayMode: GhosttySurfaceDisplayMode,
         configuration: TerminalConfiguration,
         metricsPreset: GhosttySurfaceMetricsPreset?
     ) -> Metrics {
-        let cellSize = Self.cellSize(
+        let cellSize = GhosttySurfaceLayoutMetrics.cellSize(
             for: configuration,
+            mode: displayMode,
             metricsPreset: metricsPreset
         )
-        let basePadding = Self.basePadding(
+        let basePadding = GhosttySurfaceLayoutMetrics.basePadding(
             for: bounds,
+            mode: displayMode,
             metricsPreset: metricsPreset
         )
         let usableWidth = max(1, bounds.width - basePadding.left - basePadding.right)
@@ -885,41 +963,8 @@ private final class GhosttyMetalRenderer {
                 height: max(1, Int((cellSize.height * scale).rounded()))
             ),
             padding: padding,
-            displayScale: scale
-        )
-    }
-
-    private static func cellSize(
-        for configuration: TerminalConfiguration,
-        metricsPreset: GhosttySurfaceMetricsPreset?
-    ) -> CGSize {
-        if let metricsPreset {
-            return metricsPreset.cellSize
-        }
-
-        let font = UIFont.monospacedSystemFont(ofSize: configuration.fontSize, weight: .regular)
-        let characterSize = ("W" as NSString).size(withAttributes: [.font: font])
-        return CGSize(
-            width: max(8, ceil(characterSize.width + 1)),
-            height: max(12, ceil(font.lineHeight * 1.15))
-        )
-    }
-
-    private static func basePadding(
-        for bounds: CGRect,
-        metricsPreset: GhosttySurfaceMetricsPreset?
-    ) -> UIEdgeInsets {
-        if let metricsPreset {
-            return metricsPreset.padding
-        }
-
-        let horizontalInset = max(8, floor(bounds.width * 0.015))
-        let verticalInset = max(8, floor(bounds.height * 0.02))
-        return UIEdgeInsets(
-            top: verticalInset,
-            left: horizontalInset,
-            bottom: verticalInset,
-            right: horizontalInset
+            displayScale: scale,
+            displayMode: displayMode
         )
     }
 
@@ -1023,6 +1068,20 @@ private final class GhosttyMetalRenderer {
         #endif
     }
 
+    private func regularFont(for metrics: Metrics) -> UIFont {
+        UIFont.monospacedSystemFont(
+            ofSize: GhosttySurfaceLayoutMetrics.fontSize(for: configuration, mode: metrics.displayMode),
+            weight: .regular
+        )
+    }
+
+    private func boldFont(for metrics: Metrics) -> UIFont {
+        UIFont.monospacedSystemFont(
+            ofSize: GhosttySurfaceLayoutMetrics.fontSize(for: configuration, mode: metrics.displayMode),
+            weight: .bold
+        )
+    }
+
     private func draw(
         row: GhosttyVTRowProjection,
         projection: GhosttyVTRenderProjection,
@@ -1032,12 +1091,16 @@ private final class GhosttyMetalRenderer {
         accentForegroundColor: UIColor?
     ) {
         let defaultBackground = color(for: projection.backgroundColor)
+        let resolvedRegularFont = regularFont(for: metrics)
+        let resolvedBoldFont = boldFont(for: metrics)
         if drawAttributedNarrowRowIfPossible(
             row: row,
             projection: projection,
             metrics: metrics,
             fillsDefaultBackground: fillsDefaultBackground,
-            accentColumns: accentColumns
+            accentColumns: accentColumns,
+            regularFont: resolvedRegularFont,
+            boldFont: resolvedBoldFont
         ) {
             return
         }
@@ -1066,7 +1129,9 @@ private final class GhosttyMetalRenderer {
                 metrics: metrics,
                 fillsDefaultBackground: fillsDefaultBackground,
                 defaultBackground: defaultBackground,
-                accentForegroundColor: runUsesAccent ? accentForegroundColor : nil
+                accentForegroundColor: runUsesAccent ? accentForegroundColor : nil,
+                regularFont: resolvedRegularFont,
+                boldFont: resolvedBoldFont
             )
 
             runStartColumn = nil
@@ -1091,7 +1156,9 @@ private final class GhosttyMetalRenderer {
                     metrics: metrics,
                     fillsDefaultBackground: fillsDefaultBackground,
                     defaultBackground: defaultBackground,
-                    accentForegroundColor: cellUsesAccent ? accentForegroundColor : nil
+                    accentForegroundColor: cellUsesAccent ? accentForegroundColor : nil,
+                    regularFont: resolvedRegularFont,
+                    boldFont: resolvedBoldFont
                 )
             case .narrow:
                 if runStartColumn == nil {
@@ -1118,7 +1185,9 @@ private final class GhosttyMetalRenderer {
         projection: GhosttyVTRenderProjection,
         metrics: Metrics,
         fillsDefaultBackground: Bool,
-        accentColumns: IndexSet?
+        accentColumns: IndexSet?,
+        regularFont: UIFont,
+        boldFont: UIFont
     ) -> Bool {
         guard !fillsDefaultBackground else { return false }
         guard accentColumns?.isEmpty != false else { return false }
@@ -1134,7 +1203,7 @@ private final class GhosttyMetalRenderer {
             metrics: metrics
         )
         let drawPoint = CGPoint(
-            x: lineRect.minX + 1,
+            x: lineRect.minX,
             y: lineRect.minY + max(0, floor((lineRect.height - regularFont.lineHeight) / 2))
         )
 
@@ -1191,7 +1260,9 @@ private final class GhosttyMetalRenderer {
         metrics: Metrics,
         fillsDefaultBackground: Bool,
         defaultBackground: UIColor,
-        accentForegroundColor: UIColor?
+        accentForegroundColor: UIColor?,
+        regularFont: UIFont,
+        boldFont: UIFont
     ) {
         guard width > 0 else { return }
 
@@ -1209,10 +1280,7 @@ private final class GhosttyMetalRenderer {
 
         guard !text.isEmpty, !style.invisible else { return }
         let font = style.bold ? boldFont : regularFont
-        let drawRect = rect.insetBy(
-            dx: 1,
-            dy: max(0, floor((rect.height - font.lineHeight) / 2))
-        )
+        let drawRect = GhosttySurfaceLayoutMetrics.textRect(for: rect, font: font)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(style.faint ? 0.6 : 1.0),
@@ -1229,7 +1297,9 @@ private final class GhosttyMetalRenderer {
         metrics: Metrics,
         fillsDefaultBackground: Bool,
         defaultBackground: UIColor,
-        accentForegroundColor: UIColor?
+        accentForegroundColor: UIColor?,
+        regularFont: UIFont,
+        boldFont: UIFont
     ) {
         let rect = cellRect(
             column: cell.column,
@@ -1245,10 +1315,7 @@ private final class GhosttyMetalRenderer {
 
         guard !cell.text.isEmpty, !cell.style.invisible else { return }
         let font = cell.style.bold ? boldFont : regularFont
-        let drawRect = rect.insetBy(
-            dx: 1,
-            dy: max(0, floor((rect.height - font.lineHeight) / 2))
-        )
+        let drawRect = GhosttySurfaceLayoutMetrics.textRect(for: rect, font: font)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(cell.style.faint ? 0.6 : 1.0),

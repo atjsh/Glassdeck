@@ -36,6 +36,20 @@ final class GlassdeckAppUITests: XCTestCase {
         )
     }
 
+    func testSessionRowTapNavigatesToDetail() {
+        let app = launchApp(scenario: "sessions")
+
+        let sessionRow = app.descendants(matching: .any)
+            .matching(identifier: "session-card-11111111-1111-1111-1111-111111111111")
+            .firstMatch
+        XCTAssertTrue(sessionRow.waitForExistence(timeout: 5))
+
+        sessionRow.tap()
+
+        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.exists)
+    }
+
     func testSessionScenarioTerminalScreenshotIsNotBlank() {
         let app = launchApp(scenario: "sessions", openActiveSession: true)
 
@@ -92,6 +106,11 @@ final class GlassdeckAppUITests: XCTestCase {
 
         let thirdFrame = waitForAnimationProgress(pastFrame: secondFrame + 10, in: app)
         XCTAssertGreaterThan(thirdFrame, secondFrame)
+
+        assertScreenshotIsNotBlank(
+            of: terminalSurface,
+            named: "animation-terminal-surface"
+        )
     }
 
     func testRemoteScenarioAutoEntersTrackpadView() {
@@ -101,18 +120,89 @@ final class GlassdeckAppUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 
-    func testRemoteScenarioCanLaunchIntoLocalTerminalOverride() {
-        let app = launchApp(
-            scenario: "remote",
-            openActiveSession: true,
-            additionalArguments: ["-uiTestForceLocalTerminal"]
+    func testRemoteScenarioDoesNotOfferLocalTerminalOverride() {
+        let app = launchApp(scenario: "remote", openActiveSession: true)
+
+        let menuButton = app.buttons["session-menu-button"].firstMatch
+        XCTAssertTrue(menuButton.waitForExistence(timeout: 5))
+        menuButton.tap()
+
+        XCTAssertFalse(app.buttons["View Local Terminal"].firstMatch.exists)
+    }
+
+    func testSessionScenarioCanToggleTerminalKeyboardFromTap() {
+        let app = launchApp(scenario: "sessions", openActiveSession: true)
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        XCTAssertTrue(terminalSurface.waitForExistence(timeout: 5))
+        waitForTerminalKeyboardState(presented: false, in: app)
+
+        terminalSurface.tap()
+        waitForTerminalKeyboardState(presented: true, in: app)
+
+        terminalSurface.tap()
+        waitForTerminalKeyboardState(presented: false, in: app)
+    }
+
+    func testSSHKeysSheetShowsEmptyStateWhenNoKeysExist() {
+        let app = launchApp(scenario: "connections")
+
+        app.buttons["connections-toolbar-menu"].firstMatch.tap()
+        app.buttons["connections-menu-ssh-keys"].firstMatch.tap()
+
+        XCTAssertTrue(app.navigationBars["SSH Keys"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No Stored Keys"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Stored Keys"].firstMatch.exists)
+    }
+
+    func testTerminalSettingsExposeIndependentIPhoneAndExternalMonitorProfiles() {
+        let app = launchApp(scenario: "sessions", openActiveSession: true)
+
+        let menuButton = app.buttons["session-menu-button"].firstMatch
+        XCTAssertTrue(menuButton.waitForExistence(timeout: 5))
+        menuButton.tap()
+        app.buttons["Settings"].firstMatch.tap()
+
+        let targetPicker = app.segmentedControls["terminal-settings-target-picker"].firstMatch
+        XCTAssertTrue(targetPicker.waitForExistence(timeout: 5))
+
+        let profileSummary = app.otherElements["terminal-settings-profile-summary"].firstMatch
+        XCTAssertTrue(profileSummary.waitForExistence(timeout: 5))
+        let iphoneProfileSummary = profileSummary.value as? String
+
+        targetPicker.buttons["External Monitor"].firstMatch.tap()
+        let externalProfileSummary = profileSummary.value as? String
+        XCTAssertNotEqual(externalProfileSummary, iphoneProfileSummary)
+
+        targetPicker.buttons["iPhone"].firstMatch.tap()
+        XCTAssertEqual(profileSummary.value as? String, iphoneProfileSummary)
+    }
+
+    func testAnimationScenarioDoesNotLeakDarkOverlayIntoConnectionsTab() {
+        let app = launchUITestApp(
+            scenario: "animation",
+            additionalEnvironment: [
+                "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH": homeAnimationFramesPath()
+            ]
         )
 
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.otherElements["terminal-surface-view"].firstMatch.waitForExistence(timeout: 3))
-        waitForTerminalRenderSummary(
-            containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
-            in: app
+        let sessionsTab = app.tabBars.buttons["Sessions"].firstMatch
+        XCTAssertTrue(sessionsTab.waitForExistence(timeout: 10))
+        sessionsTab.tap()
+        let animationSessionCard = app.descendants(matching: .any)
+            .matching(identifier: "session-card-55555555-5555-5555-5555-555555555555")
+            .firstMatch
+        XCTAssertTrue(animationSessionCard.waitForExistence(timeout: 10))
+
+        app.tabBars.buttons["Connections"].firstMatch.tap()
+
+        let connectionRow = app.buttons[
+            connectionRowIdentifier(name: "Glassdeck Test SSH", host: "glassdeck-test.local")
+        ].firstMatch
+        XCTAssertTrue(connectionRow.waitForExistence(timeout: 10))
+        assertScreenHasAverageBrightness(
+            named: "connections-after-animation-switch",
+            minimumAverageBrightness: 120
         )
     }
 

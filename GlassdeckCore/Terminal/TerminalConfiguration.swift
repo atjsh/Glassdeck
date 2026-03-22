@@ -1,5 +1,21 @@
 import Foundation
 
+public enum TerminalDisplayTarget: String, Sendable, Codable, CaseIterable, Equatable, Identifiable {
+    case iphone
+    case externalMonitor
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .iphone:
+            "iPhone"
+        case .externalMonitor:
+            "External Monitor"
+        }
+    }
+}
+
 /// Configuration for terminal appearance and behavior.
 public struct TerminalConfiguration: Sendable, Codable, Equatable {
     public var fontFamily: String = "SF Mono"

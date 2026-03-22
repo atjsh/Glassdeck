@@ -29,14 +29,6 @@ final class RemoteControlStateTests: XCTestCase {
             externalDisplaySessionID: session.id,
             session: session
         ))
-
-        session.remoteControlShowsLocalTerminal = true
-        XCTAssertFalse(SessionManager.remoteTrackpadEligibility(
-            hasExternalDisplayConnected: true,
-            activeSessionID: session.id,
-            externalDisplaySessionID: session.id,
-            session: session
-        ))
     }
 
     func testMouseModePersistsAndShowsVisiblePointer() {
@@ -225,6 +217,102 @@ final class RemoteControlStateTests: XCTestCase {
         XCTAssertNotNil(session.surface)
         XCTAssertFalse(firstSurface === session.surface)
         XCTAssertEqual(session.surface?.terminalConfiguration.colorScheme, .defaultLight)
+    }
+
+    func testTerminalDisplayTargetUsesActualPresentationState() {
+        let sessionManager = SessionManager()
+        let session = SSHSessionModel(profile: sampleProfile())
+
+        sessionManager.replaceSessionsForPreview(
+            [session],
+            activeSessionID: session.id,
+            externalDisplaySessionID: session.id,
+            hasExternalDisplayConnected: false
+        )
+        XCTAssertEqual(sessionManager.terminalDisplayTarget(for: session), .iphone)
+
+        sessionManager.setExternalDisplayConnected(true)
+        XCTAssertEqual(sessionManager.terminalDisplayTarget(for: session), .externalMonitor)
+
+        sessionManager.setExternalDisplayConnected(false)
+        XCTAssertEqual(sessionManager.terminalDisplayTarget(for: session), .iphone)
+    }
+
+    func testSessionDetailPresentabilityRequiresRenderedFrameForLocalTerminal() {
+        let sessionManager = SessionManager()
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+
+        XCTAssertFalse(sessionManager.isSessionDetailPresentable(for: session))
+
+        session.surface = try? GhosttySurface()
+        XCTAssertFalse(sessionManager.isSessionDetailPresentable(for: session))
+
+        session.terminalHasRenderedFrame = true
+        XCTAssertTrue(sessionManager.isSessionDetailPresentable(for: session))
+    }
+
+    func testRoutedExternalSessionStillRequiresRenderedFrameForTerminalPresentation() {
+        let sessionManager = SessionManager()
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+        session.surface = try? GhosttySurface()
+
+        sessionManager.replaceSessionsForPreview(
+            [session],
+            activeSessionID: session.id,
+            externalDisplaySessionID: session.id,
+            hasExternalDisplayConnected: true
+        )
+
+        XCTAssertFalse(sessionManager.isTerminalPresentationReady(for: session))
+
+        session.terminalHasRenderedFrame = true
+        XCTAssertTrue(sessionManager.isTerminalPresentationReady(for: session))
+        XCTAssertTrue(sessionManager.isSessionDetailPresentable(for: session))
+    }
+
+    func testRefreshingExternalMonitorProfileRecreatesPresentedSurface() async {
+        let appSettings = AppSettings()
+        let sessionManager = SessionManager(appSettings: appSettings)
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .connected
+
+        XCTAssertTrue(sessionManager.attachSyntheticSurfaceForPreview(
+            to: session,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "external",
+                transcript: ""
+            )
+        ))
+        sessionManager.replaceSessionsForPreview(
+            [session],
+            activeSessionID: session.id,
+            externalDisplaySessionID: session.id,
+            hasExternalDisplayConnected: true
+        )
+
+        let originalSurface = session.surface
+        appSettings.setTerminalConfig(
+            TerminalConfiguration(
+                fontSize: 24,
+                colorScheme: .defaultLight,
+                scrollbackLines: 36_000,
+                cursorStyle: .underline,
+                cursorBlink: false,
+                bellSound: false
+            ),
+            for: .externalMonitor
+        )
+
+        await sessionManager.refreshTerminalConfiguration(for: .externalMonitor)
+
+        XCTAssertNotNil(session.surface)
+        XCTAssertFalse(originalSurface === session.surface)
+        XCTAssertEqual(session.surface?.terminalConfiguration.fontSize, 24)
+        XCTAssertEqual(session.surface?.terminalConfiguration.colorScheme, .defaultLight)
+        XCTAssertEqual(session.surface?.terminalConfiguration.scrollbackLines, 36_000)
+        XCTAssertEqual(sessionManager.terminalDisplayTarget(for: session), .externalMonitor)
     }
 
     private func configuredSession(

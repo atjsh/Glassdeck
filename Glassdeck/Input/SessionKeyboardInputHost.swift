@@ -31,6 +31,7 @@ final class SessionKeyboardHostView: UIView, UIKeyInput {
         isOpaque = false
         isAccessibilityElement = true
         accessibilityIdentifier = "session-keyboard-host"
+        accessibilityLabel = "Software Keyboard Host"
         accessibilityTraits.insert(.allowsDirectInteraction)
     }
 
@@ -61,6 +62,8 @@ final class SessionKeyboardHostView: UIView, UIKeyInput {
             self.softwareKeyboardPresented = softwareKeyboardPresented
             reloadInputViews()
         }
+
+        accessibilityValue = softwareKeyboardPresented ? "presented" : "hidden"
 
         if isFocused {
             if !isFirstResponder {

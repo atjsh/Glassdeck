@@ -6,12 +6,13 @@ import Foundation
 /// the remote shell. The bridge is UI-agnostic and can be exercised entirely
 /// with test doubles.
 public actor SSHPTYBridge {
-    private let terminal: TerminalIO
+    private var terminal: any TerminalIO
     private var shell: (any InteractiveShell)?
     private var isActive = false
     private var readTask: Task<Void, Never>?
     private var currentSize = TerminalSize(columns: 80, rows: 24)
     private var onDisconnect: (@Sendable () -> Void)?
+    private var terminalOutputHandler: (@Sendable (Data) -> Void)?
 
     public init(terminal: any TerminalIO) {
         self.terminal = terminal
@@ -21,10 +22,12 @@ public actor SSHPTYBridge {
         self.shell = shell
         isActive = true
 
-        await terminal.setOutputHandler { [weak self] data in
+        let outputHandler: @Sendable (Data) -> Void = { [weak self] data in
             guard let self else { return }
             Task { await self.sendToShell(data) }
         }
+        terminalOutputHandler = outputHandler
+        await terminal.setOutputHandler(outputHandler)
 
         readTask = Task { [weak self] in
             guard let self else { return }
@@ -53,11 +56,20 @@ public actor SSHPTYBridge {
         }
 
         self.shell = nil
+        terminalOutputHandler = nil
         await terminal.setOutputHandler(nil)
     }
 
     public func setOnDisconnect(_ handler: @escaping @Sendable () -> Void) {
         onDisconnect = handler
+    }
+
+    public func replaceTerminal(_ terminal: any TerminalIO) async {
+        let previousTerminal = self.terminal
+        self.terminal = terminal
+
+        await previousTerminal.setOutputHandler(nil)
+        await terminal.setOutputHandler(isActive ? terminalOutputHandler : nil)
     }
 
     public func resize(
@@ -89,6 +101,7 @@ public actor SSHPTYBridge {
     private func handleDisconnect() async {
         guard isActive else { return }
         isActive = false
+        terminalOutputHandler = nil
         await terminal.setOutputHandler(nil)
         onDisconnect?()
     }

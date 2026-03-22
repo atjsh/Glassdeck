@@ -17,6 +17,7 @@ enum UITestLaunchSupport {
     private static let remotePreviewTerminalMarker = "GLASSDECK_PASSWORD_OK"
     private static let animationFramesEnvironmentKey = "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
     private static let terminalColorSchemeEnvironmentKey = "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME"
+    private static let preserveHostStateEnvironmentKey = "GLASSDECK_UI_TEST_PRESERVE_HOST_STATE"
     private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
 
     static var currentScenario: Scenario? {
@@ -43,6 +44,10 @@ enum UITestLaunchSupport {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-uiTestDisableAnimations") {
             UserDefaults.standard.set(false, forKey: "UIViewAnimationEnabled")
+        }
+
+        if ProcessInfo.processInfo.environment[preserveHostStateEnvironmentKey] == "1" {
+            return
         }
 
         guard let scenario = currentScenario else {
@@ -85,9 +90,6 @@ enum UITestLaunchSupport {
         case .remote:
             let connections = previewConnections()
             let session = previewRemoteSession(using: connections[0], sessionManager: sessionManager)
-            if arguments.contains("-uiTestForceLocalTerminal") {
-                session.remoteControlShowsLocalTerminal = true
-            }
             connectionStore.replaceAll(with: connections)
             sessionManager.replaceSessionsForPreview(
                 [session],
@@ -315,6 +317,8 @@ enum UITestLaunchSupport {
     private static func resetPersistentTestState() {
         activeAnimationPlayer?.stop()
         activeAnimationPlayer = nil
+        SessionPersistenceStore().clear()
+        SessionCredentialStore().removeAll()
         UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
         for keyID in SSHKeyManager.shared.listKeys() {
             try? SSHKeyManager.shared.deleteKey(id: keyID)
@@ -367,7 +371,13 @@ enum UITestLaunchSupport {
             return
         }
 
-        appSettings.terminalConfig.colorScheme = scheme
+        var iphoneConfiguration = appSettings.terminalConfig(for: .iphone)
+        iphoneConfiguration.colorScheme = scheme
+        appSettings.setTerminalConfig(iphoneConfiguration, for: .iphone)
+
+        var externalMonitorConfiguration = appSettings.terminalConfig(for: .externalMonitor)
+        externalMonitorConfiguration.colorScheme = scheme
+        appSettings.setTerminalConfig(externalMonitorConfiguration, for: .externalMonitor)
     }
 }
 #endif

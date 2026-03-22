@@ -33,6 +33,7 @@ final class SSHSessionModel: Identifiable {
     var terminalIsHealthy = true
     var terminalRenderFailureReason: String?
     var terminalVisibleTextSummary = ""
+    var terminalHasRenderedFrame = false
     var terminalAnimationProgress: GhosttyHomeAnimationProgress?
     var terminalInteractionGeometry: RemoteTerminalGeometry = .zero
     var terminalInteractionCapabilities = GhosttyVTInteractionCapabilities(
@@ -48,6 +49,9 @@ final class SSHSessionModel: Identifiable {
     var remoteControlShowsLocalTerminal = false
     var remoteControlKeyboardFocused = false
     var remoteControlSoftwareKeyboardPresented = false
+    var localTerminalSoftwareKeyboardPresented = false
+    var shouldRestoreConnectionOnForeground = false
+    var wasRestoredFromPersistence = false
 
     var displayName: String {
         terminalTitle ?? "\(profile.username)@\(profile.host)"

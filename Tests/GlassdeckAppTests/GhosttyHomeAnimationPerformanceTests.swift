@@ -109,6 +109,44 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
         )
     }
 
+    func testTerminalLayoutMetricsKeepConfiguredFontSizeOnExternalDisplay() {
+        let configuration = TerminalConfiguration(fontSize: 14)
+
+        XCTAssertEqual(
+            GhosttySurfaceLayoutMetrics.fontSize(for: configuration, mode: .externalDisplay),
+            14,
+            accuracy: 0.001
+        )
+    }
+
+    func testTerminalLayoutMetricsPreserveWiderPaddingForExternalDisplay() {
+        let bounds = CGRect(x: 0, y: 0, width: 1_280, height: 800)
+
+        let standard = GhosttySurfaceLayoutMetrics.basePadding(
+            for: bounds,
+            mode: .standard,
+            metricsPreset: nil
+        )
+        let external = GhosttySurfaceLayoutMetrics.basePadding(
+            for: bounds,
+            mode: .externalDisplay,
+            metricsPreset: nil
+        )
+
+        XCTAssertGreaterThan(external.left, standard.left)
+        XCTAssertGreaterThan(external.top, standard.top)
+    }
+
+    func testTerminalLayoutMetricsAnchorTextToCellLeadingEdge() {
+        let cellRect = CGRect(x: 12, y: 24, width: 18, height: 30)
+        let font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+
+        let textRect = GhosttySurfaceLayoutMetrics.textRect(for: cellRect, font: font)
+
+        XCTAssertEqual(textRect.minX, cellRect.minX)
+        XCTAssertLessThanOrEqual(textRect.maxX, cellRect.maxX)
+    }
+
     private var performanceBudget: TimeInterval {
         #if targetEnvironment(simulator)
         0.022

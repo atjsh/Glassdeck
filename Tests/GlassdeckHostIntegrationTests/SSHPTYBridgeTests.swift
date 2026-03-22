@@ -55,6 +55,39 @@ final class SSHPTYBridgeTests: XCTestCase {
         let writes = await shell.writes
         XCTAssertTrue(writes.isEmpty)
     }
+
+    func testBridgeCanReplaceTerminalWithoutDisconnectingShell() async throws {
+        let initialTerminal = FakeTerminal()
+        let replacementTerminal = FakeTerminal()
+        let shell = FakeShell()
+        let bridge = SSHPTYBridge(terminal: initialTerminal)
+
+        await bridge.start(shell: shell)
+
+        await shell.emitOutput(Data("before".utf8))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let initialRenderedOutputBeforeReplace = await initialTerminal.renderedOutput
+        XCTAssertEqual(initialRenderedOutputBeforeReplace, [Data("before".utf8)])
+
+        await bridge.replaceTerminal(replacementTerminal)
+        await shell.emitOutput(Data("after".utf8))
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        let initialRenderedOutputAfterReplace = await initialTerminal.renderedOutput
+        let replacementRenderedOutput = await replacementTerminal.renderedOutput
+        XCTAssertEqual(initialRenderedOutputAfterReplace, [Data("before".utf8)])
+        XCTAssertEqual(replacementRenderedOutput, [Data("after".utf8)])
+
+        await replacementTerminal.emitInput(Data("pwd\n".utf8))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let writesAfterReplacementInput = await shell.writes
+        XCTAssertEqual(writesAfterReplacementInput, [Data("pwd\n".utf8)])
+
+        await initialTerminal.emitInput(Data("ignored\n".utf8))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let writesAfterOldTerminalInput = await shell.writes
+        XCTAssertEqual(writesAfterOldTerminalInput, [Data("pwd\n".utf8)])
+    }
 }
 
 private actor FakeTerminal: TerminalIO {

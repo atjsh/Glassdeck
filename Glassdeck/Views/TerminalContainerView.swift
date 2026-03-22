@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import CoreLocation
 import GlassdeckCore
 import SwiftUI
 
@@ -76,8 +77,15 @@ private struct SessionDetailContent: View {
         sessionManager.shouldShowRemoteTrackpad(for: session)
     }
 
+    private var terminalPresentationReady: Bool {
+        sessionManager.isTerminalPresentationReady(for: session)
+    }
+
     private var terminalBackgroundColor: Color {
-        let theme = (session.surface?.terminalConfiguration ?? appSettings.terminalConfig).colorScheme.theme
+        let theme = (
+            session.surface?.terminalConfiguration
+            ?? appSettings.terminalConfig(for: sessionManager.terminalDisplayTarget(for: session))
+        ).colorScheme.theme
         return Color(
             red: Double(theme.background.r) / 255,
             green: Double(theme.background.g) / 255,
@@ -86,6 +94,12 @@ private struct SessionDetailContent: View {
     }
 
     private var terminalRenderSummaryValue: String {
+        if !showingRemoteTrackpad && !terminalPresentationReady {
+            if session.surface == nil {
+                return "[terminal pending] Restoring terminal surface"
+            }
+            return "[terminal pending] Preparing terminal"
+        }
         if session.terminalVisibleTextSummary.isEmpty {
             return session.terminalRenderFailureReason ?? ""
         }
@@ -157,14 +171,6 @@ private struct SessionDetailContent: View {
                         }
                     }
 
-                    if showingRemoteTrackpad {
-                        Button {
-                            sessionManager.showLocalTerminalForCurrentVisit(sessionID: session.id)
-                        } label: {
-                            Label("View Local Terminal", systemImage: "rectangle.on.rectangle")
-                        }
-                    }
-
                     Button {
                         activeSheet = .displayRouting
                     } label: {
@@ -174,7 +180,7 @@ private struct SessionDetailContent: View {
                     Button {
                         activeSheet = .settings
                     } label: {
-                        Label("Terminal Settings", systemImage: "gearshape")
+                        Label("Settings", systemImage: "gearshape")
                     }
 
                     Button {
@@ -254,6 +260,12 @@ private struct SessionDetailContent: View {
                     .ignoresSafeArea(.container, edges: .bottom)
                     .accessibilityIdentifier("terminal-surface-view")
 
+                if !terminalPresentationReady {
+                    TerminalPresentationPlaceholderView(session: session)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                        .accessibilityIdentifier("terminal-presentation-placeholder")
+                }
+
                 if let statusBannerState {
                     InlineStatusBanner(
                         label: statusBannerState.label,
@@ -299,6 +311,66 @@ private struct SessionDetailContent: View {
         case .connected, .connecting, .authenticating, .reconnecting:
             nil
         }
+    }
+}
+
+struct TerminalPresentationPlaceholderView: View {
+    let session: SSHSessionModel
+
+    private var title: String {
+        switch session.status {
+        case .connecting, .authenticating, .reconnecting:
+            session.status.label
+        case .connected:
+            "Preparing Terminal…"
+        case .disconnected:
+            "Terminal Unavailable"
+        case .failed:
+            "Terminal Unavailable"
+        }
+    }
+
+    private var subtitle: String {
+        if let reason = session.terminalRenderFailureReason, !reason.isEmpty {
+            return reason
+        }
+        if session.surface == nil {
+            return "Restoring the terminal surface for this session."
+        }
+        return "Waiting for the terminal to finish its first render."
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                if case .failed = session.status {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.orange)
+                } else {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.2)
+                }
+
+                Text(title)
+                    .font(.body.monospaced())
+                    .foregroundStyle(.white.opacity(0.82))
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            .padding(24)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(subtitle)
     }
 }
 
@@ -406,55 +478,175 @@ struct DisplayRoutingPicker: View {
 }
 
 struct TerminalSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var appSettings
+    @Environment(SessionManager.self) private var sessionManager
+    @Environment(SessionLifecycleCoordinator.self) private var lifecycleCoordinator
     @State private var showHelpBrowser = false
+    @State private var selectedDisplayTarget: TerminalDisplayTarget = .iphone
 
     private var colorSchemeBinding: Binding<TerminalColorScheme> {
-        Binding(
-            get: { appSettings.terminalConfig.colorScheme },
-            set: { appSettings.terminalConfig.colorScheme = $0 }
-        )
+        terminalBinding(\.colorScheme)
     }
 
     private var fontSizeBinding: Binding<Double> {
-        Binding(
-            get: { appSettings.terminalConfig.fontSize },
-            set: { appSettings.terminalConfig.fontSize = $0 }
-        )
+        terminalBinding(\.fontSize)
     }
 
     private var cursorStyleBinding: Binding<TerminalConfiguration.CursorStyle> {
-        Binding(
-            get: { appSettings.terminalConfig.cursorStyle },
-            set: { appSettings.terminalConfig.cursorStyle = $0 }
-        )
+        terminalBinding(\.cursorStyle)
     }
 
     private var cursorBlinkBinding: Binding<Bool> {
-        Binding(
-            get: { appSettings.terminalConfig.cursorBlink },
-            set: { appSettings.terminalConfig.cursorBlink = $0 }
-        )
+        terminalBinding(\.cursorBlink)
     }
 
     private var scrollbackLinesBinding: Binding<Int> {
-        Binding(
-            get: { appSettings.terminalConfig.scrollbackLines },
-            set: { appSettings.terminalConfig.scrollbackLines = $0 }
-        )
+        terminalBinding(\.scrollbackLines)
     }
 
     private var bellSoundBinding: Binding<Bool> {
+        terminalBinding(\.bellSound)
+    }
+
+    private var autoReconnectBinding: Binding<Bool> {
         Binding(
-            get: { appSettings.terminalConfig.bellSound },
-            set: { appSettings.terminalConfig.bellSound = $0 }
+            get: { appSettings.autoReconnect },
+            set: {
+                appSettings.autoReconnect = $0
+                lifecycleCoordinator.refreshSettingsDrivenRuntime()
+            }
         )
+    }
+
+    private var reconnectDelayBinding: Binding<Double> {
+        Binding(
+            get: { appSettings.reconnectDelay },
+            set: {
+                appSettings.reconnectDelay = $0
+                lifecycleCoordinator.refreshSettingsDrivenRuntime()
+            }
+        )
+    }
+
+    private var maxReconnectAttemptsBinding: Binding<Int> {
+        Binding(
+            get: { appSettings.maxReconnectAttempts },
+            set: {
+                appSettings.maxReconnectAttempts = $0
+                lifecycleCoordinator.refreshSettingsDrivenRuntime()
+            }
+        )
+    }
+
+    private var backgroundPersistenceEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { appSettings.backgroundPersistenceEnabled },
+            set: {
+                appSettings.backgroundPersistenceEnabled = $0
+                lifecycleCoordinator.refreshSettingsDrivenRuntime()
+            }
+        )
+    }
+
+    private var backgroundPersistenceController: SessionBackgroundPersistenceController {
+        lifecycleCoordinator.backgroundPersistenceController
+    }
+
+    private var reconnectDelayText: String {
+        String(format: "%.1fs", appSettings.reconnectDelay)
+    }
+
+    private var selectedTerminalConfig: TerminalConfiguration {
+        appSettings.terminalConfig(for: selectedDisplayTarget)
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Toggle("Auto-Reconnect", isOn: autoReconnectBinding)
+
+                    HStack {
+                        Text("Reconnect Delay")
+                        Spacer()
+                        Text(reconnectDelayText)
+                            .foregroundStyle(.secondary)
+                        Stepper(
+                            "",
+                            value: reconnectDelayBinding,
+                            in: 0.5...30,
+                            step: 0.5
+                        )
+                        .labelsHidden()
+                    }
+
+                    HStack {
+                        Text("Max Attempts")
+                        Spacer()
+                        Text("\(appSettings.maxReconnectAttempts)")
+                            .foregroundStyle(.secondary)
+                        Stepper(
+                            "",
+                            value: maxReconnectAttemptsBinding,
+                            in: 1...20
+                        )
+                        .labelsHidden()
+                    }
+                } header: {
+                    Text("Session Persistence")
+                } footer: {
+                    Text("Dropped sessions are restored on foreground return, using the saved reconnect policy below.")
+                }
+
+                Section {
+                    Toggle(
+                        "Keep Live Sessions Active in Background",
+                        isOn: backgroundPersistenceEnabledBinding
+                    )
+
+                    LabeledContent(
+                        "Location Services",
+                        value: backgroundPersistenceController.isLocationServicesEnabled ? "Available" : "Unavailable"
+                    )
+
+                    LabeledContent(
+                        "Runtime",
+                        value: backgroundPersistenceController.isRuntimeActive ? "Active" : "Inactive"
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(backgroundPersistenceController.authorizationDescription)
+                        Text(backgroundPersistenceController.statusMessage)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    if appSettings.backgroundPersistenceEnabled,
+                       backgroundPersistenceController.authorizationStatus == .notDetermined {
+                        Button("Request Location Permission") {
+                            lifecycleCoordinator.refreshSettingsDrivenRuntime()
+                        }
+                    }
+                } header: {
+                    Text("Background Persistence")
+                } footer: {
+                    Text("Uses Core Location background activity only while live sessions exist. This is best-effort and may affect battery life.")
+                }
+
+                Section {
+                    Picker("Target", selection: $selectedDisplayTarget) {
+                        ForEach(TerminalDisplayTarget.allCases) { target in
+                            Text(target.label).tag(target)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("terminal-settings-target-picker")
+                } header: {
+                    Text("Terminal Profile")
+                } footer: {
+                    Text("iPhone and External Monitor profiles are stored separately and apply immediately to matching live sessions.")
+                }
+
                 Section {
                     Picker("Color Scheme", selection: colorSchemeBinding) {
                         ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
@@ -475,10 +667,12 @@ struct TerminalSettingsView: View {
                     HStack {
                         Text("Font Size")
                         Spacer()
-                        Text("\(Int(appSettings.terminalConfig.fontSize))pt")
+                        Text("\(Int(selectedTerminalConfig.fontSize.rounded()))pt")
                             .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("terminal-settings-font-size-value")
                         Stepper("", value: fontSizeBinding, in: 8...32, step: 1)
                             .labelsHidden()
+                            .accessibilityIdentifier("terminal-settings-font-size-stepper")
                     }
 
                     Picker("Cursor", selection: cursorStyleBinding) {
@@ -496,8 +690,9 @@ struct TerminalSettingsView: View {
                     HStack {
                         Text("Scrollback Lines")
                         Spacer()
-                        Text("\(appSettings.terminalConfig.scrollbackLines)")
+                        Text("\(selectedTerminalConfig.scrollbackLines)")
                             .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("terminal-settings-scrollback-value")
                         Stepper(
                             "",
                             value: scrollbackLinesBinding,
@@ -505,13 +700,14 @@ struct TerminalSettingsView: View {
                             step: 1_000
                         )
                         .labelsHidden()
+                        .accessibilityIdentifier("terminal-settings-scrollback-stepper")
                     }
 
                     Toggle("Bell Sound", isOn: bellSoundBinding)
                 } header: {
                     Text("Behavior")
                 } footer: {
-                    Text("Changes apply to new and reconnected sessions.")
+                    Text("Applying a profile live preserves the SSH connection, but the visible terminal view may be recreated.")
                 }
 
                 Section {
@@ -522,7 +718,7 @@ struct TerminalSettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Terminal Settings")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -532,7 +728,42 @@ struct TerminalSettingsView: View {
             .sheet(isPresented: $showHelpBrowser) {
                 HelpBrowserView()
             }
+            .overlay(alignment: .bottomTrailing) {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: 1, height: 1)
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("terminal-settings-profile-summary")
+                    .accessibilityValue(terminalProfileSummaryValue)
+            }
         }
+    }
+
+    private func terminalBinding<Value>(
+        _ keyPath: WritableKeyPath<TerminalConfiguration, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { appSettings.terminalConfig(for: selectedDisplayTarget)[keyPath: keyPath] },
+            set: { newValue in
+                var configuration = appSettings.terminalConfig(for: selectedDisplayTarget)
+                configuration[keyPath: keyPath] = newValue
+                appSettings.setTerminalConfig(configuration, for: selectedDisplayTarget)
+                Task {
+                    await sessionManager.refreshTerminalConfiguration(for: selectedDisplayTarget)
+                }
+            }
+        )
+    }
+
+    private var terminalProfileSummaryValue: String {
+        [
+            "target=\(selectedDisplayTarget.rawValue)",
+            "fontSize=\(Int(selectedTerminalConfig.fontSize.rounded()))",
+            "scrollback=\(selectedTerminalConfig.scrollbackLines)",
+            "scheme=\(selectedTerminalConfig.colorScheme.rawValue)",
+        ].joined(separator: "|")
     }
 }
 

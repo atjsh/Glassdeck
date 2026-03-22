@@ -17,6 +17,7 @@ class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
             .environment(GlassdeckEnvironment.sessionManager)
             .environment(GlassdeckEnvironment.connectionStore)
             .environment(GlassdeckEnvironment.appSettings)
+            .environment(GlassdeckEnvironment.lifecycleCoordinator)
         window.rootViewController = UIHostingController(rootView: externalView)
         self.window = window
         window.makeKeyAndVisible()

@@ -94,12 +94,6 @@ struct SessionsRootView: View {
                 isActive: session.id == sessionManager.activeSessionID
             )
         }
-        .simultaneousGesture(TapGesture().onEnded {
-            sessionManager.setActiveSession(
-                id: session.id,
-                focusSurface: !UITestLaunchSupport.exposesTerminalRenderSummary
-            )
-        })
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 sessionManager.closeSession(id: session.id)
@@ -185,10 +179,6 @@ private struct SessionSummaryCard: View {
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(isActive ? Color(uiColor: .secondarySystemGroupedBackground) : Color(uiColor: .systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(isActive ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
     }

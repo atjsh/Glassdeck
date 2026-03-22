@@ -24,16 +24,20 @@
 		2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */; };
 		32F9D3FC5C7BAF26589C3735 /* SSHConnectionManagerLiveDockerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB6CF6F229C898018461F96 /* SSHConnectionManagerLiveDockerTests.swift */; };
 		40CA69F2D440F85FE652AA75 /* GhosttyHomeAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B2CDEFD098709214EDC6B2B /* GhosttyHomeAnimation.swift */; };
+		41DB6CE7DB830E5E94F8DD44 /* SessionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B0FD52A1FD108E8E0D2A46 /* SessionPersistenceTests.swift */; };
 		45631027515F25DDDE00D894 /* ConnectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */; };
+		4694627437F23768A1FDA041 /* SessionBackgroundPersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A39508A54CF083DC4057E00 /* SessionBackgroundPersistenceController.swift */; };
 		495D4E93F2ED1B79FE99E218 /* SessionKeyboardInputHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1818040EBC65B6B4002B52D /* SessionKeyboardInputHost.swift */; };
 		4CD0812DA8161FDAED02F689 /* SSHKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */; };
 		4D39521E309D66B02163B6AF /* GhosttyTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */; };
 		4F53994BA80B871E7633BA26 /* UITestLaunchSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFC9B6AF63BC559E5A43A39 /* UITestLaunchSupport.swift */; };
+		50C9435DBB80ECB82E548B7D /* SessionPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B5CB256BA567E878E4D8D1 /* SessionPersistenceStore.swift */; };
 		53437FB7C871DCB65B8A51EB /* SSHClientInteractiveShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5628E8E8CD7EDDA4235BFCD /* SSHClientInteractiveShell.swift */; };
 		58065A8C1341F7B10B297E4B /* SSHKeyImportValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0848B319DEEE53AB0D6B6AA /* SSHKeyImportValidator.swift */; };
 		59147CEDC7E11F0E371FFA08 /* ExternalTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */; };
 		598BCD44FE9D6F0306092196 /* RemoteControlStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */; };
 		5DB4B3F84B79B402AAFE96AB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E110E69F51C992B909FD3F4E /* AppSettings.swift */; };
+		63BEE521B80268F960861803 /* SessionLifecycleCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E2C3044276437BE6B658CB6 /* SessionLifecycleCoordinator.swift */; };
 		6F7FA86F088FF746A5721929 /* ConnectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */; };
 		81A4566DAF3E90F9337870D4 /* SSHReconnectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */; };
 		86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */; };
@@ -73,6 +77,7 @@
 		E69B87144634AFD2108CB61B /* GlassdeckEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025660FB2C230BA04A599321 /* GlassdeckEnvironment.swift */; };
 		EF8A64ADB0AB9E25EACAAC77 /* GhosttyHomeAnimationPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166D466D503804B9CECD314F /* GhosttyHomeAnimationPerformanceTests.swift */; };
 		FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */; };
+		FE75665145DEA201B649B8F4 /* SessionCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5058DAC24DC8B7271035A590 /* SessionCredentialStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -138,6 +143,7 @@
 		0AFC9B6AF63BC559E5A43A39 /* UITestLaunchSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestLaunchSupport.swift; sourceTree = "<group>"; };
 		0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHConnectionManager.swift; sourceTree = "<group>"; };
 		166D466D503804B9CECD314F /* GhosttyHomeAnimationPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyHomeAnimationPerformanceTests.swift; sourceTree = "<group>"; };
+		1E2C3044276437BE6B658CB6 /* SessionLifecycleCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLifecycleCoordinator.swift; sourceTree = "<group>"; };
 		1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHKeyManager.swift; sourceTree = "<group>"; };
 		20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerInputHandler.swift; sourceTree = "<group>"; };
 		20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveUITests.swift; sourceTree = "<group>"; };
@@ -157,6 +163,7 @@
 		44F3882C1AF2363E996FA14E /* SSHPTYBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHPTYBridgeTests.swift; sourceTree = "<group>"; };
 		498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHAuthenticator.swift; sourceTree = "<group>"; };
 		4B2CDEFD098709214EDC6B2B /* GhosttyHomeAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyHomeAnimation.swift; sourceTree = "<group>"; };
+		5058DAC24DC8B7271035A590 /* SessionCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCredentialStore.swift; sourceTree = "<group>"; };
 		50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadView.swift; sourceTree = "<group>"; };
 		5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalView.swift; sourceTree = "<group>"; };
 		5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStore.swift; sourceTree = "<group>"; };
@@ -167,6 +174,7 @@
 		70392DFE68FDADDEBF93A9F2 /* GlassdeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassdeckApp.swift; sourceTree = "<group>"; };
 		7197037A07EEDF4779EC844A /* InteractiveShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveShell.swift; sourceTree = "<group>"; };
 		78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionModelTests.swift; sourceTree = "<group>"; };
+		7A39508A54CF083DC4057E00 /* SessionBackgroundPersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionBackgroundPersistenceController.swift; sourceTree = "<group>"; };
 		7A4CC05A3A4E1897A4F52A56 /* TerminalContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalContainerView.swift; sourceTree = "<group>"; };
 		7C93770B5585296FFD2F1C9E /* GlassdeckAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassdeckAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D0020F203A8B8772184F0D1 /* RemoteControlSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlSupport.swift; sourceTree = "<group>"; };
@@ -178,11 +186,13 @@
 		A1818040EBC65B6B4002B52D /* SessionKeyboardInputHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKeyboardInputHost.swift; sourceTree = "<group>"; };
 		A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManagerTests.swift; sourceTree = "<group>"; };
 		AAEA7042758FD9637994E45A /* TerminalConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfiguration.swift; sourceTree = "<group>"; };
+		B2B0FD52A1FD108E8E0D2A46 /* SessionPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceTests.swift; sourceTree = "<group>"; };
 		B43E247EDE97B43ACE6C6311 /* GlassdeckApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GlassdeckApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadScreenshotUITests.swift; sourceTree = "<group>"; };
 		BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalView.swift; sourceTree = "<group>"; };
 		C181B166BD2A79C753076DF3 /* UITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
 		C3105D44E097230A7374ACEC /* RemoteControlMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlMode.swift; sourceTree = "<group>"; };
+		C8B5CB256BA567E878E4D8D1 /* SessionPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceStore.swift; sourceTree = "<group>"; };
 		C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CGhosttyVT.xcframework; path = Frameworks/CGhosttyVT.xcframework; sourceTree = "<group>"; };
 		D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTTypes.swift; sourceTree = "<group>"; };
 		D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManager.swift; sourceTree = "<group>"; };
@@ -311,6 +321,7 @@
 			children = (
 				166D466D503804B9CECD314F /* GhosttyHomeAnimationPerformanceTests.swift */,
 				962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */,
+				B2B0FD52A1FD108E8E0D2A46 /* SessionPersistenceTests.swift */,
 			);
 			path = GlassdeckAppTests;
 			sourceTree = "<group>";
@@ -398,7 +409,11 @@
 		9E4ED1FEE7111647D04C9098 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				7A39508A54CF083DC4057E00 /* SessionBackgroundPersistenceController.swift */,
+				5058DAC24DC8B7271035A590 /* SessionCredentialStore.swift */,
+				1E2C3044276437BE6B658CB6 /* SessionLifecycleCoordinator.swift */,
 				3AB4D260FBCF1015AC9C2233 /* SessionManager.swift */,
+				C8B5CB256BA567E878E4D8D1 /* SessionPersistenceStore.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -664,8 +679,12 @@
 				1A26E9797AF482E3591E0DBE /* RemoteTrackpadView.swift in Sources */,
 				AE57B3ADE1CD18036DB6FC93 /* SFTPBrowserView.swift in Sources */,
 				D1964747F9CF8E51F7DFD01E /* SSHSessionModel.swift in Sources */,
+				4694627437F23768A1FDA041 /* SessionBackgroundPersistenceController.swift in Sources */,
+				FE75665145DEA201B649B8F4 /* SessionCredentialStore.swift in Sources */,
 				495D4E93F2ED1B79FE99E218 /* SessionKeyboardInputHost.swift in Sources */,
+				63BEE521B80268F960861803 /* SessionLifecycleCoordinator.swift in Sources */,
 				AE2E81E494B8F9C720CC5D92 /* SessionManager.swift in Sources */,
+				50C9435DBB80ECB82E548B7D /* SessionPersistenceStore.swift in Sources */,
 				ACB698F2AE1745C3A59421B3 /* SessionTabView.swift in Sources */,
 				C7D5DDC6609F76479E9A47E6 /* TerminalContainerView.swift in Sources */,
 				18D8F9722B62D58F3B595B9A /* TerminalViewProtocol.swift in Sources */,
@@ -686,6 +705,7 @@
 				C51405D26C0AA665BE8FE928 /* SSHCoreTests.swift in Sources */,
 				9CB2F2526348F91CCBB53AA8 /* SSHPTYBridgeTests.swift in Sources */,
 				DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */,
+				41DB6CE7DB830E5E94F8DD44 /* SessionPersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

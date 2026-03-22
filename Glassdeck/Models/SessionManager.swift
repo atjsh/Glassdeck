@@ -3,6 +3,11 @@ import Foundation
 import GlassdeckCore
 import Observation
 
+@MainActor
+protocol SessionManagerLifecycleDelegate: AnyObject {
+    func sessionManagerDidChangeSessions(_ sessionManager: SessionManager)
+}
+
 /// Manages multiple concurrent SSH sessions and display routing.
 ///
 /// Orchestrates the full lifecycle: connection → shell → PTY bridge → terminal.
@@ -26,16 +31,31 @@ final class SessionManager {
     private(set) var activeSessionID: UUID?
     private(set) var externalDisplaySessionID: UUID?
     private(set) var hasExternalDisplayConnected = false
+    private(set) var presentationRevision = 0
 
     /// Whether the connection picker sheet is shown.
     var showConnectionPicker = false
 
     private let connectionManager = SSHConnectionManager()
-    private let reconnectManager = SSHReconnectManager()
+    private var reconnectManager: SSHReconnectManager
     @ObservationIgnored private let appSettings: AppSettings
+    @ObservationIgnored private let persistenceStore: SessionPersistenceStore
+    @ObservationIgnored private let credentialStore: SessionCredentialStore
+    @ObservationIgnored private var restoredPersistedSessions = false
+    weak var lifecycleDelegate: SessionManagerLifecycleDelegate?
 
-    init(appSettings: AppSettings = AppSettings()) {
+    init(
+        appSettings: AppSettings = AppSettings(),
+        persistenceStore: SessionPersistenceStore = SessionPersistenceStore(),
+        credentialStore: SessionCredentialStore = SessionCredentialStore()
+    ) {
         self.appSettings = appSettings
+        self.persistenceStore = persistenceStore
+        self.credentialStore = credentialStore
+        self.reconnectManager = SSHReconnectManager(
+            config: Self.reconnectConfig(from: appSettings)
+        )
+        restorePersistedSessionsIfNeeded()
     }
 
     var activeSession: SSHSessionModel? {
@@ -69,7 +89,6 @@ final class SessionManager {
             && activeSessionID == session.id
             && externalDisplaySessionID == session.id
             && session.isLiveForRemoteControl
-            && !session.remoteControlShowsLocalTerminal
     }
 
     /// Get the terminal surface for a session.
@@ -93,6 +112,101 @@ final class SessionManager {
             .first
     }
 
+    var hasLiveSessionsNeedingRuntimeSupport: Bool {
+        sessions.contains { session in
+            switch session.status {
+            case .connected, .connecting, .authenticating, .reconnecting:
+                return true
+            case .disconnected, .failed:
+                return false
+            }
+        }
+    }
+
+    func isTerminalPresentationReady(for session: SSHSessionModel) -> Bool {
+        session.surface != nil && session.terminalHasRenderedFrame
+    }
+
+    func isSessionDetailPresentable(for session: SSHSessionModel) -> Bool {
+        shouldShowRemoteTrackpad(for: session) || isTerminalPresentationReady(for: session)
+    }
+
+    func terminalDisplayTarget(for session: SSHSessionModel) -> TerminalDisplayTarget {
+        guard hasExternalDisplayConnected, externalDisplaySessionID == session.id else {
+            return .iphone
+        }
+        return .externalMonitor
+    }
+
+    func refreshTerminalConfiguration(for target: TerminalDisplayTarget) async {
+        let targetSessionIDs = sessions.compactMap { session -> UUID? in
+            guard session.surface != nil else { return nil }
+            return terminalDisplayTarget(for: session) == target ? session.id : nil
+        }
+
+        for sessionID in targetSessionIDs {
+            await refreshTerminalConfiguration(for: sessionID)
+        }
+    }
+
+    func restorePersistedSessionsIfNeeded() {
+        guard !restoredPersistedSessions else { return }
+        restoredPersistedSessions = true
+        guard let snapshot = persistenceStore.loadSnapshot() else { return }
+
+        sessions = snapshot.sessions.map(Self.session(from:))
+        activeSessionID = snapshot.activeSessionID
+        externalDisplaySessionID = snapshot.externalDisplaySessionID
+
+        for session in sessions {
+            session.isOnExternalDisplay = session.id == externalDisplaySessionID
+            if session.profile.authMethod == .password {
+                session.connectionPassword = credentialStore.password(for: session.profile.id)
+            }
+        }
+
+        persistSessions()
+        notifySessionChanges()
+    }
+
+    func resumeRestorableSessionsIfNeeded() {
+        for session in sessions where session.shouldRestoreConnectionOnForeground {
+            switch session.status {
+            case .connected, .connecting, .authenticating:
+                continue
+            case .reconnecting:
+                Task {
+                    _ = await reconnect(sessionID: session.id)
+                }
+            case .disconnected, .failed:
+                Task {
+                    _ = await reconnect(sessionID: session.id)
+                }
+            }
+        }
+    }
+
+    func handleAppDidEnterBackground() {
+        for session in sessions {
+            switch session.status {
+            case .connected, .connecting, .authenticating, .reconnecting:
+                session.shouldRestoreConnectionOnForeground = true
+            case .disconnected, .failed:
+                break
+            }
+        }
+        persistSessions()
+    }
+
+    func handleAppDidBecomeActive() {
+        refreshReconnectManager()
+        resumeRestorableSessionsIfNeeded()
+    }
+
+    func refreshReconnectConfiguration() {
+        refreshReconnectManager()
+    }
+
     // MARK: - Connection Lifecycle
 
     /// Connect to a host, open a shell, and wire up the PTY bridge.
@@ -110,6 +224,8 @@ final class SessionManager {
         session.connectionPassword = password
         sessions.append(session)
         activeSessionID = session.id
+        persistSessions()
+        notifySessionChanges()
 
         guard prepareSurface(for: session) else { return session }
         _ = await establishConnection(
@@ -132,11 +248,15 @@ final class SessionManager {
         session.surface?.setFocused(false)
         session.status = .disconnected
         session.surface = nil
-        session.remoteControlShowsLocalTerminal = false
+        session.shouldRestoreConnectionOnForeground = false
+        session.terminalHasRenderedFrame = false
         session.remoteControlKeyboardFocused = false
         session.remoteControlSoftwareKeyboardPresented = false
+        session.localTerminalSoftwareKeyboardPresented = false
         session.remoteControlUnsupportedMessage = nil
         session.remotePointerOverlayState = .hidden
+        persistSessions()
+        notifySessionChanges()
         Task {
             await reconnectManager.cancelReconnecting(sessionID: id)
             await self.teardownRemoteResources(for: session)
@@ -154,6 +274,8 @@ final class SessionManager {
         if externalDisplaySessionID == id {
             externalDisplaySessionID = nil
         }
+        persistSessions()
+        notifySessionChanges()
     }
 
     // MARK: - Session Switching
@@ -163,7 +285,6 @@ final class SessionManager {
         if let previousActiveSessionID = activeSessionID,
            previousActiveSessionID != id,
            let previousSession = sessions.first(where: { $0.id == previousActiveSessionID }) {
-            previousSession.remoteControlShowsLocalTerminal = false
             previousSession.remoteControlKeyboardFocused = false
             previousSession.remoteControlSoftwareKeyboardPresented = false
             previousSession.remoteControlUnsupportedMessage = nil
@@ -172,13 +293,15 @@ final class SessionManager {
 
         activeSessionID = id
         if let session = sessions.first(where: { $0.id == id }) {
-            session.surface?.setFocused(focusSurface)
+            session.surface?.setFocused(focusSurface && shouldFocusSurface(for: session))
             session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
         }
         for session in sessions where session.id != id {
-            session.surface?.setFocused(false)
+            session.surface?.setFocused(shouldFocusSurface(for: session))
             session.remoteControlKeyboardFocused = false
         }
+        persistSessions()
+        notifySessionChanges()
     }
 
     /// Open a new tab (shows connection picker).
@@ -192,6 +315,12 @@ final class SessionManager {
         session.requestedManualDisconnect = false
         session.connectionError = nil
         session.reconnectState = .idle
+        session.shouldRestoreConnectionOnForeground = true
+        if session.connectionPassword == nil, session.profile.authMethod == .password {
+            session.connectionPassword = credentialStore.password(for: session.profile.id)
+        }
+        persistSessions()
+        notifySessionChanges()
         guard prepareSurface(for: session) else { return false }
         return await establishConnection(
             for: session,
@@ -204,24 +333,26 @@ final class SessionManager {
 
     /// Route a session to the external display.
     func routeToExternalDisplay(sessionID: UUID) {
+        let previousExternalSessionID = externalDisplaySessionID
+
         // Unroute previous
         if let prevID = externalDisplaySessionID {
             if let previous = sessions.first(where: { $0.id == prevID }) {
                 previous.isOnExternalDisplay = false
                 previous.remotePointerOverlayState = .hidden
-                previous.remoteControlShowsLocalTerminal = false
                 previous.remoteControlUnsupportedMessage = nil
                 previous.remoteControlKeyboardFocused = false
+                previous.localTerminalSoftwareKeyboardPresented = false
             }
         }
 
         externalDisplaySessionID = sessionID
         if let session = sessions.first(where: { $0.id == sessionID }) {
             session.isOnExternalDisplay = true
-            session.remoteControlShowsLocalTerminal = false
             session.remotePointerOverlayState = .hidden
             session.remoteControlUnsupportedMessage = nil
             session.remoteControlKeyboardFocused = activeSessionID == sessionID && hasExternalDisplayConnected
+            session.localTerminalSoftwareKeyboardPresented = false
         }
 
         // Post notification for ExternalDisplaySceneDelegate
@@ -229,17 +360,28 @@ final class SessionManager {
             name: .externalDisplaySessionChanged,
             object: sessionID
         )
+        persistSessions()
+        notifySessionChanges()
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let previousExternalSessionID, previousExternalSessionID != sessionID {
+                await self.refreshTerminalConfiguration(for: previousExternalSessionID)
+            }
+            await self.refreshTerminalConfiguration(for: sessionID)
+        }
     }
 
     /// Remove external display routing.
     func clearExternalDisplay() {
+        let previousExternalSessionID = externalDisplaySessionID
         if let id = externalDisplaySessionID {
             if let session = sessions.first(where: { $0.id == id }) {
                 session.isOnExternalDisplay = false
                 session.remotePointerOverlayState = .hidden
-                session.remoteControlShowsLocalTerminal = false
                 session.remoteControlUnsupportedMessage = nil
                 session.remoteControlKeyboardFocused = false
+                session.localTerminalSoftwareKeyboardPresented = false
             }
         }
         externalDisplaySessionID = nil
@@ -247,9 +389,18 @@ final class SessionManager {
             name: .externalDisplaySessionChanged,
             object: nil
         )
+        persistSessions()
+        notifySessionChanges()
+
+        if let previousExternalSessionID {
+            Task { @MainActor [weak self] in
+                await self?.refreshTerminalConfiguration(for: previousExternalSessionID)
+            }
+        }
     }
 
     func setExternalDisplayConnected(_ isConnected: Bool) {
+        let previousExternalDisplayConnected = hasExternalDisplayConnected
         hasExternalDisplayConnected = isConnected
         if !isConnected {
             for session in sessions {
@@ -260,15 +411,22 @@ final class SessionManager {
             }
         } else if let session = activeSession {
             session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
+            if externalDisplaySessionID == session.id {
+                session.localTerminalSoftwareKeyboardPresented = false
+            }
         }
-    }
+        persistSessions()
+        notifySessionChanges()
 
-    func showLocalTerminalForCurrentVisit(sessionID: UUID) {
-        guard let session = sessions.first(where: { $0.id == sessionID }) else { return }
-        session.remoteControlShowsLocalTerminal = true
-        session.remoteControlKeyboardFocused = false
-        session.remoteControlSoftwareKeyboardPresented = false
-        session.remotePointerOverlayState = .hidden
+        guard previousExternalDisplayConnected != isConnected,
+              let externalDisplaySessionID
+        else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.refreshTerminalConfiguration(for: externalDisplaySessionID)
+        }
     }
 
     static func connectedSessionsHaveSurfaces(_ sessions: [SSHSessionModel]) -> Bool {
@@ -315,6 +473,8 @@ final class SessionManager {
             session.terminalInteractionCapabilities = interactionCapabilities
         }
 
+        persistSessions()
+        notifySessionChanges()
         return true
     }
 
@@ -342,7 +502,10 @@ final class SessionManager {
                 externalDisplaySessionID: externalDisplaySessionID,
                 session: session
             )
+            _ = prepareSurface(for: session)
         }
+        persistSessions()
+        notifySessionChanges()
     }
 
     // MARK: - Private
@@ -355,6 +518,9 @@ final class SessionManager {
             session.status = .disconnected
             session.connectionID = nil
             session.reconnectState = .idle
+            session.shouldRestoreConnectionOnForeground = false
+            persistSessions()
+            notifySessionChanges()
             return
         }
 
@@ -366,6 +532,18 @@ final class SessionManager {
         }
         session.connectionID = nil
         session.status = .reconnecting
+        session.shouldRestoreConnectionOnForeground = appSettings.autoReconnect
+        persistSessions()
+        notifySessionChanges()
+
+        guard appSettings.autoReconnect else {
+            session.status = .disconnected
+            persistSessions()
+            notifySessionChanges()
+            return
+        }
+
+        refreshReconnectManager()
 
         Task { [weak self] in
             guard let self else { return }
@@ -418,41 +596,93 @@ final class SessionManager {
         configuration: TerminalConfiguration? = nil,
         metricsPreset: GhosttySurfaceMetricsPreset? = nil
     ) -> Bool {
+        let resolvedConfiguration = configuration ?? appSettings.terminalConfig(
+            for: terminalDisplayTarget(for: session)
+        )
+
         if let surface = session.surface {
+            guard surface.terminalConfiguration == resolvedConfiguration else {
+                guard session.bridge == nil else {
+                    bind(surface: surface, to: session)
+                    applySessionPresentationState(to: surface, session: session)
+                    applySurfaceState(surface.stateSnapshot, to: session)
+                    return true
+                }
+
+                do {
+                    let replacementSurface = try GhosttySurface(
+                        configuration: resolvedConfiguration,
+                        metricsPreset: metricsPreset
+                    )
+                    replacementSurface.frame = surface.frame
+                    replacementSurface.bounds = surface.bounds
+                    replacementSurface.title = session.terminalTitle
+                    surface.onResize = nil
+                    surface.onStateChange = nil
+                    surface.onSoftwareKeyboardPresentationChange = nil
+                    session.surface = replacementSurface
+                    bind(surface: replacementSurface, to: session)
+                    applySessionPresentationState(to: replacementSurface, session: session)
+                    applySurfaceState(replacementSurface.stateSnapshot, to: session)
+                    return true
+                } catch {
+                    session.status = .failed(error.localizedDescription)
+                    session.connectionError = error.localizedDescription
+                    persistSessions()
+                    notifySessionChanges()
+                    return false
+                }
+            }
+
             bind(surface: surface, to: session)
+            applySessionPresentationState(to: surface, session: session)
             applySurfaceState(surface.stateSnapshot, to: session)
             return true
         }
 
         do {
-            let resolvedConfiguration = configuration ?? appSettings.terminalConfig
             let surface = try GhosttySurface(
                 configuration: resolvedConfiguration,
                 metricsPreset: metricsPreset
             )
             session.surface = surface
             bind(surface: surface, to: session)
+            applySessionPresentationState(to: surface, session: session)
             applySurfaceState(surface.stateSnapshot, to: session)
+            persistSessions()
+            notifySessionChanges()
             return true
         } catch {
             session.status = .failed(error.localizedDescription)
             session.connectionError = error.localizedDescription
+            persistSessions()
+            notifySessionChanges()
             return false
         }
     }
 
     private func bind(surface: GhosttySurface, to session: SSHSessionModel) {
-        surface.onStateChange = { [weak session] state in
-            session?.terminalTitle = state.title
-            session?.terminalSize = state.terminalSize
-            session?.terminalPixelSize = state.pixelSize
-            session?.scrollbackLines = state.scrollbackLines
-            session?.terminalIsHealthy = state.isHealthy
-            session?.terminalRenderFailureReason = state.renderFailureReason
-            session?.terminalVisibleTextSummary = state.visibleTextSummary
-            session?.terminalAnimationProgress = state.animationProgress
-            session?.terminalInteractionGeometry = state.interactionGeometry
-            session?.terminalInteractionCapabilities = state.interactionCapabilities
+        surface.onSoftwareKeyboardPresentationChange = { [weak session] presented in
+            session?.localTerminalSoftwareKeyboardPresented = presented
+        }
+        surface.onStateChange = { [weak self, weak session] state in
+            guard let self, let session else { return }
+            self.applySurfaceState(state, to: session)
+        }
+    }
+
+    private func bindResize(
+        for surface: GhosttySurface,
+        bridge: SSHPTYBridge?,
+        session: SSHSessionModel
+    ) {
+        surface.onResize = { [weak bridge, weak session] columns, rows, pixelSize in
+            guard let bridge else { return }
+            session?.terminalSize = TerminalSize(columns: columns, rows: rows)
+            session?.terminalPixelSize = pixelSize
+            Task {
+                await bridge.resize(columns: columns, rows: rows, pixelSize: pixelSize)
+            }
         }
     }
 
@@ -464,9 +694,91 @@ final class SessionManager {
         session.terminalIsHealthy = state.isHealthy
         session.terminalRenderFailureReason = state.renderFailureReason
         session.terminalVisibleTextSummary = state.visibleTextSummary
+        session.terminalHasRenderedFrame = state.hasRenderedFrame
         session.terminalAnimationProgress = state.animationProgress
         session.terminalInteractionGeometry = state.interactionGeometry
         session.terminalInteractionCapabilities = state.interactionCapabilities
+        session.localTerminalSoftwareKeyboardPresented = state.softwareKeyboardPresented
+        presentationRevision &+= 1
+    }
+
+    private func applySessionPresentationState(to surface: GhosttySurface, session: SSHSessionModel) {
+        let localKeyboardPresented: Bool
+        switch terminalDisplayTarget(for: session) {
+        case .iphone:
+            localKeyboardPresented = session.localTerminalSoftwareKeyboardPresented
+        case .externalMonitor:
+            localKeyboardPresented = false
+            session.localTerminalSoftwareKeyboardPresented = false
+        }
+
+        surface.setSoftwareKeyboardPresented(localKeyboardPresented)
+        surface.setFocused(shouldFocusSurface(for: session))
+    }
+
+    private func shouldFocusSurface(for session: SSHSessionModel) -> Bool {
+        guard session.isLiveForRemoteControl else { return false }
+        switch terminalDisplayTarget(for: session) {
+        case .iphone:
+            return activeSessionID == session.id
+        case .externalMonitor:
+            return true
+        }
+    }
+
+    private func refreshTerminalConfiguration(for sessionID: UUID) async {
+        guard let session = sessions.first(where: { $0.id == sessionID }) else { return }
+        guard let existingSurface = session.surface else { return }
+        let configuration = appSettings.terminalConfig(for: terminalDisplayTarget(for: session))
+
+        guard existingSurface.terminalConfiguration != configuration else {
+            applySessionPresentationState(to: existingSurface, session: session)
+            return
+        }
+
+        await recreateSurface(for: session, configuration: configuration)
+    }
+
+    private func recreateSurface(
+        for session: SSHSessionModel,
+        configuration: TerminalConfiguration
+    ) async {
+        let previousSurface = session.surface
+
+        do {
+            let surface = try GhosttySurface(configuration: configuration)
+            if let previousSurface {
+                previousSurface.onResize = nil
+                previousSurface.onStateChange = nil
+                previousSurface.onSoftwareKeyboardPresentationChange = nil
+                surface.frame = previousSurface.frame
+                surface.bounds = previousSurface.bounds
+                surface.title = session.terminalTitle
+            }
+
+            session.surface = surface
+            bind(surface: surface, to: session)
+            applySessionPresentationState(to: surface, session: session)
+            applySurfaceState(surface.stateSnapshot, to: session)
+
+            if let bridge = session.bridge {
+                bindResize(for: surface, bridge: bridge, session: session)
+                await bridge.replaceTerminal(GhosttySurfaceTerminalIO(surface: surface))
+                await bridge.resize(
+                    columns: session.terminalSize.columns,
+                    rows: session.terminalSize.rows,
+                    pixelSize: session.terminalPixelSize
+                )
+            }
+
+            persistSessions()
+            notifySessionChanges()
+        } catch {
+            session.connectionError = error.localizedDescription
+            session.terminalRenderFailureReason = error.localizedDescription
+            persistSessions()
+            notifySessionChanges()
+        }
     }
 
     private func establishConnection(
@@ -485,9 +797,12 @@ final class SessionManager {
         session.connectionError = nil
         session.reconnectState = isReconnect ? session.reconnectState : .idle
         session.status = isReconnect ? .reconnecting : .connecting
+        session.shouldRestoreConnectionOnForeground = true
         session.remoteControlUnsupportedMessage = nil
         session.remotePointerOverlayState = .hidden
         session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
+        persistSessions()
+        notifySessionChanges()
 
         await teardownRemoteResources(for: session)
 
@@ -511,14 +826,7 @@ final class SessionManager {
             let bridge = SSHPTYBridge(terminal: GhosttySurfaceTerminalIO(surface: surface))
             session.bridge = bridge
 
-            surface.onResize = { [weak bridge, weak session] columns, rows, pixelSize in
-                guard let bridge else { return }
-                session?.terminalSize = TerminalSize(columns: columns, rows: rows)
-                session?.terminalPixelSize = pixelSize
-                Task {
-                    await bridge.resize(columns: columns, rows: rows, pixelSize: pixelSize)
-                }
-            }
+            bindResize(for: surface, bridge: bridge, session: session)
 
             await bridge.start(shell: shell)
             await bridge.setOnDisconnect { [weak self, sessionID = session.id] in
@@ -531,6 +839,12 @@ final class SessionManager {
             session.status = .connected
             session.reconnectState = isReconnect ? .reconnected : .idle
             session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
+            session.shouldRestoreConnectionOnForeground = true
+            if session.profile.authMethod == .password, let password, !password.isEmpty {
+                try? credentialStore.storePassword(password, for: session.profile.id)
+            }
+            persistSessions()
+            notifySessionChanges()
             return true
         } catch {
             await teardownRemoteResources(for: session)
@@ -541,12 +855,17 @@ final class SessionManager {
             } else {
                 session.status = .failed(error.localizedDescription)
             }
+            persistSessions()
+            notifySessionChanges()
             return false
         }
     }
 
     private func reconnectSession(sessionID: UUID) async -> Bool {
         guard let session = sessions.first(where: { $0.id == sessionID }) else { return false }
+        if session.connectionPassword == nil, session.profile.authMethod == .password {
+            session.connectionPassword = credentialStore.password(for: session.profile.id)
+        }
         guard prepareSurface(for: session) else { return false }
         return await establishConnection(
             for: session,
@@ -570,6 +889,152 @@ final class SessionManager {
         case .gaveUp(let attempts):
             session.reconnectState = .gaveUp(attempts: attempts)
             session.status = .failed(status.label)
+        }
+        persistSessions()
+        notifySessionChanges()
+    }
+
+    private func refreshReconnectManager() {
+        reconnectManager = SSHReconnectManager(
+            config: Self.reconnectConfig(from: appSettings)
+        )
+    }
+
+    private func persistSessions() {
+        guard !sessions.isEmpty || activeSessionID != nil || externalDisplaySessionID != nil else {
+            persistenceStore.clear()
+            return
+        }
+
+        let snapshot = PersistedSessionSnapshot(
+            sessions: sessions.map(Self.persistedDescriptor(from:)),
+            activeSessionID: activeSessionID,
+            externalDisplaySessionID: externalDisplaySessionID
+        )
+        persistenceStore.saveSnapshot(snapshot)
+    }
+
+    private func notifySessionChanges() {
+        lifecycleDelegate?.sessionManagerDidChangeSessions(self)
+    }
+
+    static func reconnectConfig(from appSettings: AppSettings) -> SSHReconnectManager.Config {
+        SSHReconnectManager.Config(
+            enabled: appSettings.autoReconnect,
+            maxAttempts: max(1, appSettings.maxReconnectAttempts),
+            initialDelay: max(0.5, appSettings.reconnectDelay),
+            maxDelay: max(1.0, appSettings.reconnectDelay * 4),
+            backoffMultiplier: 2.0
+        )
+    }
+
+    private static func persistedDescriptor(from session: SSHSessionModel) -> PersistedSessionDescriptor {
+        PersistedSessionDescriptor(
+            id: session.id,
+            profile: session.profile,
+            status: persistedStatus(from: session.status),
+            connectionError: session.connectionError,
+            connectedAt: session.connectedAt,
+            reconnectState: persistedReconnectState(from: session.reconnectState),
+            terminalTitle: session.terminalTitle,
+            terminalSize: session.terminalSize,
+            terminalPixelSize: session.terminalPixelSize,
+            scrollbackLines: session.scrollbackLines,
+            shouldRestoreConnectionOnForeground: session.shouldRestoreConnectionOnForeground,
+            isOnExternalDisplay: session.isOnExternalDisplay
+        )
+    }
+
+    private static func session(from descriptor: PersistedSessionDescriptor) -> SSHSessionModel {
+        let session = SSHSessionModel(id: descriptor.id, profile: descriptor.profile)
+        let shouldRestoreConnectionOnForeground =
+            descriptor.shouldRestoreConnectionOnForeground
+            || descriptor.status.requiresLiveResources
+        session.status = sessionStatus(
+            from: descriptor.status,
+            shouldRestore: shouldRestoreConnectionOnForeground
+        )
+        session.connectionError = descriptor.connectionError
+        session.connectedAt = descriptor.connectedAt
+        session.reconnectState = reconnectState(from: descriptor.reconnectState)
+        session.terminalTitle = descriptor.terminalTitle
+        session.terminalSize = descriptor.terminalSize
+        session.terminalPixelSize = descriptor.terminalPixelSize
+        session.scrollbackLines = descriptor.scrollbackLines
+        session.shouldRestoreConnectionOnForeground = shouldRestoreConnectionOnForeground
+        session.isOnExternalDisplay = descriptor.isOnExternalDisplay
+        session.wasRestoredFromPersistence = true
+        return session
+    }
+
+    private static func persistedStatus(from status: SSHSessionModel.SessionStatus) -> PersistedSessionDescriptor.Status {
+        switch status {
+        case .disconnected:
+            return .disconnected
+        case .connecting:
+            return .connecting
+        case .authenticating:
+            return .authenticating
+        case .connected:
+            return .connected
+        case .reconnecting:
+            return .reconnecting
+        case .failed(let message):
+            return .failed(message)
+        }
+    }
+
+    private static func sessionStatus(
+        from status: PersistedSessionDescriptor.Status,
+        shouldRestore: Bool
+    ) -> SSHSessionModel.SessionStatus {
+        if shouldRestore, status.requiresLiveResources {
+            return .reconnecting
+        }
+
+        switch status {
+        case .disconnected:
+            return .disconnected
+        case .connecting:
+            return .disconnected
+        case .authenticating:
+            return .disconnected
+        case .connected:
+            return .disconnected
+        case .reconnecting:
+            return .disconnected
+        case .failed(let message):
+            return .failed(message)
+        }
+    }
+
+    private static func persistedReconnectState(
+        from reconnectState: SSHSessionModel.ReconnectState
+    ) -> PersistedReconnectState {
+        switch reconnectState {
+        case .idle:
+            return .idle
+        case .attempting(let attempt, let maxAttempts):
+            return .attempting(attempt: attempt, maxAttempts: maxAttempts)
+        case .reconnected:
+            return .reconnected
+        case .gaveUp(let attempts):
+            return .gaveUp(attempts: attempts)
+        }
+    }
+
+    private static func reconnectState(
+        from reconnectState: PersistedReconnectState
+    ) -> SSHSessionModel.ReconnectState {
+        switch reconnectState {
+        case .idle:
+            return .idle
+        case .attempting(let attempt, let maxAttempts):
+            return .attempting(attempt: attempt, maxAttempts: maxAttempts)
+        case .reconnected:
+            return .reconnected
+        case .gaveUp(let attempts):
+            return .gaveUp(attempts: attempts)
         }
     }
 
@@ -596,3 +1061,14 @@ extension Notification.Name {
     static let externalDisplaySessionChanged = Notification.Name("externalDisplaySessionChanged")
 }
 #endif
+
+private extension PersistedSessionDescriptor.Status {
+    var requiresLiveResources: Bool {
+        switch self {
+        case .connecting, .authenticating, .connected, .reconnecting:
+            true
+        case .disconnected, .failed:
+            false
+        }
+    }
+}

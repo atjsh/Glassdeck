@@ -157,17 +157,23 @@ struct SSHKeyListView: View {
 
     var body: some View {
         List {
-            Section {
-                ForEach(keys) { key in
-                    StoredKeyRow(
-                        key: key,
-                        isSelected: selectedKeyID == key.id
-                    ) {
-                        selectedKeyID = key.id
+            if keys.isEmpty {
+                Section {
+                    SSHKeyEmptyState {
+                        showGenerateSheet = true
                     }
                 }
-            } header: {
-                Text("Stored Keys")
+            } else {
+                Section("Stored Keys") {
+                    ForEach(keys) { key in
+                        StoredKeyRow(
+                            key: key,
+                            isSelected: selectedKeyID == key.id
+                        ) {
+                            selectedKeyID = key.id
+                        }
+                    }
+                }
             }
 
             Section {
@@ -311,6 +317,32 @@ private struct StoredKeyRow: View {
         }
         .accessibilityIdentifier("ssh-key-row")
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SSHKeyEmptyState: View {
+    let onGenerate: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                Text("No Stored Keys")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "key.slash")
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Generate or import an SSH key to use key-based authentication.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Button("Generate New Key", action: onGenerate)
+                .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .accessibilityIdentifier("ssh-key-empty-state")
     }
 }
 

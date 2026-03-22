@@ -16,9 +16,19 @@ class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
             .environment(GlassdeckEnvironment.sessionManager)
             .environment(GlassdeckEnvironment.connectionStore)
             .environment(GlassdeckEnvironment.appSettings)
+            .environment(GlassdeckEnvironment.lifecycleCoordinator)
         window.rootViewController = UIHostingController(rootView: rootView)
         self.window = window
         window.makeKeyAndVisible()
+        GlassdeckEnvironment.lifecycleCoordinator.start()
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        GlassdeckEnvironment.lifecycleCoordinator.handleAppDidBecomeActive()
+    }
+
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        GlassdeckEnvironment.lifecycleCoordinator.handleAppDidEnterBackground()
     }
 }
 #endif

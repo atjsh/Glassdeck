@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import Foundation
 import GlassdeckCore
 import SwiftUI
 
@@ -41,6 +42,7 @@ struct TerminalSurfaceView: View {
                     GhosttyPositionedTerminalView(
                         surface: surface,
                         isFocused: !exposesUITestInputProxy,
+                        softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented,
                         terminalSize: TerminalSize(
                             columns: GhosttyHomeAnimationSequence.expectedColumns,
                             rows: GhosttyHomeAnimationSequence.expectedRows
@@ -48,14 +50,13 @@ struct TerminalSurfaceView: View {
                         configuration: GhosttyHomeAnimationSequence.testingTerminalConfiguration,
                         metricsPreset: GhosttyHomeAnimationSequence.testingMetricsPreset
                     )
-                    .ignoresSafeArea()
                 } else {
                     GhosttyTerminalViewWrapper(
                         surface: surface,
-                        isFocused: !exposesUITestInputProxy
+                        isFocused: session.isConnected,
+                        softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .ignoresSafeArea()
                 }
 
                 if let terminalRenderFailureReason, session.isConnected {
@@ -77,12 +78,21 @@ struct TerminalSurfaceView: View {
         .overlay {
             SessionKeyboardInputHost(
                 session: session,
-                isFocused: true,
-                softwareKeyboardPresented: exposesUITestInputProxy
+                isFocused: session.isConnected,
+                softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented
             )
-            .frame(width: exposesUITestInputProxy ? 44 : 1, height: exposesUITestInputProxy ? 44 : 1)
+            .frame(width: 1, height: 1)
             .clipped()
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                guard session.isConnected else { return }
+                let presented = !session.localTerminalSoftwareKeyboardPresented
+                session.localTerminalSoftwareKeyboardPresented = presented
+                session.surface?.setSoftwareKeyboardPresented(presented)
+            }
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("terminal-surface-view")
     }
@@ -182,7 +192,12 @@ struct TerminalSurfaceView: View {
         isBroken: Bool
     ) {
         guard isBroken else { return }
-        assertionFailure("Connected session \(session.id) is missing its GhosttySurface.")
+        let message = "Connected session \(session.id) is missing its GhosttySurface."
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            assertionFailure(message)
+        } else {
+            NSLog("%@", message)
+        }
     }
 }
 
@@ -190,22 +205,31 @@ struct TerminalSurfaceView: View {
 struct GhosttyTerminalViewWrapper: UIViewRepresentable {
     let surface: GhosttySurface
     let isFocused: Bool
+    let softwareKeyboardPresented: Bool
 
     func makeUIView(context: Context) -> GhosttyTerminalHostingView {
         let hostingView = GhosttyTerminalHostingView()
-        hostingView.update(surface: surface, isFocused: isFocused)
+        hostingView.update(
+            surface: surface,
+            isFocused: isFocused,
+            softwareKeyboardPresented: softwareKeyboardPresented
+        )
         return hostingView
     }
 
     func updateUIView(_ uiView: GhosttyTerminalHostingView, context: Context) {
-        uiView.update(surface: surface, isFocused: isFocused)
+        uiView.update(
+            surface: surface,
+            isFocused: isFocused,
+            softwareKeyboardPresented: softwareKeyboardPresented
+        )
     }
 }
 
 final class GhosttyTerminalHostingView: UIView {
     private weak var hostedSurface: GhosttySurface?
 
-    func update(surface: GhosttySurface, isFocused: Bool) {
+    func update(surface: GhosttySurface, isFocused: Bool, softwareKeyboardPresented: Bool) {
         backgroundColor = terminalThemeColor(for: surface.terminalConfiguration.colorScheme)
         if hostedSurface !== surface {
             hostedSurface?.removeFromSuperview()
@@ -222,6 +246,7 @@ final class GhosttyTerminalHostingView: UIView {
             ])
         }
 
+        surface.setSoftwareKeyboardPresented(softwareKeyboardPresented)
         surface.setFocused(isFocused)
         surface.setNeedsLayout()
         surface.layoutIfNeeded()
@@ -241,6 +266,7 @@ private func terminalThemeColor(for colorScheme: TerminalColorScheme) -> UIColor
 struct GhosttyPositionedTerminalView: View {
     let surface: GhosttySurface
     let isFocused: Bool
+    let softwareKeyboardPresented: Bool
     let terminalSize: TerminalSize
     let configuration: TerminalConfiguration
     let metricsPreset: GhosttySurfaceMetricsPreset?
@@ -260,7 +286,8 @@ struct GhosttyPositionedTerminalView: View {
 
                 GhosttyTerminalViewWrapper(
                     surface: surface,
-                    isFocused: isFocused
+                    isFocused: isFocused,
+                    softwareKeyboardPresented: softwareKeyboardPresented
                 )
                 .frame(
                     width: naturalBounds.width,

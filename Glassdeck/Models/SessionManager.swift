@@ -56,6 +56,21 @@ final class SessionManager {
             config: Self.reconnectConfig(from: appSettings)
         )
         restorePersistedSessionsIfNeeded()
+        configureHostKeyValidation()
+    }
+
+    /// Called when the SSH layer needs the user to approve a host key.
+    /// Set by the view layer to present an alert.
+    var hostKeyPromptHandler: (@MainActor (HostKeyPromptInfo) async -> Bool)?
+
+    private func configureHostKeyValidation() {
+        let manager = connectionManager
+        Task {
+            await manager.setHostKeyPromptHandler { [weak self] info in
+                guard let handler = await self?.hostKeyPromptHandler else { return false }
+                return await handler(info)
+            }
+        }
     }
 
     var activeSession: SSHSessionModel? {
@@ -550,7 +565,7 @@ final class SessionManager {
             await self.reconnectManager.startReconnecting(
                 sessionID: sessionID,
                 reconnect: { [weak self] in
-                    guard let self else { return false }
+                    guard let self else { return .failure(.permanent("Session manager deallocated")) }
                     return await self.reconnectSession(sessionID: sessionID)
                 },
                 onStatusChange: { [weak self] status in
@@ -746,7 +761,15 @@ final class SessionManager {
         let previousSurface = session.surface
 
         do {
-            let surface = try GhosttySurface(configuration: configuration)
+            let surface: GhosttySurface
+            if let existingEngine = session.engine {
+                // Reuse the existing engine to preserve terminal state (scrollback, modes, colors)
+                surface = try GhosttySurface(configuration: configuration, engine: existingEngine)
+            } else {
+                surface = try GhosttySurface(configuration: configuration)
+                session.engine = surface.engine
+            }
+
             if let previousSurface {
                 previousSurface.onResize = nil
                 previousSurface.onStateChange = nil
@@ -861,17 +884,22 @@ final class SessionManager {
         }
     }
 
-    private func reconnectSession(sessionID: UUID) async -> Bool {
-        guard let session = sessions.first(where: { $0.id == sessionID }) else { return false }
+    private func reconnectSession(sessionID: UUID) async -> Result<Void, SSHReconnectManager.ReconnectError> {
+        guard let session = sessions.first(where: { $0.id == sessionID }) else {
+            return .failure(.permanent("Session not found"))
+        }
         if session.connectionPassword == nil, session.profile.authMethod == .password {
             session.connectionPassword = credentialStore.password(for: session.profile.id)
         }
-        guard prepareSurface(for: session) else { return false }
-        return await establishConnection(
+        guard prepareSurface(for: session) else {
+            return .failure(.transient("Surface preparation failed"))
+        }
+        let success = await establishConnection(
             for: session,
             password: session.connectionPassword,
             isReconnect: true
         )
+        return success ? .success(()) : .failure(.transient(session.connectionError ?? "Connection failed"))
     }
 
     private func applyReconnectStatus(
@@ -889,6 +917,9 @@ final class SessionManager {
         case .gaveUp(let attempts):
             session.reconnectState = .gaveUp(attempts: attempts)
             session.status = .failed(status.label)
+        case .permanentFailure(let reason):
+            session.reconnectState = .gaveUp(attempts: 0)
+            session.status = .failed(reason)
         }
         persistSessions()
         notifySessionChanges()

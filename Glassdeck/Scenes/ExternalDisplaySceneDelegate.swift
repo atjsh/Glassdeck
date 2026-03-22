@@ -12,6 +12,9 @@ class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        // Release previous window to avoid a scene leak on reconnection
+        self.window = nil
+
         let window = UIWindow(windowScene: windowScene)
         let externalView = ExternalTerminalView()
             .environment(GlassdeckEnvironment.sessionManager)

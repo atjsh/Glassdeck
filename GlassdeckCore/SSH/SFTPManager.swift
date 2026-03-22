@@ -308,19 +308,36 @@ public actor SFTPManager: SFTPManaging {
 }
 
 public struct LiveSFTPClientSessionProvider: SFTPClientSessionProviding {
-    public init() {}
+    public var hostKeyPromptHandler: (@Sendable (HostKeyPromptInfo) async -> Bool)?
+
+    public init(
+        hostKeyPromptHandler: (@Sendable (HostKeyPromptInfo) async -> Bool)? = nil
+    ) {
+        self.hostKeyPromptHandler = hostKeyPromptHandler
+    }
 
     public func connect(
         to profile: ConnectionProfile,
         password: String?
     ) async throws -> any SFTPClientSession {
+        let hostKeyValidation: SSHAuthentication.HostKeyValidation
+        if let promptHandler = hostKeyPromptHandler {
+            hostKeyValidation = .custom(HostKeyValidationDelegate(
+                host: profile.host,
+                port: profile.port,
+                promptHandler: promptHandler
+            ))
+        } else {
+            hostKeyValidation = .acceptAll()
+        }
+
         let connection = SSHConnection(
             host: profile.host,
             port: UInt16(profile.port),
             authentication: SSHAuthentication(
                 username: profile.username,
                 method: try Self.buildAuthMethod(for: profile, password: password),
-                hostKeyValidation: .acceptAll()
+                hostKeyValidation: hostKeyValidation
             ),
             defaultTimeout: 15.0
         )

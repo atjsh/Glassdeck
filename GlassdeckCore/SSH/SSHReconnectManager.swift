@@ -4,6 +4,7 @@ import Foundation
 ///
 /// Implements exponential backoff with configurable max attempts.
 /// Integrates with SessionManager to re-establish connections transparently.
+/// Distinguishes transient failures (retry) from permanent failures (fail fast).
 public actor SSHReconnectManager {
     private var reconnectTasks: [UUID: Task<Void, Never>] = [:]
 
@@ -29,6 +30,14 @@ public actor SSHReconnectManager {
         }
     }
 
+    /// Classifies reconnection failures to determine retry strategy.
+    public enum ReconnectError: Error, Sendable {
+        /// Transient failures that may resolve on retry (e.g., network timeout).
+        case transient(String)
+        /// Permanent failures that won't resolve by retrying (e.g., auth failure, invalid host).
+        case permanent(String)
+    }
+
     private let config: Config
 
     public init(config: Config = Config()) {
@@ -39,11 +48,13 @@ public actor SSHReconnectManager {
     ///
     /// - Parameters:
     ///   - sessionID: The session to reconnect.
-    ///   - reconnect: Async closure that attempts reconnection. Returns true on success.
+    ///   - reconnect: Async closure that attempts reconnection.
+    ///     Returns `.success` on success, `.failure(.transient)` to retry,
+    ///     or `.failure(.permanent)` to stop immediately.
     ///   - onStatusChange: Called with status updates for UI display.
     public func startReconnecting(
         sessionID: UUID,
-        reconnect: @escaping @Sendable () async -> Bool,
+        reconnect: @escaping @Sendable () async -> Result<Void, ReconnectError>,
         onStatusChange: @escaping @Sendable (ReconnectStatus) -> Void
     ) {
         guard config.enabled else { return }
@@ -64,11 +75,17 @@ public actor SSHReconnectManager {
                 guard !Task.isCancelled else { break }
 
                 // Try reconnecting
-                let success = await reconnect()
-                if success {
+                switch await reconnect() {
+                case .success:
                     onStatusChange(.reconnected)
                     self.finishReconnecting(sessionID: sessionID)
                     return
+                case .failure(.permanent(let reason)):
+                    onStatusChange(.permanentFailure(reason: reason))
+                    self.finishReconnecting(sessionID: sessionID)
+                    return
+                case .failure(.transient):
+                    break // Continue retrying
                 }
 
                 // Exponential backoff
@@ -104,6 +121,7 @@ public actor SSHReconnectManager {
         case attempting(attempt: Int, maxAttempts: Int)
         case reconnected
         case gaveUp(attempts: Int)
+        case permanentFailure(reason: String)
 
         public var label: String {
             switch self {
@@ -113,6 +131,8 @@ public actor SSHReconnectManager {
                 return "Reconnected"
             case .gaveUp(let attempts):
                 return "Failed after \(attempts) attempts"
+            case .permanentFailure(let reason):
+                return reason
             }
         }
     }

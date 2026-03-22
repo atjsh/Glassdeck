@@ -199,7 +199,7 @@ struct ContentView: View {
             return
         }
 
-        guard hostBackedLaunchRoutingSession != nil else {
+        guard let session = hostBackedLaunchRoutingSession else {
             UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
             return
         }
@@ -218,35 +218,20 @@ struct ContentView: View {
             return
         }
 
+        guard isSessionRouteReady(session) else {
+            UITestLaunchSupport.setLaunchRoutingState(.waitingForRouteableSession)
+            return
+        }
+
         launchRoutingScheduled = true
         Task { @MainActor in
             defer { launchRoutingScheduled = false }
-            var attempt = 0
-            while attempt < 40 && !appliedLaunchRouting {
-                attempt += 1
-                try? await Task.sleep(for: .milliseconds(attempt == 1 ? 1 : 250))
-
-                guard shouldOpenActiveSessionOnLaunch else { return }
-                guard let session = hostBackedLaunchRoutingSession else {
-                    UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
-                    continue
-                }
-
-                if isSessionRouteReady(session) {
-                    selectedTab = .sessions
-                    await Task.yield()
-                    sessionsPath = [session.id]
-                    appliedLaunchRouting = true
-                    UITestLaunchSupport.setLaunchRoutingState(.routeApplied)
-                    return
-                }
-
-                UITestLaunchSupport.setLaunchRoutingState(.waitingForRouteableSession)
-            }
-
-            if hostBackedLaunchRoutingSession != nil {
-                UITestLaunchSupport.setLaunchRoutingState(.noRouteableSession)
-            }
+            // Yield once so the view hierarchy settles before navigating.
+            await Task.yield()
+            selectedTab = .sessions
+            sessionsPath = [session.id]
+            appliedLaunchRouting = true
+            UITestLaunchSupport.setLaunchRoutingState(.routeApplied)
         }
     }
 

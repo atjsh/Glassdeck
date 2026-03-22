@@ -248,7 +248,15 @@ public final class GhosttyVTTerminalEngine {
         ghostty_key_event_set_action(keyEvent, Self.keyAction(for: event.action))
         ghostty_key_event_set_key(keyEvent, Self.key(for: event.keyCode))
         ghostty_key_event_set_mods(keyEvent, Self.mods(for: event.modifiers))
-        ghostty_key_event_set_consumed_mods(keyEvent, 0)
+        // Compute consumed modifiers: Shift is consumed for printable keys
+        // (matching ghostling/main.c:540-548 algorithm)
+        var consumedMods: GhosttyMods = 0
+        if let unshiftedScalar = event.unshiftedText?.unicodeScalars.first,
+           unshiftedScalar.value != 0,
+           event.modifiers.contains(.shift) {
+            consumedMods = GhosttyMods(GHOSTTY_MODS_SHIFT)
+        }
+        ghostty_key_event_set_consumed_mods(keyEvent, consumedMods)
         ghostty_key_event_set_composing(keyEvent, event.composing)
 
         let text = event.text
@@ -906,6 +914,8 @@ public final class GhosttyVTTerminalEngine {
         case .left: return GHOSTTY_MOUSE_BUTTON_LEFT
         case .right: return GHOSTTY_MOUSE_BUTTON_RIGHT
         case .middle: return GHOSTTY_MOUSE_BUTTON_MIDDLE
+        case .button4: return GHOSTTY_MOUSE_BUTTON_FOUR
+        case .button5: return GHOSTTY_MOUSE_BUTTON_FIVE
         }
     }
 

@@ -358,6 +358,8 @@ public enum GhosttyVTMouseButton: Sendable, Equatable {
     case left
     case right
     case middle
+    case button4
+    case button5
 }
 
 public struct GhosttyVTPoint: Sendable, Equatable {

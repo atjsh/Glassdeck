@@ -39,3 +39,4 @@ Frameworks/*
 # IDEs
 .idea/
 .vscode/
+buildServer.json

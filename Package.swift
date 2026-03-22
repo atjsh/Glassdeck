@@ -36,6 +36,9 @@ var targets: [Target] = [
         name: "GlassdeckCoreTests",
         dependencies: [
             "GlassdeckCore",
+            .product(name: "NIOCore", package: "swift-nio"),
+            .product(name: "NIOEmbedded", package: "swift-nio"),
+            .product(name: "NIOSSH", package: "swift-nio-ssh"),
         ],
         path: "Tests/GlassdeckCoreTests"
     ),
@@ -65,6 +68,7 @@ let package = Package(
         )
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.0"),
         .package(path: "Vendor/swift-ssh-client"),
     ],

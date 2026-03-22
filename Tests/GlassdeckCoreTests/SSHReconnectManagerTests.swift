@@ -71,6 +71,40 @@ final class SSHReconnectManagerTests: XCTestCase {
         XCTAssertEqual(recorded, [.attempting(attempt: 1, maxAttempts: 5)])
         XCTAssertEqual(performedAttempts, 0)
     }
+
+    func testPermanentFailureStopsImmediately() async throws {
+        let manager = SSHReconnectManager(
+            config: .init(
+                maxAttempts: 5,
+                initialDelay: 0.01,
+                maxDelay: 0.01,
+                backoffMultiplier: 1
+            )
+        )
+        let recorder = ReconnectRecorder()
+        let sessionID = UUID()
+
+        await manager.startReconnecting(
+            sessionID: sessionID,
+            reconnect: {
+                .failure(.permanent("auth denied"))
+            },
+            onStatusChange: { status in
+                Task { await recorder.append(status) }
+            }
+        )
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        let recorded = await recorder.values
+        XCTAssertEqual(
+            recorded,
+            [
+                .attempting(attempt: 1, maxAttempts: 5),
+                .permanentFailure(reason: "auth denied"),
+            ]
+        )
+    }
 }
 
 private actor ReconnectRecorder {
@@ -93,9 +127,12 @@ private actor AttemptCounter {
         self.succeedOnAttempt = succeedOnAttempt
     }
 
-    func performAttempt() -> Bool {
+    func performAttempt() -> Result<Void, SSHReconnectManager.ReconnectError> {
         attempts += 1
-        return succeedOnAttempt == attempts
+        if succeedOnAttempt == attempts {
+            return .success(())
+        }
+        return .failure(.transient("attempt \(attempts) failed"))
     }
 
     var performedAttempts: Int {

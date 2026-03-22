@@ -29,6 +29,10 @@ final class GlassdeckAppUITests: XCTestCase {
     func testSessionRowTapNavigatesToDetail() {
         let app = launchApp(scenario: "sessions")
 
+        let sessionsTab = app.tabBars.buttons["Sessions"].firstMatch
+        XCTAssertTrue(sessionsTab.waitForExistence(timeout: 3))
+        sessionsTab.tap()
+
         let sessionRow = app.descendants(matching: .any)
             .matching(identifier: "session-card-11111111-1111-1111-1111-111111111111")
             .firstMatch
@@ -90,12 +94,23 @@ final class GlassdeckAppUITests: XCTestCase {
 
         let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
         XCTAssertTrue(terminalSurface.waitForExistence(timeout: 5))
-        let firstFrame = waitForAnimationProgress(pastFrame: 16, in: app)
-        let secondFrame = waitForAnimationProgress(pastFrame: firstFrame + 10, in: app)
-        XCTAssertGreaterThan(secondFrame, firstFrame)
+        // The animation loops through 235 frames (0–234) at ~31ms each (~7.3s per
+        // cycle).  Verify the player is running by confirming the frame counter
+        // changes between snapshots.  We use a fixed low threshold for the first
+        // check (startFrameIndex is 16) so the target is always reachable even
+        // after a frame-index wrap.
+        let firstFrame = waitForAnimationProgress(pastFrame: 20, in: app)
+        XCTAssertGreaterThan(firstFrame, 20)
 
-        let thirdFrame = waitForAnimationProgress(pastFrame: secondFrame + 10, in: app)
-        XCTAssertGreaterThan(thirdFrame, secondFrame)
+        Thread.sleep(forTimeInterval: 0.5)
+
+        let secondFrame = currentAnimationFrame(in: app)
+        XCTAssertNotEqual(secondFrame, firstFrame, "Animation should be advancing frames")
+
+        Thread.sleep(forTimeInterval: 0.5)
+
+        let thirdFrame = currentAnimationFrame(in: app)
+        XCTAssertNotEqual(thirdFrame, secondFrame, "Animation should continue advancing")
 
         assertScreenshotIsNotBlank(
             of: terminalSurface,

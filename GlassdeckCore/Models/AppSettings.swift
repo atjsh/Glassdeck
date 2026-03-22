@@ -197,7 +197,7 @@ public final class AppSettings {
         migratedConfiguration.fontSize = max(
             configuration.fontSize * 1.35,
             configuration.fontSize + 4
-        ).rounded()
+        )
         return migratedConfiguration
     }
 }

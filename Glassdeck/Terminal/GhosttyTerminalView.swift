@@ -111,7 +111,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     private static let bellSoundID: SystemSoundID = 1103
 
     private let configuration: TerminalConfiguration
-    private let engine: GhosttyVTTerminalEngine
+    private(set) var engine: GhosttyVTTerminalEngine
     private let renderer: GhosttyMetalRenderer
     private let softwareMirrorView = UIImageView()
 
@@ -130,6 +130,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var currentAnimationAccentColumnsByRow: [Int: IndexSet]?
     private var cursorBlinkTimer: Timer?
     private var cursorBlinkPhaseVisible = true
+    private var preeditText: String?
     private var currentSoftwareKeyboardPresented = false
     private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,
@@ -244,6 +245,22 @@ final class GhosttySurface: UIView, UIKeyInput {
         setupView()
     }
 
+    /// Creates a surface reusing an existing terminal engine (preserves scrollback and state).
+    init(
+        configuration: TerminalConfiguration,
+        engine: GhosttyVTTerminalEngine,
+        metricsPreset: GhosttySurfaceMetricsPreset? = nil
+    ) throws {
+        self.configuration = configuration
+        self.engine = engine
+        self.renderer = try GhosttyMetalRenderer(
+            configuration: configuration,
+            metricsPreset: metricsPreset
+        )
+        super.init(frame: .zero)
+        setupView()
+    }
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) not supported")
     }
@@ -327,16 +344,58 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func insertText(_ text: String) {
+        preeditText = nil
         let event = GhosttyVTKeyEventDescriptor(text: text)
         sendKey(event)
     }
 
     func deleteBackward() {
+        if preeditText != nil {
+            preeditText = nil
+            render(clearDirty: false)
+            return
+        }
         sendKey(
             GhosttyVTKeyEventDescriptor(
                 keyCode: .backspace
             )
         )
+    }
+
+    func setMarkedText(_ markedText: String?) {
+        preeditText = markedText
+        if let markedText, !markedText.isEmpty {
+            // Inform the engine this is a composing event (suppresses output)
+            let event = GhosttyVTKeyEventDescriptor(text: markedText, composing: true)
+            sendKey(event)
+        }
+        render(clearDirty: false)
+    }
+
+    func unmarkText() {
+        guard let text = preeditText, !text.isEmpty else {
+            preeditText = nil
+            return
+        }
+        preeditText = nil
+        let event = GhosttyVTKeyEventDescriptor(text: text)
+        sendKey(event)
+    }
+
+    /// Returns the cursor rect in the coordinate space of this view, for IME candidate window positioning.
+    func cursorRectForIME() -> CGRect {
+        guard let projection = latestProjectionForState,
+              let cursorX = projection.cursor.x,
+              let cursorY = projection.cursor.y else {
+            return .zero
+        }
+        let metrics = currentMetrics
+        return CGRect(
+            x: metrics.padding.left + (CGFloat(cursorX) * metrics.cellSize.width),
+            y: metrics.padding.top + (CGFloat(cursorY) * metrics.cellSize.height),
+            width: metrics.cellSize.width,
+            height: metrics.cellSize.height
+        ).integral
     }
 
     override func paste(_ sender: Any?) {
@@ -505,7 +564,8 @@ final class GhosttySurface: UIView, UIKeyInput {
                 metrics: currentMetrics,
                 focused: terminalIsFocused,
                 cursorBlinkPhaseVisible: cursorBlinkPhaseVisible,
-                accentColumnsByRow: currentAnimationAccentColumnsByRow
+                accentColumnsByRow: currentAnimationAccentColumnsByRow,
+                preeditText: preeditText
             )
             if Self.usesSoftwareMirrorPresentation {
                 softwareMirrorView.image = renderer.cachedFrameImage
@@ -634,12 +694,23 @@ final class GhosttySurface: UIView, UIKeyInput {
     func sendRemoteScroll(steps: Int, surfacePixelPoint: CGPoint) -> Bool {
         guard steps != 0 else { return false }
         guard currentInteractionCapabilities.supportsScrollReporting else { return false }
-        guard let coordinates = sgrScrollCoordinates(for: surfacePixelPoint) else { return false }
 
-        let button = steps > 0 ? 65 : 64
+        let scrollButton: GhosttyVTMouseButton = steps > 0 ? .button4 : .button5
         for _ in 0..<abs(steps) {
-            let sequence = "\u{1B}[<\(button);\(coordinates.column);\(coordinates.row)M"
-            outputHandler?(Data(sequence.utf8))
+            guard let descriptor = mouseDescriptor(
+                action: .press,
+                button: scrollButton,
+                surfacePixelPoint: surfacePixelPoint
+            ) else { return false }
+
+            do {
+                guard let data = try engine.encodeMouse(descriptor), !data.isEmpty else { return false }
+                outputHandler?(data)
+            } catch {
+                isHealthy = false
+                publishState()
+                return false
+            }
         }
         return true
     }
@@ -656,11 +727,6 @@ final class GhosttySurface: UIView, UIKeyInput {
                 let key = press.key,
                 let descriptor = keyDescriptor(for: key, action: action)
             else {
-                unhandled.insert(press)
-                continue
-            }
-
-            if shouldUseTextInputFallback(descriptor: descriptor, action: action) {
                 unhandled.insert(press)
                 continue
             }
@@ -733,13 +799,6 @@ final class GhosttySurface: UIView, UIKeyInput {
         )
     }
 
-    private func sgrScrollCoordinates(for surfacePixelPoint: CGPoint) -> (column: Int, row: Int)? {
-        guard let cell = interactionGeometry.cellPosition(forSurfacePixelPoint: surfacePixelPoint) else {
-            return nil
-        }
-        return (cell.column + 1, cell.row + 1)
-    }
-
     private func keyDescriptor(
         for key: UIKey,
         action: GhosttyVTKeyAction
@@ -759,26 +818,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         )
     }
 
-    private func shouldUseTextInputFallback(
-        descriptor: GhosttyVTKeyEventDescriptor,
-        action: GhosttyVTKeyAction
-    ) -> Bool {
-        guard action == .press else { return false }
-        guard descriptor.modifiers.isEmpty else { return false }
-        guard let keyCode = descriptor.keyCode else { return false }
 
-        switch keyCode {
-        case .a, .b, .c, .d, .e, .f, .g, .h, .i, .j, .k, .l, .m,
-             .n, .o, .p, .q, .r, .s, .t, .u, .v, .w, .x, .y, .z,
-             .digit0, .digit1, .digit2, .digit3, .digit4, .digit5,
-             .digit6, .digit7, .digit8, .digit9, .space, .tab,
-             .comma, .period, .slash, .backquote, .minus, .equal,
-             .quote, .semicolon, .backslash, .bracketLeft, .bracketRight:
-            return !descriptor.text.isEmpty
-        default:
-            return false
-        }
-    }
 }
 
 final class GhosttySurfaceTerminalIO: TerminalIO, @unchecked Sendable {
@@ -842,6 +882,8 @@ private final class GhosttyMetalRenderer {
     private let metricsPreset: GhosttySurfaceMetricsPreset?
 
     private var cachedFrame: UIImage?
+    private var blinkPhaseVisible = true
+    private var blinkTimer: Timer?
 
     var cachedFrameImage: UIImage? {
         cachedFrame
@@ -995,7 +1037,8 @@ private final class GhosttyMetalRenderer {
         metrics: Metrics,
         focused: Bool,
         cursorBlinkPhaseVisible: Bool,
-        accentColumnsByRow: [Int: IndexSet]?
+        accentColumnsByRow: [Int: IndexSet]?,
+        preeditText: String? = nil
     ) {
         guard bounds.width > 0, bounds.height > 0 else { return }
         #if targetEnvironment(simulator)
@@ -1012,6 +1055,15 @@ private final class GhosttyMetalRenderer {
         let projection = themedProjection(from: projection)
         let shouldReuseFrame = projection.dirtyState == .partial && cachedFrame != nil
         let dirtyRows = Set(projection.dirtyRows)
+
+        // Update VT cursor style from terminal state (DECSCUSR)
+        _vtCursorVisualStyle = projection.cursor.visualStyle
+
+        // Manage text blink timer
+        let anyBlinkCells = projection.rowsProjection.contains { row in
+            row.cells.contains { $0.style.blink }
+        }
+        updateBlinkTimer(needed: anyBlinkCells)
 
         let accentForegroundColor = metricsPreset?.accentForegroundColor.map(color(for:))
         let image = imageRenderer.image { context in
@@ -1046,6 +1098,14 @@ private final class GhosttyMetalRenderer {
                 focused: focused,
                 cursorBlinkPhaseVisible: cursorBlinkPhaseVisible
             )
+
+            if let preeditText, !preeditText.isEmpty {
+                drawPreeditOverlay(
+                    text: preeditText,
+                    projection: projection,
+                    metrics: metrics
+                )
+            }
         }
 
         cachedFrame = image
@@ -1080,6 +1140,33 @@ private final class GhosttyMetalRenderer {
             ofSize: GhosttySurfaceLayoutMetrics.fontSize(for: configuration, mode: metrics.displayMode),
             weight: .bold
         )
+    }
+
+    private func italicFont(from baseFont: UIFont) -> UIFont {
+        if let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitItalic) {
+            return UIFont(descriptor: descriptor, size: 0)
+        }
+        // Fallback: apply an oblique transform
+        let matrix = CGAffineTransform(a: 1, b: 0, c: 0.2, d: 1, tx: 0, ty: 0)
+        let descriptor = baseFont.fontDescriptor.withMatrix(matrix)
+        return UIFont(descriptor: descriptor, size: 0)
+    }
+
+    private func resolvedFont(for style: GhosttyVTTextStyle, regular: UIFont, bold: UIFont) -> UIFont {
+        let base = style.bold ? bold : regular
+        return style.italic ? italicFont(from: base) : base
+    }
+
+    private func underlineStyle(for value: Int) -> NSUnderlineStyle? {
+        switch value {
+        case 0: return nil
+        case 1: return .single
+        case 2: return .double
+        case 3: return .single // curly — best approximation with NSUnderlineStyle
+        case 4: return .patternDot  // dotted
+        case 5: return .patternDash // dashed
+        default: return .single
+        }
     }
 
     private func draw(
@@ -1195,6 +1282,8 @@ private final class GhosttyMetalRenderer {
         let cells = row.cells.sorted { $0.column < $1.column }
         guard cells.allSatisfy({ $0.width == .narrow }) else { return false }
         guard cells.allSatisfy({ styleUsesDefaultBackground($0.style) }) else { return false }
+        // Fall back to cell-by-cell drawing when blink cells need hiding
+        if !blinkPhaseVisible, cells.contains(where: { $0.style.blink }) { return false }
 
         let lineRect = cellRect(
             column: 0,
@@ -1218,12 +1307,21 @@ private final class GhosttyMetalRenderer {
             }
 
             let colors = resolvedColors(for: style, projection: projection)
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: style.bold ? boldFont : regularFont,
+            var attributes: [NSAttributedString.Key: Any] = [
+                .font: resolvedFont(for: style, regular: regularFont, bold: boldFont),
                 .foregroundColor: colors.foreground.withAlphaComponent(style.faint ? 0.6 : 1.0),
-                .underlineStyle: style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
                 .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
             ]
+            if let uStyle = underlineStyle(for: style.underline) {
+                attributes[.underlineStyle] = uStyle.rawValue
+            }
+            if case .none = style.underlineColor {} else {
+                attributes[.underlineColor] = color(
+                    for: style.underlineColor,
+                    palette: projection.palette,
+                    fallback: colors.foreground
+                )
+            }
             attributed.append(NSAttributedString(string: runText, attributes: attributes))
             runText = ""
         }
@@ -1279,15 +1377,33 @@ private final class GhosttyMetalRenderer {
         }
 
         guard !text.isEmpty, !style.invisible else { return }
-        let font = style.bold ? boldFont : regularFont
+        let shouldHideForBlink = style.blink && !blinkPhaseVisible
+        guard !shouldHideForBlink else { return }
+        let font = resolvedFont(for: style, regular: regularFont, bold: boldFont)
         let drawRect = GhosttySurfaceLayoutMetrics.textRect(for: rect, font: font)
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(style.faint ? 0.6 : 1.0),
-            .underlineStyle: style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
             .strikethroughStyle: style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
         ]
+        if let uStyle = underlineStyle(for: style.underline) {
+            attributes[.underlineStyle] = uStyle.rawValue
+        }
+        if case .none = style.underlineColor {} else {
+            attributes[.underlineColor] = color(
+                for: style.underlineColor,
+                palette: projection.palette,
+                fallback: colors.foreground
+            )
+        }
         (text as NSString).draw(in: drawRect, withAttributes: attributes)
+
+        // Draw overline
+        if style.overline {
+            let overlineY = rect.minY
+            (accentForegroundColor ?? colors.foreground).withAlphaComponent(style.faint ? 0.6 : 1.0).setFill()
+            UIRectFill(CGRect(x: rect.minX, y: overlineY, width: rect.width, height: 1))
+        }
     }
 
     private func drawCell(
@@ -1314,15 +1430,32 @@ private final class GhosttyMetalRenderer {
         }
 
         guard !cell.text.isEmpty, !cell.style.invisible else { return }
-        let font = cell.style.bold ? boldFont : regularFont
+        let shouldHideForBlink = cell.style.blink && !blinkPhaseVisible
+        guard !shouldHideForBlink else { return }
+        let font = resolvedFont(for: cell.style, regular: regularFont, bold: boldFont)
         let drawRect = GhosttySurfaceLayoutMetrics.textRect(for: rect, font: font)
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: (accentForegroundColor ?? colors.foreground).withAlphaComponent(cell.style.faint ? 0.6 : 1.0),
-            .underlineStyle: cell.style.underline == 0 ? 0 : NSUnderlineStyle.single.rawValue,
             .strikethroughStyle: cell.style.strikethrough ? NSUnderlineStyle.single.rawValue : 0
         ]
+        if let uStyle = underlineStyle(for: cell.style.underline) {
+            attributes[.underlineStyle] = uStyle.rawValue
+        }
+        if case .none = cell.style.underlineColor {} else {
+            attributes[.underlineColor] = color(
+                for: cell.style.underlineColor,
+                palette: projection.palette,
+                fallback: colors.foreground
+            )
+        }
         (cell.text as NSString).draw(in: drawRect, withAttributes: attributes)
+
+        // Draw overline
+        if cell.style.overline {
+            (accentForegroundColor ?? colors.foreground).withAlphaComponent(cell.style.faint ? 0.6 : 1.0).setFill()
+            UIRectFill(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 1))
+        }
     }
 
     private func drawCursor(
@@ -1357,6 +1490,34 @@ private final class GhosttyMetalRenderer {
         case .block:
             UIBezierPath(rect: rect).fill()
         }
+    }
+
+    private func drawPreeditOverlay(
+        text: String,
+        projection: GhosttyVTRenderProjection,
+        metrics: Metrics
+    ) {
+        guard let cursorX = projection.cursor.x, let cursorY = projection.cursor.y else { return }
+        let origin = cellRect(column: cursorX, row: cursorY, width: 1, metrics: metrics)
+        let font = regularFont(for: metrics)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color(for: projection.foregroundColor),
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .underlineColor: color(for: projection.foregroundColor),
+        ]
+        let nsString = text as NSString
+        let textSize = nsString.size(withAttributes: attrs)
+        let bgRect = CGRect(
+            x: origin.minX,
+            y: origin.minY,
+            width: textSize.width,
+            height: metrics.cellSize.height
+        )
+        color(for: projection.backgroundColor).setFill()
+        UIBezierPath(rect: bgRect).fill()
+        let textOrigin = CGPoint(x: origin.minX, y: origin.minY + (metrics.cellSize.height - textSize.height) / 2)
+        nsString.draw(at: textOrigin, withAttributes: attrs)
     }
 
     private func cellRect(
@@ -1402,6 +1563,14 @@ private final class GhosttyMetalRenderer {
     }
 
     private var cursorVisualStyle: GhosttyVTCursorVisualStyle {
+        // Prefer VT-resolved cursor style (DECSCUSR), fall back to user config
+        _vtCursorVisualStyle ?? configuredCursorVisualStyle
+    }
+
+    /// VT-resolved cursor style from the terminal (set via DECSCUSR sequences).
+    private var _vtCursorVisualStyle: GhosttyVTCursorVisualStyle?
+
+    private var configuredCursorVisualStyle: GhosttyVTCursorVisualStyle {
         switch configuration.cursorStyle {
         case .block:
             return .block
@@ -1412,14 +1581,63 @@ private final class GhosttyMetalRenderer {
         }
     }
 
+    private func updateBlinkTimer(needed: Bool) {
+        if needed, blinkTimer == nil {
+            blinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                self?.blinkPhaseVisible.toggle()
+            }
+        } else if !needed, blinkTimer != nil {
+            blinkTimer?.invalidate()
+            blinkTimer = nil
+            blinkPhaseVisible = true
+        }
+    }
+
     private func themedProjection(from projection: GhosttyVTRenderProjection) -> GhosttyVTRenderProjection {
         let theme = configuration.colorScheme.theme
         var projection = projection
-        projection.backgroundColor = theme.background
-        projection.foregroundColor = theme.foreground
-        projection.cursorColor = theme.cursor
-        projection.palette = theme.palette
+
+        // Apply theme colors only when the terminal hasn't overridden them via OSC.
+        // The C API resolves to known defaults when no OSC changes have been applied;
+        // we detect this and substitute the user's theme.
+        if isTerminalDefault(color: projection.backgroundColor) {
+            projection.backgroundColor = theme.background
+        }
+        if isTerminalDefault(color: projection.foregroundColor) {
+            projection.foregroundColor = theme.foreground
+        }
+        // Cursor: apply theme if terminal hasn't set one via OSC 12
+        if projection.cursorColor == nil {
+            projection.cursorColor = theme.cursor
+        }
+        // Palette: apply theme palette only if the terminal is using the default palette
+        if isDefaultPalette(projection.palette) {
+            projection.palette = theme.palette
+        }
         return projection
+    }
+
+    private static let terminalDefaultBackground = GhosttyVTColor(r: 0, g: 0, b: 0)
+    private static let terminalDefaultForeground = GhosttyVTColor(r: 229, g: 229, b: 229)
+
+    private func isTerminalDefault(color: GhosttyVTColor) -> Bool {
+        color == Self.terminalDefaultBackground || color == Self.terminalDefaultForeground
+    }
+
+    private func isDefaultPalette(_ palette: [GhosttyVTColor]) -> Bool {
+        // The default palette generated by resolveThemeColors has known first 16 entries
+        guard palette.count == 256 else { return true }
+        // Quick check: compare first 4 entries against known defaults
+        let defaults: [GhosttyVTColor] = [
+            GhosttyVTColor(r: 0, g: 0, b: 0),
+            GhosttyVTColor(r: 205, g: 0, b: 0),
+            GhosttyVTColor(r: 0, g: 205, b: 0),
+            GhosttyVTColor(r: 205, g: 205, b: 0),
+        ]
+        for (i, expected) in defaults.enumerated() {
+            if palette[i] != expected { return false }
+        }
+        return true
     }
 
     private func color(for color: GhosttyVTColor) -> UIColor {

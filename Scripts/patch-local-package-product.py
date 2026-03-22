@@ -7,6 +7,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NoReturn
 
 
 LOCAL_PACKAGE_SECTION = re.compile(
@@ -113,7 +114,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(1)
 

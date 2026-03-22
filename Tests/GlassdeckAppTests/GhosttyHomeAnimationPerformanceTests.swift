@@ -20,7 +20,7 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
         )
 
         let stripped = payloadString.replacingOccurrences(
-            of: #"\u{001B}\[[0-9;?]*[A-Za-z]"#,
+            of: #"\x{1B}\[[0-9;?]*[A-Za-z]"#,
             with: "",
             options: .regularExpression
         )

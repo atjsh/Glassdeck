@@ -135,6 +135,13 @@ enum UITestLaunchSupport {
                 sessionManager: sessionManager
             )
             connectionStore.replaceAll(with: [connection])
+            // Align app settings with the animation terminal configuration so that
+            // replaceSessionsForPreview → prepareSurface does not recreate the surface
+            // (a replacement surface starts with zero metrics, preventing routing).
+            appSettings.setTerminalConfig(
+                GhosttyHomeAnimationSequence.testingTerminalConfiguration,
+                for: .iphone
+            )
             sessionManager.replaceSessionsForPreview(
                 [session],
                 activeSessionID: session.id,

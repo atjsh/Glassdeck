@@ -273,7 +273,10 @@ final class RemoteControlStateTests: XCTestCase {
     }
 
     func testRefreshingExternalMonitorProfileRecreatesPresentedSurface() async {
-        let appSettings = AppSettings()
+        let suiteName = "test.refresh-external-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let appSettings = AppSettings(defaults: defaults)
         let sessionManager = SessionManager(appSettings: appSettings)
         let session = SSHSessionModel(profile: sampleProfile())
         session.status = .connected

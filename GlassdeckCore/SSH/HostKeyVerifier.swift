@@ -1,13 +1,14 @@
 import Foundation
 import Crypto
+import Security
 
 /// Manages SSH host key fingerprint verification (TOFU — Trust On First Use).
 ///
-/// Stores known host key fingerprints in UserDefaults. On first connection
-/// to a host, the fingerprint is saved. On subsequent connections, it's
-/// compared against the stored value to detect MITM attacks.
+/// Stores known host key fingerprints in the Keychain for secure persistence.
+/// On first connection to a host, the fingerprint is saved. On subsequent
+/// connections, it's compared against the stored value to detect MITM attacks.
 struct HostKeyVerifier: Sendable {
-    private static let storageKey = "glassdeck.known-hosts"
+    private static let keychainService = "com.glassdeck.known-hosts"
 
     enum VerificationResult: Sendable {
         case trusted
@@ -62,19 +63,57 @@ struct HostKeyVerifier: Sendable {
         loadKnownHosts()
     }
 
-    // MARK: - Persistence
+    // MARK: - Keychain Persistence
 
     private static func loadKnownHosts() -> [String: String] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return [:]
+        // Try Keychain first
+        if let data = loadFromKeychain(),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            return decoded
         }
-        return decoded
+        // Migrate from legacy UserDefaults if present
+        if let legacyData = UserDefaults.standard.data(forKey: "glassdeck.known-hosts"),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: legacyData) {
+            saveKnownHosts(decoded)
+            UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
+            return decoded
+        }
+        return [:]
     }
 
     private static func saveKnownHosts(_ hosts: [String: String]) {
-        if let data = try? JSONEncoder().encode(hosts) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
+        guard let data = try? JSONEncoder().encode(hosts) else { return }
+        saveToKeychain(data)
+    }
+
+    private static func loadFromKeychain() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: "known-hosts",
+            kSecReturnData as String: true,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    private static func saveToKeychain(_ data: Data) {
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: "known-hosts",
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: "known-hosts",
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        ]
+        SecItemAdd(addQuery as CFDictionary, nil)
     }
 }

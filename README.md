@@ -1,5 +1,7 @@
 # Glassdeck
 
+![Glassdeck Terminal Screenshot](.github/media/glassdeck-simulator.png)
+
 Glassdeck is an iOS 26 SSH client with a shared Swift core and a generated Xcode app target. The current revision uses a real `libghostty-vt` backend for terminal state, a Glassdeck-owned Metal renderer, PTY-aware SSH shells, and an expanding SFTP workflow.
 
 ## Current Scope

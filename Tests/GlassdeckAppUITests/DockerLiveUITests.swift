@@ -130,20 +130,20 @@ final class DockerLiveUITests: XCTestCase {
         captureTerminalDiagnostics(in: app, named: "docker-resume-after-activate")
 
         assertConnectedTerminal(for: app)
-        waitForTerminalRenderSummary(
-            containingAnyOf: ["GLASSDECK_SSH_OK", "Reconnecting"],
-            in: app,
-            timeout: 30
-        )
+        waitForTerminalToBecomeUsable(in: app, timeout: 30)
 
         enterTerminalCommand("echo GLASSDECK_UI_RESUME_OK; pwd\n", in: app)
         waitForTerminalRenderSummary(containing: "GLASSDECK_UI_RESUME_OK", in: app, timeout: 30)
+        assertScreenshotIsNotBlank(
+            of: app.otherElements["terminal-surface-view"].firstMatch,
+            named: "docker-resume-terminal"
+        )
         captureTerminalDiagnostics(in: app, named: "docker-resume-restored")
     }
 
     func testPasswordAuthSessionRelaunchesIntoDetailWithoutBlankTerminal() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        let app = launchLiveDockerApp(configuration: configuration)
+        var app = launchLiveDockerApp(configuration: configuration)
 
         createConnection(
             app: app,
@@ -172,62 +172,65 @@ final class DockerLiveUITests: XCTestCase {
         captureTerminalDiagnostics(in: app, named: "docker-relaunch-before-terminate")
 
         app.terminate()
-        app.launchArguments = [
-            "-uiTestScenario",
-            "empty",
-            "-uiTestDisableAnimations",
-            "-uiTestOpenActiveSession",
-            "-uiTestExposeTerminalRenderSummary"
-        ]
-        app.launchEnvironment[UITestEnvironmentKeys.preserveHostBackedState] = "1"
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_ENABLED"] = "1"
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_HOST"] = configuration.host
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_PORT"] = String(configuration.port)
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_USER"] = configuration.username
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_PASSWORD"] = configuration.password
-        app.launchEnvironment["GLASSDECK_LIVE_SSH_KEY_PATH"] = configuration.privateKeyPath
-        app.launch()
+        app = launchLiveDockerHostBackedApp(configuration: configuration)
         captureTerminalDiagnostics(in: app, named: "docker-relaunch-after-launch")
 
-        guard app.otherElements["session-detail-view"].firstMatch.waitForExistence(timeout: 20) else {
+        let sessionDetail = app.otherElements["session-detail-view"].firstMatch
+        if !sessionDetail.waitForExistence(timeout: 20) {
             captureTerminalDiagnostics(in: app, named: "docker-relaunch-missing-session-detail")
-            throw XCTSkip("Cold relaunch did not reopen the session detail view in this XCUITest harness.")
+            XCTFail("Cold relaunch did not reopen the session detail view.")
+            return
         }
+        XCTAssertTrue(sessionDetail.exists)
         captureTerminalDiagnostics(in: app, named: "docker-relaunch-session-detail-visible")
-        waitForTerminalRenderSummary(
-            containingAnyOf: ["glassdeck@", "Reconnecting", "[terminal pending]", "Last login:"],
-            in: app,
-            timeout: 30
-        )
-        captureTerminalDiagnostics(in: app, named: "docker-relaunch-after-summary")
+        waitForTerminalToBecomeUsable(in: app, timeout: 30)
+        captureTerminalDiagnostics(in: app, named: "docker-relaunch-after-usable")
 
         let placeholder = app.otherElements["terminal-presentation-placeholder"].firstMatch
         if placeholder.exists {
             captureTerminalDiagnostics(in: app, named: "docker-relaunch-placeholder-visible")
-            XCTAssertTrue(app.otherElements["terminal-surface-view"].firstMatch.waitForExistence(timeout: 5))
-        } else {
-            let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
-            XCTAssertTrue(terminalSurface.waitForExistence(timeout: 10))
-            assertScreenshotIsNotBlank(of: terminalSurface, named: "docker-relaunch-terminal")
         }
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        XCTAssertTrue(
+            terminalSurface.waitForExistence(timeout: 15),
+            "Expected terminal surface to appear after relaunch."
+        )
+        enterTerminalCommand("echo GLASSDECK_UI_RELAUNCH_OK; pwd\n", in: app)
+        waitForTerminalRenderSummary(containing: "GLASSDECK_UI_RELAUNCH_OK", in: app, timeout: 30)
+        captureTerminalDiagnostics(in: app, named: "docker-relaunch-after-summary")
+        assertScreenshotIsNotBlank(of: terminalSurface, named: "docker-relaunch-terminal")
     }
 
     private func launchLiveDockerApp(configuration: LiveDockerUITestConfiguration) -> XCUIApplication {
         let clipboardSeed = (try? Data(contentsOf: URL(fileURLWithPath: configuration.privateKeyPath)))
             .map { $0.base64EncodedString() } ?? ""
+        var environment = liveDockerLaunchEnvironment(from: configuration)
+        environment["GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64"] = clipboardSeed
 
         return launchUITestApp(
             scenario: "empty",
             additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
-            additionalEnvironment: [
-                "GLASSDECK_LIVE_SSH_ENABLED": "1",
-                "GLASSDECK_LIVE_SSH_HOST": configuration.host,
-                "GLASSDECK_LIVE_SSH_PORT": String(configuration.port),
-                "GLASSDECK_LIVE_SSH_USER": configuration.username,
-                "GLASSDECK_LIVE_SSH_PASSWORD": configuration.password,
-                "GLASSDECK_LIVE_SSH_KEY_PATH": configuration.privateKeyPath,
-                "GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64": clipboardSeed,
-            ]
+            additionalEnvironment: environment
+        )
+    }
+
+    private func liveDockerLaunchEnvironment(from configuration: LiveDockerUITestConfiguration) -> [String: String] {
+        [
+            "GLASSDECK_LIVE_SSH_ENABLED": "1",
+            "GLASSDECK_LIVE_SSH_HOST": configuration.host,
+            "GLASSDECK_LIVE_SSH_PORT": String(configuration.port),
+            "GLASSDECK_LIVE_SSH_USER": configuration.username,
+            "GLASSDECK_LIVE_SSH_PASSWORD": configuration.password,
+            "GLASSDECK_LIVE_SSH_KEY_PATH": configuration.privateKeyPath,
+        ]
+    }
+
+    private func launchLiveDockerHostBackedApp(configuration: LiveDockerUITestConfiguration) -> XCUIApplication {
+        return launchHostBackedUITestApp(
+            openActiveSession: true,
+            additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
+            additionalEnvironment: liveDockerLaunchEnvironment(from: configuration)
         )
     }
 

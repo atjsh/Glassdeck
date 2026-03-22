@@ -454,6 +454,52 @@ extension XCTestCase {
         )
     }
 
+    func waitForTerminalToBecomeUsable(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 30,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let summaryElement = app.descendants(matching: .any)
+            .matching(identifier: "terminal-render-summary")
+            .firstMatch
+        XCTAssertTrue(
+            summaryElement.waitForExistence(timeout: 10),
+            "Expected the terminal render summary accessibility element to exist.",
+            file: file,
+            line: line
+        )
+
+        let usableSummaryMarkers = [
+            "glassdeck@",
+            "root@",
+            "Last login:",
+            "[terminal pending]",
+            "Welcome",
+            "GLASSDECK_UI_",
+        ]
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let summary = (summaryElement.value as? String) ?? summaryElement.label
+            if usableSummaryMarkers.contains(where: summary.contains) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+
+        let finalSummary = (summaryElement.value as? String) ?? summaryElement.label
+        captureTerminalDiagnostics(
+            in: app,
+            named: "terminal-usable-timeout-\(accessibilitySlug(String(finalSummary.prefix(48))))"
+        )
+        XCTFail(
+            "Timed out waiting for terminal to report a usable shell state. Current summary: \(finalSummary)",
+            file: file,
+            line: line
+        )
+    }
+
     @discardableResult
     func waitForAnimationProgress(
         pastFrame frame: Int,

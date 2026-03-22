@@ -13,12 +13,13 @@ enum AppLaunchRouting {
         appliedLaunchRouting: Bool,
         launchRoutingScheduled: Bool,
         hasActiveSession: Bool,
-        isActiveSessionPresentable: Bool
+        isActiveSessionPresentable: Bool,
+        allowHostBackedLaunchFallback: Bool = false
     ) -> Bool {
         shouldOpenActiveSessionOnLaunch
             && !appliedLaunchRouting
             && !launchRoutingScheduled
-            && hasActiveSession
+            && (hasActiveSession || allowHostBackedLaunchFallback)
             && isActiveSessionPresentable
     }
 }
@@ -65,11 +66,53 @@ struct ContentView: View {
         ProcessInfo.processInfo.arguments.contains("-uiTestOpenActiveSession")
     }
 
+    private var hostBackedLaunchRoutingSession: SSHSessionModel? {
+        if let activeSession = sessionManager.activeSession {
+            return activeSession
+        }
+
+        guard UITestLaunchSupport.shouldRouteAfterPreservedHostState else {
+            return nil
+        }
+
+        return sessionManager.sessions
+            .filter {
+                $0.shouldRestoreConnectionOnForeground
+                || $0.isConnected
+                || $0.status == .reconnecting
+            }
+            .sorted {
+                ($0.connectedAt ?? .distantPast) > ($1.connectedAt ?? .distantPast)
+            }
+            .first
+            ?? sessionManager.sessions
+                .sorted {
+                    ($0.connectedAt ?? .distantPast) > ($1.connectedAt ?? .distantPast)
+                }
+                .first
+    }
+
+    private var isLaunchSessionRouteReady: Bool {
+        guard let session = hostBackedLaunchRoutingSession else { return false }
+        if sessionManager.isSessionDetailPresentable(for: session) {
+            return true
+        }
+        return UITestLaunchSupport.isPreservingHostState && session.surface != nil
+    }
+
+    private var isLaunchSessionRouteEligible: Bool {
+        if isLaunchSessionRouteReady {
+            return true
+        }
+
+        return UITestLaunchSupport.shouldRouteAfterPreservedHostState && hostBackedLaunchRoutingSession != nil
+    }
+
     private var launchRoutingSignature: String {
-        let activeSession = sessionManager.activeSession
+        let launchSession = hostBackedLaunchRoutingSession
         return [
-            activeSession?.id.uuidString ?? "none",
-            activeSession.map { sessionManager.isSessionDetailPresentable(for: $0) ? "ready" : "pending" } ?? "missing",
+            launchSession?.id.uuidString ?? "none",
+            launchSession.map { sessionManager.isSessionDetailPresentable(for: $0) ? "ready" : "pending" } ?? "missing",
             String(sessionManager.presentationRevision),
             String(selectedTab == .sessions),
             String(sessionsPath.count),
@@ -149,32 +192,79 @@ struct ContentView: View {
     }
 
     private func scheduleDeferredLaunchRoutingIfNeeded() {
+        if launchRoutingScheduled || appliedLaunchRouting || !shouldOpenActiveSessionOnLaunch {
+            if shouldOpenActiveSessionOnLaunch && !shouldOpenSessionRouteSessionEligible {
+                UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
+            }
+            return
+        }
+
+        guard hostBackedLaunchRoutingSession != nil else {
+            UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
+            return
+        }
+
         guard AppLaunchRouting.shouldScheduleDeferredRoute(
             shouldOpenActiveSessionOnLaunch: shouldOpenActiveSessionOnLaunch,
             appliedLaunchRouting: appliedLaunchRouting,
             launchRoutingScheduled: launchRoutingScheduled,
             hasActiveSession: sessionManager.activeSession != nil,
-            isActiveSessionPresentable: sessionManager.activeSession.map(sessionManager.isSessionDetailPresentable) ?? false
+            isActiveSessionPresentable: isLaunchSessionRouteEligible,
+            allowHostBackedLaunchFallback: UITestLaunchSupport.shouldRouteAfterPreservedHostState
         ) else {
+            if shouldOpenActiveSessionOnLaunch && sessionManager.sessions.isEmpty {
+                UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
+            }
             return
         }
-        guard sessionManager.activeSession != nil else { return }
 
         launchRoutingScheduled = true
         Task { @MainActor in
-            await Task.yield()
             defer { launchRoutingScheduled = false }
-            guard !appliedLaunchRouting else { return }
-            guard let activeSession = sessionManager.activeSession else { return }
-            guard sessionManager.isSessionDetailPresentable(for: activeSession) else { return }
+            var attempt = 0
+            while attempt < 40 && !appliedLaunchRouting {
+                attempt += 1
+                try? await Task.sleep(for: .milliseconds(attempt == 1 ? 1 : 250))
 
-            selectedTab = .sessions
-            await Task.yield()
-            guard let activeSession = sessionManager.activeSession else { return }
-            guard sessionManager.isSessionDetailPresentable(for: activeSession) else { return }
-            sessionsPath = [activeSession.id]
-            appliedLaunchRouting = true
+                guard shouldOpenActiveSessionOnLaunch else { return }
+                guard let session = hostBackedLaunchRoutingSession else {
+                    UITestLaunchSupport.setLaunchRoutingState(.waitingForSession)
+                    continue
+                }
+
+                if isSessionRouteReady(session) {
+                    selectedTab = .sessions
+                    await Task.yield()
+                    sessionsPath = [session.id]
+                    appliedLaunchRouting = true
+                    UITestLaunchSupport.setLaunchRoutingState(.routeApplied)
+                    return
+                }
+
+                UITestLaunchSupport.setLaunchRoutingState(.waitingForRouteableSession)
+            }
+
+            if hostBackedLaunchRoutingSession != nil {
+                UITestLaunchSupport.setLaunchRoutingState(.noRouteableSession)
+            }
         }
+    }
+
+    private func isSessionRouteReady(_ session: SSHSessionModel) -> Bool {
+        if sessionManager.isSessionDetailPresentable(for: session) { return true }
+        return UITestLaunchSupport.isPreservingHostState && session.surface != nil
+    }
+
+    private var shouldOpenSessionRouteSessionEligible: Bool {
+        if !shouldOpenActiveSessionOnLaunch {
+            return false
+        }
+
+        if sessionManager.activeSession != nil {
+            return true
+        }
+
+        return hostBackedLaunchRoutingSession != nil
     }
 }
 

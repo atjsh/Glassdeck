@@ -18,7 +18,16 @@ enum UITestLaunchSupport {
     private static let animationFramesEnvironmentKey = "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
     private static let terminalColorSchemeEnvironmentKey = "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME"
     private static let preserveHostStateEnvironmentKey = "GLASSDECK_UI_TEST_PRESERVE_HOST_STATE"
+    private static let hostBackedLaunchRoutingStateDefaultsKey = "glassdeck.ui-test.launch-routing-state"
     private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
+
+    enum HostBackedLaunchState: String {
+        case unavailable
+        case waitingForSession
+        case waitingForRouteableSession
+        case routeApplied
+        case noRouteableSession
+    }
 
     static var currentScenario: Scenario? {
         let arguments = ProcessInfo.processInfo.arguments
@@ -36,6 +45,26 @@ enum UITestLaunchSupport {
         ProcessInfo.processInfo.arguments.contains("-uiTestExposeTerminalRenderSummary")
     }
 
+    static var isPreservingHostState: Bool {
+        ProcessInfo.processInfo.environment[preserveHostStateEnvironmentKey] == "1"
+    }
+
+    static var shouldRouteAfterPreservedHostState: Bool {
+        isPreservingHostState && ProcessInfo.processInfo.arguments.contains("-uiTestOpenActiveSession")
+    }
+
+    static var launchRoutingState: HostBackedLaunchState {
+        HostBackedLaunchState(rawValue: UserDefaults.standard.string(forKey: hostBackedLaunchRoutingStateDefaultsKey) ?? "") ?? .unavailable
+    }
+
+    static func setLaunchRoutingState(_ state: HostBackedLaunchState) {
+        UserDefaults.standard.set(state.rawValue, forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    }
+
+    static func clearLaunchRoutingState() {
+        UserDefaults.standard.removeObject(forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    }
+
     static func configureIfNeeded(
         sessionManager: SessionManager,
         connectionStore: ConnectionStore,
@@ -46,7 +75,9 @@ enum UITestLaunchSupport {
             UserDefaults.standard.set(false, forKey: "UIViewAnimationEnabled")
         }
 
-        if ProcessInfo.processInfo.environment[preserveHostStateEnvironmentKey] == "1" {
+        if isPreservingHostState {
+            clearLaunchRoutingState()
+            setLaunchRoutingState(.waitingForSession)
             return
         }
 

@@ -53,4 +53,37 @@ final class AppLaunchRoutingTests: XCTestCase {
             isActiveSessionPresentable: true
         ))
     }
+
+    func testShouldScheduleDeferredRouteAllowsHostBackedFallbackSession() {
+        XCTAssertTrue(AppLaunchRouting.shouldScheduleDeferredRoute(
+            shouldOpenActiveSessionOnLaunch: true,
+            appliedLaunchRouting: false,
+            launchRoutingScheduled: false,
+            hasActiveSession: false,
+            isActiveSessionPresentable: true,
+            allowHostBackedLaunchFallback: true
+        ))
+    }
+
+    func testShouldNotScheduleDeferredRouteWhenOnlyFallbackUnavailable() {
+        XCTAssertFalse(AppLaunchRouting.shouldScheduleDeferredRoute(
+            shouldOpenActiveSessionOnLaunch: true,
+            appliedLaunchRouting: false,
+            launchRoutingScheduled: false,
+            hasActiveSession: false,
+            isActiveSessionPresentable: true,
+            allowHostBackedLaunchFallback: false
+        ))
+    }
+
+    func testShouldNotScheduleDeferredRouteUntilSessionIsRouteable() {
+        XCTAssertFalse(AppLaunchRouting.shouldScheduleDeferredRoute(
+            shouldOpenActiveSessionOnLaunch: true,
+            appliedLaunchRouting: false,
+            launchRoutingScheduled: false,
+            hasActiveSession: false,
+            isActiveSessionPresentable: false,
+            allowHostBackedLaunchFallback: true
+        ))
+    }
 }

@@ -132,6 +132,9 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var cursorBlinkPhaseVisible = true
     private var preeditText: String?
     private var currentSoftwareKeyboardPresented = false
+    private var pendingRenderClearDirty = false
+    private var renderScheduled = false
+    private(set) var renderCount = 0
     private var currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
         supportsMousePlacement: false,
         supportsScrollReporting: false
@@ -282,7 +285,7 @@ final class GhosttySurface: UIView, UIKeyInput {
             AudioServicesPlaySystemSound(Self.bellSoundID)
         }
         engine.write(data)
-        render(clearDirty: true)
+        scheduleRender(clearDirty: true)
     }
 
     func setAnimationAccentRows(_ accentColumnsByRow: [Int: IndexSet]?) {
@@ -497,6 +500,15 @@ final class GhosttySurface: UIView, UIKeyInput {
         }
     }
 
+    private func scheduleRender(clearDirty: Bool) {
+        if clearDirty {
+            pendingRenderClearDirty = true
+        }
+        guard !renderScheduled else { return }
+        renderScheduled = true
+        setNeedsLayout()
+    }
+
     private func updateLayout() {
         guard bounds.width > 0, bounds.height > 0 else { return }
 
@@ -514,8 +526,13 @@ final class GhosttySurface: UIView, UIKeyInput {
         currentMetrics = metrics
         cellSize = metrics.cellSize
 
-        guard metrics.terminalSize != previousTerminalSize || metrics.pixelSize != previousPixelSize else {
-            render(clearDirty: true)
+        let sizeChanged = metrics.terminalSize != previousTerminalSize || metrics.pixelSize != previousPixelSize
+        let clearDirty = pendingRenderClearDirty || sizeChanged || !renderScheduled
+        pendingRenderClearDirty = false
+        renderScheduled = false
+
+        guard sizeChanged else {
+            render(clearDirty: clearDirty)
             return
         }
 
@@ -547,12 +564,13 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     private func render(clearDirty: Bool) {
+        renderCount += 1
         do {
             let projection = try engine.snapshotProjection(clearDirty: clearDirty)
             latestProjectionForState = projection
             currentInteractionCapabilities = try engine.interactionCapabilities()
             currentScrollbackLines = max(0, Int((projection.scrollbar?.total ?? 0)) - projection.rows)
-            if onStateChange != nil {
+            if UITestLaunchSupport.exposesTerminalRenderSummary {
                 currentVisibleTextSummary = Self.visibleTextSummary(from: projection)
             } else {
                 currentVisibleTextSummary = ""
@@ -611,7 +629,7 @@ final class GhosttySurface: UIView, UIKeyInput {
 
     private func handleCursorBlinkTimerFired() {
         cursorBlinkPhaseVisible.toggle()
-        render(clearDirty: false)
+        scheduleRender(clearDirty: false)
     }
 
     private func publishState() {

@@ -249,7 +249,6 @@ final class GhosttyTerminalHostingView: UIView {
         surface.setSoftwareKeyboardPresented(softwareKeyboardPresented)
         surface.setFocused(isFocused)
         surface.setNeedsLayout()
-        surface.layoutIfNeeded()
     }
 }
 

@@ -93,6 +93,19 @@ private struct SessionDetailContent: View {
         )
     }
 
+    /// Whether the terminal background is dark enough that toolbar items should be white.
+    private var terminalBackgroundIsDark: Bool {
+        let theme = (
+            session.surface?.terminalConfiguration
+            ?? appSettings.terminalConfig(for: sessionManager.terminalDisplayTarget(for: session))
+        ).colorScheme.theme
+        // Relative luminance (ITU-R BT.709)
+        let luminance = 0.2126 * Double(theme.background.r) / 255
+                      + 0.7152 * Double(theme.background.g) / 255
+                      + 0.0722 * Double(theme.background.b) / 255
+        return luminance < 0.5
+    }
+
     private var terminalRenderSummaryValue: String {
         if !showingRemoteTrackpad && !terminalPresentationReady {
             if session.surface == nil {
@@ -140,7 +153,8 @@ private struct SessionDetailContent: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarBackground(.clear, for: .navigationBar)
-        .toolbarColorScheme(showingRemoteTrackpad ? .light : .dark, for: .navigationBar)
+        .toolbarColorScheme(showingRemoteTrackpad ? .light : (terminalBackgroundIsDark ? .dark : .light), for: .navigationBar)
+        .preferredColorScheme(showingRemoteTrackpad ? nil : (terminalBackgroundIsDark ? .dark : .light))
         .toolbar {
             ToolbarItem(placement: .principal) {
                 SessionTitleView(session: session)

@@ -44,6 +44,7 @@
 		682A63CDDA2F6C7A831F934E /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D174DF02D5CBB837DA4309BF /* TerminalSettingsView.swift */; };
 		6ED04EB9CA08EE94FA8BB1FA /* AppLaunchRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEB5D5C88E284763FBA319E /* AppLaunchRoutingTests.swift */; };
 		6F7FA86F088FF746A5721929 /* ConnectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */; };
+		784E068FB50A937DF5E9DD44 /* TerminalRenderPerformanceLiveDockerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602A2ADD7567B432B3F34EE2 /* TerminalRenderPerformanceLiveDockerTests.swift */; };
 		7B7FCF2EB120FA268F20EC50 /* SessionKeyboardIMETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91CE5CCAADE8E98F433CBF78 /* SessionKeyboardIMETests.swift */; };
 		81A4566DAF3E90F9337870D4 /* SSHReconnectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */; };
 		86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */; };
@@ -179,6 +180,7 @@
 		50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadView.swift; sourceTree = "<group>"; };
 		5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalView.swift; sourceTree = "<group>"; };
 		5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStore.swift; sourceTree = "<group>"; };
+		602A2ADD7567B432B3F34EE2 /* TerminalRenderPerformanceLiveDockerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderPerformanceLiveDockerTests.swift; sourceTree = "<group>"; };
 		68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTPlatformTests.swift; sourceTree = "<group>"; };
 		6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHSessionModel.swift; sourceTree = "<group>"; };
 		6A41F781492401F7FB04B39F /* TerminalIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalIO.swift; sourceTree = "<group>"; };
@@ -283,6 +285,7 @@
 				DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */,
 				3EB6CF6F229C898018461F96 /* SSHConnectionManagerLiveDockerTests.swift */,
 				44F3882C1AF2363E996FA14E /* SSHPTYBridgeTests.swift */,
+				602A2ADD7567B432B3F34EE2 /* TerminalRenderPerformanceLiveDockerTests.swift */,
 			);
 			path = GlassdeckHostIntegrationTests;
 			sourceTree = "<group>";
@@ -756,6 +759,7 @@
 				DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */,
 				7B7FCF2EB120FA268F20EC50 /* SessionKeyboardIMETests.swift in Sources */,
 				41DB6CE7DB830E5E94F8DD44 /* SessionPersistenceTests.swift in Sources */,
+				784E068FB50A937DF5E9DD44 /* TerminalRenderPerformanceLiveDockerTests.swift in Sources */,
 				E01D1526CE9FB9B41BB8268A /* TerminalRenderingConsistencyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

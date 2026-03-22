@@ -602,18 +602,14 @@ final class GhosttySurface: UIView, UIKeyInput {
 
         guard cursorBlinkTimer == nil else { return }
         cursorBlinkPhaseVisible = true
-        let timer = Timer(
-            timeInterval: Self.cursorBlinkInterval,
-            target: self,
-            selector: #selector(handleCursorBlinkTimer(_:)),
-            userInfo: nil,
-            repeats: true
-        )
+        let timer = Timer(timeInterval: Self.cursorBlinkInterval, repeats: true) { [weak self] _ in
+            self?.handleCursorBlinkTimerFired()
+        }
         cursorBlinkTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    @objc private func handleCursorBlinkTimer(_ timer: Timer) {
+    private func handleCursorBlinkTimerFired() {
         cursorBlinkPhaseVisible.toggle()
         render(clearDirty: false)
     }

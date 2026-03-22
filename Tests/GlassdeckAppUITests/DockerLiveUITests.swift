@@ -21,11 +21,11 @@ final class DockerLiveUITests: XCTestCase {
         app.buttons["connection-save-button"].firstMatch.tap()
 
         let passwordRow = app.buttons[connectionRowIdentifier(name: "Docker Password", host: configuration.host)].firstMatch
-        XCTAssertTrue(passwordRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(passwordRow.waitForExistence(timeout: UITestTimeout.standard))
         passwordRow.tap()
 
         let passwordField = app.secureTextFields["connection-password-field"].firstMatch
-        XCTAssertTrue(passwordField.waitForExistence(timeout: 5))
+        XCTAssertTrue(passwordField.waitForExistence(timeout: UITestTimeout.standard))
         passwordField.tap()
         passwordField.typeText(configuration.password)
         app.buttons["connection-password-connect-button"].firstMatch.tap()
@@ -47,16 +47,16 @@ final class DockerLiveUITests: XCTestCase {
         let app = launchLiveDockerApp(configuration: configuration)
 
         let toolbarMenu = app.buttons["connections-toolbar-menu"].firstMatch
-        XCTAssertTrue(toolbarMenu.waitForExistence(timeout: 5))
+        XCTAssertTrue(toolbarMenu.waitForExistence(timeout: UITestTimeout.standard))
         toolbarMenu.tap()
         app.buttons["connections-menu-ssh-keys"].firstMatch.tap()
 
-        XCTAssertTrue(app.navigationBars["SSH Keys"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["SSH Keys"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
         app.buttons["ssh-key-import-clipboard-button"].firstMatch.tap()
         let importedKeyRow = app.descendants(matching: .any)
             .matching(identifier: "ssh-key-row")
             .firstMatch
-        XCTAssertTrue(importedKeyRow.waitForExistence(timeout: 10))
+        XCTAssertTrue(importedKeyRow.waitForExistence(timeout: UITestTimeout.long))
         app.buttons["dismiss-button"].firstMatch.tap()
 
         createConnection(
@@ -72,14 +72,14 @@ final class DockerLiveUITests: XCTestCase {
         let storedKeyRow = app.descendants(matching: .any)
             .matching(identifier: "ssh-key-row")
             .firstMatch
-        XCTAssertTrue(storedKeyRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(storedKeyRow.waitForExistence(timeout: UITestTimeout.standard))
         storedKeyRow.tap()
         app.navigationBars["SSH Keys"].buttons.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["connection-selected-ssh-key"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["connection-selected-ssh-key"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
         app.buttons["connection-save-button"].firstMatch.tap()
 
         let connectionRow = app.buttons[connectionRowIdentifier(name: "Docker Key", host: configuration.host)].firstMatch
-        XCTAssertTrue(connectionRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(connectionRow.waitForExistence(timeout: UITestTimeout.standard))
         connectionRow.tap()
 
         assertConnectedTerminal(for: app)
@@ -111,11 +111,11 @@ final class DockerLiveUITests: XCTestCase {
         let connectionRow = app.buttons[
             connectionRowIdentifier(name: "Docker Resume", host: configuration.host)
         ].firstMatch
-        XCTAssertTrue(connectionRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(connectionRow.waitForExistence(timeout: UITestTimeout.standard))
         connectionRow.tap()
 
         let passwordField = app.secureTextFields["connection-password-field"].firstMatch
-        XCTAssertTrue(passwordField.waitForExistence(timeout: 5))
+        XCTAssertTrue(passwordField.waitForExistence(timeout: UITestTimeout.standard))
         passwordField.tap()
         passwordField.typeText(configuration.password)
         app.buttons["connection-password-connect-button"].firstMatch.tap()
@@ -158,11 +158,11 @@ final class DockerLiveUITests: XCTestCase {
         let connectionRow = app.buttons[
             connectionRowIdentifier(name: "Docker Relaunch", host: configuration.host)
         ].firstMatch
-        XCTAssertTrue(connectionRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(connectionRow.waitForExistence(timeout: UITestTimeout.standard))
         connectionRow.tap()
 
         let passwordField = app.secureTextFields["connection-password-field"].firstMatch
-        XCTAssertTrue(passwordField.waitForExistence(timeout: 5))
+        XCTAssertTrue(passwordField.waitForExistence(timeout: UITestTimeout.standard))
         passwordField.tap()
         passwordField.typeText(configuration.password)
         app.buttons["connection-password-connect-button"].firstMatch.tap()
@@ -251,7 +251,7 @@ final class DockerLiveUITests: XCTestCase {
 
         if authMethod == .sshKey {
             let authPicker = app.segmentedControls["connection-auth-method-picker"].firstMatch
-            XCTAssertTrue(authPicker.waitForExistence(timeout: 5))
+            XCTAssertTrue(authPicker.waitForExistence(timeout: UITestTimeout.standard))
             authPicker.buttons["SSH Key"].firstMatch.tap()
         }
     }
@@ -272,14 +272,14 @@ final class DockerLiveUITests: XCTestCase {
 
     private func enterTerminalCommand(_ command: String, in app: XCUIApplication) {
         let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
-        XCTAssertTrue(terminalSurface.waitForExistence(timeout: 10))
+        XCTAssertTrue(terminalSurface.waitForExistence(timeout: UITestTimeout.long))
         terminalSurface.tap()
-        waitForTerminalKeyboardState(presented: true, in: app, timeout: 10)
+        waitForTerminalKeyboardState(presented: true, in: app, timeout: UITestTimeout.long)
 
         let terminalInput = app.descendants(matching: .any)
             .matching(identifier: "session-keyboard-host")
             .firstMatch
-        XCTAssertTrue(terminalInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(terminalInput.waitForExistence(timeout: UITestTimeout.long))
         terminalInput.typeText(command)
     }
 }

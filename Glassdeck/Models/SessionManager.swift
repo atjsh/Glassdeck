@@ -56,21 +56,6 @@ final class SessionManager {
             config: Self.reconnectConfig(from: appSettings)
         )
         restorePersistedSessionsIfNeeded()
-        configureHostKeyValidation()
-    }
-
-    /// Called when the SSH layer needs the user to approve a host key.
-    /// Set by the view layer to present an alert.
-    var hostKeyPromptHandler: (@MainActor (HostKeyPromptInfo) async -> Bool)?
-
-    private func configureHostKeyValidation() {
-        let manager = connectionManager
-        Task {
-            await manager.setHostKeyPromptHandler { [weak self] info in
-                guard let handler = await self?.hostKeyPromptHandler else { return false }
-                return await handler(info)
-            }
-        }
     }
 
     var activeSession: SSHSessionModel? {
@@ -259,7 +244,6 @@ final class SessionManager {
 
         session.requestedManualDisconnect = true
         session.reconnectState = .idle
-        session.connectionError = nil
         session.surface?.setFocused(false)
         session.status = .disconnected
         session.surface = nil
@@ -328,7 +312,6 @@ final class SessionManager {
     func reconnect(sessionID: UUID) async -> Bool {
         guard let session = sessions.first(where: { $0.id == sessionID }) else { return false }
         session.requestedManualDisconnect = false
-        session.connectionError = nil
         session.reconnectState = .idle
         session.shouldRestoreConnectionOnForeground = true
         if session.connectionPassword == nil, session.profile.authMethod == .password {
@@ -642,7 +625,6 @@ final class SessionManager {
                     return true
                 } catch {
                     session.status = .failed(error.localizedDescription)
-                    session.connectionError = error.localizedDescription
                     persistSessions()
                     notifySessionChanges()
                     return false
@@ -669,7 +651,6 @@ final class SessionManager {
             return true
         } catch {
             session.status = .failed(error.localizedDescription)
-            session.connectionError = error.localizedDescription
             persistSessions()
             notifySessionChanges()
             return false
@@ -797,7 +778,6 @@ final class SessionManager {
             persistSessions()
             notifySessionChanges()
         } catch {
-            session.connectionError = error.localizedDescription
             session.terminalRenderFailureReason = error.localizedDescription
             persistSessions()
             notifySessionChanges()
@@ -811,13 +791,11 @@ final class SessionManager {
     ) async -> Bool {
         guard let surface = session.surface else {
             session.status = .failed("Terminal surface initialization failed")
-            session.connectionError = "Terminal surface initialization failed"
             return false
         }
 
         session.requestedManualDisconnect = false
         session.connectionPassword = password
-        session.connectionError = nil
         session.reconnectState = isReconnect ? session.reconnectState : .idle
         session.status = isReconnect ? .reconnecting : .connecting
         session.shouldRestoreConnectionOnForeground = true
@@ -871,7 +849,6 @@ final class SessionManager {
             return true
         } catch {
             await teardownRemoteResources(for: session)
-            session.connectionError = error.localizedDescription
             session.remoteControlKeyboardFocused = false
             if isReconnect {
                 session.status = .reconnecting
@@ -899,7 +876,7 @@ final class SessionManager {
             password: session.connectionPassword,
             isReconnect: true
         )
-        return success ? .success(()) : .failure(.transient(session.connectionError ?? "Connection failed"))
+        return success ? .success(()) : .failure(.transient(session.connectionErrorMessage ?? "Connection failed"))
     }
 
     private func applyReconnectStatus(
@@ -964,7 +941,6 @@ final class SessionManager {
             id: session.id,
             profile: session.profile,
             status: persistedStatus(from: session.status),
-            connectionError: session.connectionError,
             connectedAt: session.connectedAt,
             reconnectState: persistedReconnectState(from: session.reconnectState),
             terminalTitle: session.terminalTitle,
@@ -985,7 +961,6 @@ final class SessionManager {
             from: descriptor.status,
             shouldRestore: shouldRestoreConnectionOnForeground
         )
-        session.connectionError = descriptor.connectionError
         session.connectedAt = descriptor.connectedAt
         session.reconnectState = reconnectState(from: descriptor.reconnectState)
         session.terminalTitle = descriptor.terminalTitle

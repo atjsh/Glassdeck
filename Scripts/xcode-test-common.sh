@@ -7,9 +7,17 @@ XCODE_TEST_DEFAULT_LOGS_DIR="$XCODE_TEST_ROOT/.build/TestLogs"
 XCODE_TEST_DEFAULT_UNIT_SIM_DERIVED_DATA="$XCODE_TEST_ROOT/.build/DerivedData-SimTests"
 XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA="$XCODE_TEST_ROOT/.build/DerivedData-UISim"
 
+XCODE_TEST_PROJECT="$XCODE_TEST_ROOT/GlassdeckApp.xcodeproj"
+XCODE_TEST_PROJECT_SPEC="$XCODE_TEST_ROOT/project.yml"
+XCODE_TEST_GENERATE_SCRIPT="$XCODE_TEST_ROOT/Scripts/generate-xcodeproj.sh"
+
 XCODE_TEST_LOG_FILE=""
 XCODE_TEST_RESULT_BUNDLE=""
 XCODE_TEST_SHOULD_CLEAN=0
+GLASSDECK_VERBOSE="${GLASSDECK_VERBOSE:-0}"
+XTEST_ONLY_ARGS=()
+XTEST_ONLY_LABELS=()
+SIMULATOR_ID=""
 
 xcode_test_die() {
   echo "$*" >&2
@@ -228,4 +236,87 @@ run_xcode_action() {
 
 run_xcode_test() {
   run_xcode_action "$@"
+}
+
+# ---------------------------------------------------------------------------
+# High-level helpers — absorb the boilerplate repeated by every script.
+# ---------------------------------------------------------------------------
+
+parse_standard_args() {
+  reset_xcode_action_mode
+  while [[ $# -gt 0 ]]; do
+    if handle_xcode_action_arg "$1"; then shift; continue; fi
+    case "$1" in
+      --verbose) GLASSDECK_VERBOSE=1; shift ;;
+      --only-testing)
+        [[ $# -ge 2 ]] || xcode_test_die "--only-testing requires a test identifier."
+        XTEST_ONLY_ARGS+=("-only-testing:$2")
+        XTEST_ONLY_LABELS+=("$2")
+        shift 2 ;;
+      *) xcode_test_die "Unknown argument: $1" ;;
+    esac
+  done
+}
+
+prepare_simulator() {
+  ensure_xcode_test_tools
+  ensure_generated_project "$XCODE_TEST_PROJECT" "$XCODE_TEST_PROJECT_SPEC" "$XCODE_TEST_GENERATE_SCRIPT"
+  SIMULATOR_ID="$(resolve_simulator_id "${SIMULATOR_NAME:-iPhone 17}")"
+  boot_simulator "$SIMULATOR_ID"
+}
+
+prepare_device() {
+  ensure_xcodebuild_tool
+  [[ -n "${DEVICE_ID:-}" ]] || xcode_test_die "Set DEVICE_ID to a connected iOS device UDID."
+  ensure_generated_project "$XCODE_TEST_PROJECT" "$XCODE_TEST_PROJECT_SPEC" "$XCODE_TEST_GENERATE_SCRIPT"
+}
+
+# run_sim_test RUNNER SCHEME DERIVED_DATA [ENV_ARGS...] [-- EXTRA_XCODEBUILD_ARGS...]
+run_sim_test() {
+  local runner="$1" scheme="$2" dd="$3"
+  shift 3
+  local env_args=() extra_args=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do env_args+=("$1"); shift; done
+  [[ "${1:-}" == "--" ]] && shift
+  extra_args=("$@")
+
+  local action_args=()
+  append_xcode_action_args action_args test
+
+  run_xcode_action "$runner" "$XCODE_TEST_PROJECT" "$scheme" "$dd" \
+    "platform=iOS Simulator,id=$SIMULATOR_ID" \
+    "tests (filters: $(describe_test_filters "${XTEST_ONLY_LABELS[@]}"))" \
+    "$XCODE_TEST_DEFAULT_RESULTS_DIR" "$XCODE_TEST_DEFAULT_LOGS_DIR" \
+    "${env_args[@]}" \
+    -- "${action_args[@]}" "${XTEST_ONLY_ARGS[@]}" "${extra_args[@]}"
+}
+
+# run_device_test RUNNER SCHEME DERIVED_DATA [-- EXTRA_XCODEBUILD_ARGS...]
+run_device_test() {
+  local runner="$1" scheme="$2" dd="$3"
+  shift 3
+  [[ "${1:-}" == "--" ]] && shift
+  local extra_args=("$@")
+
+  local action_args=()
+  append_xcode_action_args action_args test
+
+  run_xcode_action "$runner" "$XCODE_TEST_PROJECT" "$scheme" "$dd" \
+    "id=$DEVICE_ID" \
+    "tests (filters: $(describe_test_filters "${XTEST_ONLY_LABELS[@]}"))" \
+    "$XCODE_TEST_DEFAULT_RESULTS_DIR" "$XCODE_TEST_DEFAULT_LOGS_DIR" \
+    -- "${action_args[@]}" "${XTEST_ONLY_ARGS[@]}" "${extra_args[@]}"
+}
+
+# run_sim_build RUNNER SCHEME DERIVED_DATA
+run_sim_build() {
+  local runner="$1" scheme="$2" dd="$3"
+  local action_args=()
+  append_xcode_action_args action_args build
+
+  XCODE_ACTION_QUIET=0 XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_action \
+    "$runner" "$XCODE_TEST_PROJECT" "$scheme" "$dd" \
+    "platform=iOS Simulator,id=$SIMULATOR_ID" "build" "" \
+    "$XCODE_TEST_DEFAULT_LOGS_DIR" \
+    -- "${action_args[@]}"
 }

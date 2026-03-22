@@ -21,7 +21,6 @@ struct PersistedSessionDescriptor: Codable, Equatable, Identifiable {
     let id: UUID
     var profile: ConnectionProfile
     var status: Status
-    var connectionError: String?
     var connectedAt: Date?
     var reconnectState: PersistedReconnectState
     var terminalTitle: String?

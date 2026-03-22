@@ -187,10 +187,11 @@ struct ConnectionsRootView: View {
                 profile: profile,
                 password: $pendingPassword
             ) {
+                let capturedPassword = pendingPassword
+                pendingPassword = ""
+                passwordPromptProfile = nil
                 Task {
-                    await launch(profile: profile, password: pendingPassword)
-                    pendingPassword = ""
-                    passwordPromptProfile = nil
+                    await launch(profile: profile, password: capturedPassword)
                 }
             }
             .presentationDetents([.medium])

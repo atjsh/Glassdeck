@@ -141,7 +141,6 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            lifecycleCoordinator.start()
             synchronizeRootState()
             scheduleDeferredLaunchRoutingIfNeeded()
         }

@@ -15,16 +15,16 @@ final class RemoteTrackpadScreenshotUITests: XCTestCase {
         )
 
         let remoteTrackpad = app.otherElements["remote-trackpad-view"].firstMatch
-        XCTAssertTrue(remoteTrackpad.waitForExistence(timeout: 5))
+        XCTAssertTrue(remoteTrackpad.waitForExistence(timeout: UITestTimeout.standard))
         captureScreenshot(named: "docker-remote-trackpad-cursor")
 
         let modePicker = app.segmentedControls["remote-mode-picker"].firstMatch
-        XCTAssertTrue(modePicker.waitForExistence(timeout: 5))
+        XCTAssertTrue(modePicker.waitForExistence(timeout: UITestTimeout.standard))
         modePicker.buttons["Mouse"].firstMatch.tap()
         captureScreenshot(named: "docker-remote-trackpad-mouse")
 
         let keyboardToggle = app.buttons["remote-keyboard-toggle"].firstMatch
-        XCTAssertTrue(keyboardToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(keyboardToggle.waitForExistence(timeout: UITestTimeout.standard))
         keyboardToggle.tap()
         captureScreenshot(named: "docker-remote-trackpad-keyboard")
     }

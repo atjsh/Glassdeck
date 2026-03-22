@@ -31,6 +31,7 @@ public actor SSHPTYBridge {
 
         readTask = Task { [weak self] in
             guard let self else { return }
+            guard let shell = await self.shell else { return }
 
             do {
                 for try await chunk in shell.output {

@@ -13,15 +13,6 @@ public actor SSHConnectionManager {
     private var connections: [UUID: ManagedConnection] = [:]
     private let eventLoopGroup: EventLoopGroup
 
-    /// Called to prompt the user for host key trust decisions.
-    private(set) var hostKeyPromptHandler: (@Sendable (HostKeyPromptInfo) async -> Bool)?
-
-    public func setHostKeyPromptHandler(
-        _ handler: @escaping @Sendable (HostKeyPromptInfo) async -> Bool
-    ) {
-        hostKeyPromptHandler = handler
-    }
-
     struct ManagedConnection {
         let id: UUID
         let profile: ConnectionProfile
@@ -57,16 +48,9 @@ public actor SSHConnectionManager {
         let id = UUID()
         let authMethod = try buildAuthMethod(for: profile, password: password)
 
-        let hostKeyValidation: SSHAuthentication.HostKeyValidation
-        if let promptHandler = hostKeyPromptHandler {
-            hostKeyValidation = .custom(HostKeyValidationDelegate(
-                host: profile.host,
-                port: profile.port,
-                promptHandler: promptHandler
-            ))
-        } else {
-            hostKeyValidation = .acceptAll()
-        }
+        let hostKeyValidation: SSHAuthentication.HostKeyValidation = .custom(
+            HostKeyValidationDelegate(host: profile.host, port: profile.port)
+        )
 
         let sshConnection = SSHConnection(
             host: profile.host,

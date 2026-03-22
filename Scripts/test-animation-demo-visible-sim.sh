@@ -1,46 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_DEMO_SCRIPT="$ROOT/Scripts/run-animation-demo-sim.sh"
 # shellcheck source=Scripts/xcode-test-common.sh
-source "$ROOT/Scripts/xcode-test-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/xcode-test-common.sh"
 
-SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
-SCREENSHOT_DIR="${SCREENSHOT_DIR:-$ROOT/.build/AnimationDemoVisible}"
+SCREENSHOT_DIR="${SCREENSHOT_DIR:-$XCODE_TEST_ROOT/.build/AnimationDemoVisible}"
 FRAME_A_PATH="$SCREENSHOT_DIR/frame-a.png"
 FRAME_B_PATH="$SCREENSHOT_DIR/frame-b.png"
 RUN_DEMO_ARGS=()
-RUN_DEMO_SUPPRESS_OUTPUT=1
+RUN_DEMO_SUPPRESS=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --clean|--rebuild)
-      RUN_DEMO_ARGS+=("$1")
-      shift
-      ;;
-    --verbose)
-      RUN_DEMO_ARGS+=("$1")
-      RUN_DEMO_SUPPRESS_OUTPUT=0
-      shift
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      exit 1
-      ;;
+    --clean|--rebuild) RUN_DEMO_ARGS+=("$1"); shift ;;
+    --verbose) RUN_DEMO_ARGS+=("$1"); RUN_DEMO_SUPPRESS=0; shift ;;
+    *) xcode_test_die "Unknown argument: $1" ;;
   esac
 done
 
 ensure_xcode_test_tools
-
 mkdir -p "$SCREENSHOT_DIR"
+SIMULATOR_ID="$(resolve_simulator_id "${SIMULATOR_NAME:-iPhone 17}")"
 
-SIMULATOR_ID="$(resolve_simulator_id "$SIMULATOR_NAME")"
-
-if [[ "$RUN_DEMO_SUPPRESS_OUTPUT" == "1" ]]; then
-  "$RUN_DEMO_SCRIPT" "${RUN_DEMO_ARGS[@]}" >/dev/null
+if [[ "$RUN_DEMO_SUPPRESS" == "1" ]]; then
+  "$XCODE_TEST_COMMON_DIR/run-animation-demo-sim.sh" "${RUN_DEMO_ARGS[@]}" >/dev/null
 else
-  "$RUN_DEMO_SCRIPT" "${RUN_DEMO_ARGS[@]}"
+  "$XCODE_TEST_COMMON_DIR/run-animation-demo-sim.sh" "${RUN_DEMO_ARGS[@]}"
 fi
 
 sleep 4

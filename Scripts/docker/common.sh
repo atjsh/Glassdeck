@@ -140,3 +140,48 @@ Suggested terminal checks:
   nano --mouse ~/testdata/nano-target.txt
 EOF
 }
+
+# ---------------------------------------------------------------------------
+# Simulator env helpers for Docker SSH tests
+# ---------------------------------------------------------------------------
+
+inject_docker_ssh_sim_env() {
+  local sim_id="$1" host="$2"
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_ENABLED 1
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_HOST "$host"
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_PORT "$GLASSDECK_TEST_SSH_PORT"
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_USER "$GLASSDECK_TEST_SSH_USER"
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_PASSWORD "$GLASSDECK_TEST_SSH_PASSWORD"
+  xcrun simctl spawn "$sim_id" launchctl setenv GLASSDECK_LIVE_SSH_KEY_PATH "$GLASSDECK_TEST_SSH_KEY"
+}
+
+clear_docker_ssh_sim_env() {
+  local sim_id="$1"
+  local key
+  for key in \
+    GLASSDECK_LIVE_SSH_ENABLED GLASSDECK_LIVE_SSH_HOST GLASSDECK_LIVE_SSH_PORT \
+    GLASSDECK_LIVE_SSH_USER GLASSDECK_LIVE_SSH_PASSWORD GLASSDECK_LIVE_SSH_KEY_PATH \
+    GLASSDECK_UI_SCREENSHOT_CAPTURE
+  do
+    xcrun simctl spawn "$sim_id" launchctl unsetenv "$key" >/dev/null 2>&1 || true
+  done
+}
+
+# Populates DOCKER_SSH_XCODE_ENV with env assignments for run_xcode_action.
+docker_ssh_xcode_env() {
+  local host="$1"
+  DOCKER_SSH_XCODE_ENV=(
+    "GLASSDECK_LIVE_SSH_ENABLED=1"
+    "GLASSDECK_LIVE_SSH_HOST=$host"
+    "GLASSDECK_LIVE_SSH_PORT=$GLASSDECK_TEST_SSH_PORT"
+    "GLASSDECK_LIVE_SSH_USER=$GLASSDECK_TEST_SSH_USER"
+    "GLASSDECK_LIVE_SSH_PASSWORD=$GLASSDECK_TEST_SSH_PASSWORD"
+    "GLASSDECK_LIVE_SSH_KEY_PATH=$GLASSDECK_TEST_SSH_KEY"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_ENABLED=1"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_HOST=$host"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_PORT=$GLASSDECK_TEST_SSH_PORT"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_USER=$GLASSDECK_TEST_SSH_USER"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_PASSWORD=$GLASSDECK_TEST_SSH_PASSWORD"
+    "SIMCTL_CHILD_GLASSDECK_LIVE_SSH_KEY_PATH=$GLASSDECK_TEST_SSH_KEY"
+  )
+}

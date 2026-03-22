@@ -147,7 +147,7 @@ final class SessionKeyboardHostView: UIView, UITextInput {
         surface?.unmarkText()
     }
 
-    func text(in range: UITextRange) -> String? { nil }
+    func text(in range: UITextRange) -> String? { "" }
 
     func replace(_ range: UITextRange, withText text: String) {
         insertText(text)

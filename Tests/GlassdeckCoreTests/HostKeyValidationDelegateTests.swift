@@ -28,14 +28,7 @@ final class HostKeyValidationDelegateTests: XCTestCase {
 
         HostKeyVerifier.trustHost(host: testHost, port: testPort, fingerprint: fingerprint)
 
-        let delegate = HostKeyValidationDelegate(
-            host: testHost,
-            port: testPort,
-            promptHandler: { _ in
-                XCTFail("Prompt should not be called for a trusted host")
-                return false
-            }
-        )
+        let delegate = HostKeyValidationDelegate(host: testHost, port: testPort)
 
         let loop = EmbeddedEventLoop()
         defer { try? loop.syncShutdownGracefully() }
@@ -47,22 +40,11 @@ final class HostKeyValidationDelegateTests: XCTestCase {
         XCTAssertNoThrow(try promise.futureResult.wait())
     }
 
-    func testDelegatePromptsForNewHostAndAccepts() throws {
+    func testDelegateAutoTrustsNewHost() throws {
         let nioKey = try makeTestPublicKey()
         let host = testHost!
 
-        let promptExpectation = expectation(description: "prompt called")
-        let delegate = HostKeyValidationDelegate(
-            host: host,
-            port: testPort,
-            promptHandler: { info in
-                XCTAssertEqual(info.host, host)
-                XCTAssertTrue(info.isNewHost)
-                XCTAssertNil(info.existingFingerprint)
-                promptExpectation.fulfill()
-                return true
-            }
-        )
+        let delegate = HostKeyValidationDelegate(host: host, port: testPort)
 
         let loop = EmbeddedEventLoop()
         defer { try? loop.syncShutdownGracefully() }
@@ -71,7 +53,6 @@ final class HostKeyValidationDelegateTests: XCTestCase {
         delegate.validateHostKey(hostKey: nioKey, validationCompletePromise: promise)
         loop.run()
 
-        wait(for: [promptExpectation], timeout: 5)
         XCTAssertNoThrow(try promise.futureResult.wait())
 
         // Host should now be trusted
@@ -80,32 +61,11 @@ final class HostKeyValidationDelegateTests: XCTestCase {
         case .trusted:
             break
         default:
-            XCTFail("Host should be trusted after acceptance")
+            XCTFail("Host should be trusted after TOFU")
         }
     }
 
-    func testDelegatePromptsForNewHostAndRejects() throws {
-        let nioKey = try makeTestPublicKey()
-
-        let delegate = HostKeyValidationDelegate(
-            host: testHost,
-            port: testPort,
-            promptHandler: { _ in false }
-        )
-
-        let loop = EmbeddedEventLoop()
-        defer { try? loop.syncShutdownGracefully() }
-        let promise = loop.makePromise(of: Void.self)
-
-        delegate.validateHostKey(hostKey: nioKey, validationCompletePromise: promise)
-        loop.run()
-
-        XCTAssertThrowsError(try promise.futureResult.wait()) { error in
-            XCTAssertTrue(error is HostKeyValidationError)
-        }
-    }
-
-    func testDelegateMismatchPromptsWithExistingFingerprint() throws {
+    func testDelegateRejectsMismatchedHostKey() throws {
         let oldNIOKey = try makeTestPublicKey()
         let oldFingerprint = HostKeyVerifier.fingerprint(from: publicKeyBytes(oldNIOKey))
 
@@ -113,18 +73,7 @@ final class HostKeyValidationDelegateTests: XCTestCase {
 
         let newNIOKey = try makeTestPublicKey()
 
-        let promptExpectation = expectation(description: "mismatch prompt called")
-        let delegate = HostKeyValidationDelegate(
-            host: testHost,
-            port: testPort,
-            promptHandler: { info in
-                XCTAssertFalse(info.isNewHost)
-                XCTAssertNotNil(info.existingFingerprint)
-                XCTAssertEqual(info.existingFingerprint, oldFingerprint)
-                promptExpectation.fulfill()
-                return true
-            }
-        )
+        let delegate = HostKeyValidationDelegate(host: testHost, port: testPort)
 
         let loop = EmbeddedEventLoop()
         defer { try? loop.syncShutdownGracefully() }
@@ -133,8 +82,9 @@ final class HostKeyValidationDelegateTests: XCTestCase {
         delegate.validateHostKey(hostKey: newNIOKey, validationCompletePromise: promise)
         loop.run()
 
-        wait(for: [promptExpectation], timeout: 5)
-        XCTAssertNoThrow(try promise.futureResult.wait())
+        XCTAssertThrowsError(try promise.futureResult.wait()) { error in
+            XCTAssertTrue(error is HostKeyValidationError)
+        }
     }
 
     // MARK: - Helpers

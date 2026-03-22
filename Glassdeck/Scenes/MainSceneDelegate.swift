@@ -20,7 +20,6 @@ class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = UIHostingController(rootView: rootView)
         self.window = window
         window.makeKeyAndVisible()
-        GlassdeckEnvironment.lifecycleCoordinator.start()
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {

@@ -1,69 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT="$ROOT/GlassdeckApp.xcodeproj"
-PROJECT_SPEC="$ROOT/project.yml"
-GENERATE_SCRIPT="$ROOT/Scripts/generate-xcodeproj.sh"
 # shellcheck source=Scripts/xcode-test-common.sh
-source "$ROOT/Scripts/xcode-test-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/xcode-test-common.sh"
 
-SCHEME="${SCHEME:-GlassdeckApp}"
-APP_NAME="${APP_NAME:-Glassdeck}"
-SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
-DERIVED_DATA="${DERIVED_DATA:-$XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA}"
-TEST_LOGS_DIR="${TEST_LOGS_DIR:-$ROOT/.build/TestLogs}"
 TAIL_LOGS=false
-RUNNER_NAME="run-ios-sim"
-XCODE_ACTION_ARGS=()
-
 reset_xcode_action_mode
 for arg in "$@"; do
-  if handle_xcode_action_arg "$arg"; then
-    continue
-  fi
-
+  if handle_xcode_action_arg "$arg"; then continue; fi
   case "$arg" in
-    --logs)
-      TAIL_LOGS=true
-      ;;
-    --verbose)
-      GLASSDECK_VERBOSE=1
-      ;;
-    *)
-      echo "Unknown argument: $arg" >&2
-      exit 1
-      ;;
+    --logs) TAIL_LOGS=true ;;
+    --verbose) GLASSDECK_VERBOSE=1 ;;
+    *) xcode_test_die "Unknown argument: $arg" ;;
   esac
 done
 
-ensure_xcode_test_tools
-ensure_generated_project "$PROJECT" "$PROJECT_SPEC" "$GENERATE_SCRIPT"
-SIMULATOR_ID="$(resolve_simulator_id "$SIMULATOR_NAME")"
-boot_simulator "$SIMULATOR_ID"
-append_xcode_action_args XCODE_ACTION_ARGS build
+APP_NAME="${APP_NAME:-Glassdeck}"
+prepare_simulator
+run_sim_build run-ios-sim GlassdeckApp "$XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA"
 
-XCODE_ACTION_QUIET=0 XCODE_TEST_SUPPRESS_SUCCESS=1 run_xcode_action \
-  "$RUNNER_NAME" \
-  "$PROJECT" \
-  "$SCHEME" \
-  "$DERIVED_DATA" \
-  "platform=iOS Simulator,id=$SIMULATOR_ID" \
-  "build" \
-  "" \
-  "$TEST_LOGS_DIR" \
-  -- \
-  "${XCODE_ACTION_ARGS[@]}"
-
-APP_PATH="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "Built app not found at $APP_PATH" >&2
-  exit 1
-fi
-
-BUNDLE_ID="$(
-  /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist"
-)"
+APP_PATH="$XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
+[[ -d "$APP_PATH" ]] || xcode_test_die "Built app not found at $APP_PATH"
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist")"
 
 xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
 xcrun simctl launch "$SIMULATOR_ID" "$BUNDLE_ID"

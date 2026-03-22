@@ -88,8 +88,9 @@ public actor SSHReconnectManager {
                     break // Continue retrying
                 }
 
-                // Exponential backoff
-                delay = min(delay * config.backoffMultiplier, config.maxDelay)
+                // Exponential backoff with jitter
+                let jitter = Double.random(in: 0.75...1.25)
+                delay = min(delay * config.backoffMultiplier * jitter, config.maxDelay)
             }
 
             if !Task.isCancelled {

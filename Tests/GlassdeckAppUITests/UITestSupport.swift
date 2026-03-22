@@ -38,6 +38,12 @@ enum UITestEnvironmentKeys {
     static let preserveHostBackedState = "GLASSDECK_UI_TEST_PRESERVE_HOST_STATE"
 }
 
+enum UITestTimeout {
+    static let short: TimeInterval = 3
+    static let standard: TimeInterval = 5
+    static let long: TimeInterval = 10
+}
+
 @MainActor
 extension XCTestCase {
     private struct ScreenshotAnalysis {
@@ -135,7 +141,7 @@ extension XCTestCase {
         line: UInt = #line
     ) -> XCUIScreenshot {
         XCTAssertTrue(
-            element.waitForExistence(timeout: 10),
+            element.waitForExistence(timeout: UITestTimeout.long),
             "Expected screenshot target '\(name)' to exist.",
             file: file,
             line: line
@@ -387,7 +393,7 @@ extension XCTestCase {
             .matching(identifier: "terminal-render-summary")
             .firstMatch
         XCTAssertTrue(
-            summaryElement.waitForExistence(timeout: 10),
+            summaryElement.waitForExistence(timeout: UITestTimeout.long),
             "Expected the terminal render summary accessibility element to exist.",
             file: file,
             line: line
@@ -427,7 +433,7 @@ extension XCTestCase {
             .matching(identifier: "terminal-render-summary")
             .firstMatch
         XCTAssertTrue(
-            summaryElement.waitForExistence(timeout: 10),
+            summaryElement.waitForExistence(timeout: UITestTimeout.long),
             "Expected the terminal render summary accessibility element to exist.",
             file: file,
             line: line
@@ -464,7 +470,7 @@ extension XCTestCase {
             .matching(identifier: "terminal-render-summary")
             .firstMatch
         XCTAssertTrue(
-            summaryElement.waitForExistence(timeout: 10),
+            summaryElement.waitForExistence(timeout: UITestTimeout.long),
             "Expected the terminal render summary accessibility element to exist.",
             file: file,
             line: line
@@ -512,7 +518,7 @@ extension XCTestCase {
             .matching(identifier: "terminal-animation-progress")
             .firstMatch
         XCTAssertTrue(
-            progressElement.waitForExistence(timeout: 10),
+            progressElement.waitForExistence(timeout: UITestTimeout.long),
             "Expected the terminal animation progress accessibility element to exist.",
             file: file,
             line: line
@@ -571,6 +577,25 @@ extension XCTestCase {
         )
     }
 
+    /// Accept the host key trust alert if it appears after initiating an SSH
+    /// connection. When the host key is already trusted this is a no-op.
+    func acceptHostKeyAlertIfPresent(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 20,
+        required: Bool = false,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let trustButton = app.alerts.buttons["Trust"].firstMatch
+        if trustButton.waitForExistence(timeout: timeout) {
+            trustButton.tap()
+        } else if required {
+            let alertCount = app.alerts.count
+            let description = app.debugDescription
+            XCTFail("Host key Trust button not found after \(timeout)s. alerts=\(alertCount)\n\(description)", file: file, line: line)
+        }
+    }
+
     func currentAnimationFrame(
         in app: XCUIApplication,
         file: StaticString = #filePath,
@@ -580,7 +605,7 @@ extension XCTestCase {
             .matching(identifier: "terminal-animation-progress")
             .firstMatch
         XCTAssertTrue(
-            progressElement.waitForExistence(timeout: 10),
+            progressElement.waitForExistence(timeout: UITestTimeout.long),
             "Expected the terminal animation progress accessibility element to exist.",
             file: file,
             line: line

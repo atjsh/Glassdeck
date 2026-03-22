@@ -7,7 +7,7 @@ import Security
 /// Stores known host key fingerprints in the Keychain for secure persistence.
 /// On first connection to a host, the fingerprint is saved. On subsequent
 /// connections, it's compared against the stored value to detect MITM attacks.
-struct HostKeyVerifier: Sendable {
+public struct HostKeyVerifier: Sendable {
     private static let keychainService = "com.glassdeck.known-hosts"
 
     enum VerificationResult: Sendable {
@@ -61,6 +61,11 @@ struct HostKeyVerifier: Sendable {
     /// Get all known hosts and their fingerprints.
     static func allKnownHosts() -> [String: String] {
         loadKnownHosts()
+    }
+
+    /// Remove all known hosts from the store.
+    public static func clearAllKnownHosts() {
+        saveKnownHosts([:])
     }
 
     // MARK: - Keychain Persistence

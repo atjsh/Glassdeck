@@ -3,7 +3,7 @@ import NIOCore
 import NIOSSH
 import Crypto
 
-/// Information presented to the user when a host key needs verification.
+/// Information about a host key mismatch (for future UI use).
 public struct HostKeyPromptInfo: Sendable {
     public let host: String
     public let port: Int
@@ -12,22 +12,18 @@ public struct HostKeyPromptInfo: Sendable {
     public let isNewHost: Bool
 }
 
-/// Bridges the NIO SSH host-key validation callback to the existing
-/// ``HostKeyVerifier`` TOFU store, prompting the user via an async closure
-/// when the key is new or has changed.
+/// Validates SSH host keys using Trust-On-First-Use (TOFU).
+///
+/// - **New host**: Automatically trusts and stores the fingerprint.
+/// - **Known host, same key**: Succeeds immediately.
+/// - **Known host, different key**: Rejects (possible MITM attack).
 final class HostKeyValidationDelegate: NIOSSHClientServerAuthenticationDelegate {
     private let host: String
     private let port: Int
-    private let promptHandler: @Sendable (HostKeyPromptInfo) async -> Bool
 
-    init(
-        host: String,
-        port: Int,
-        promptHandler: @escaping @Sendable (HostKeyPromptInfo) async -> Bool
-    ) {
+    init(host: String, port: Int) {
         self.host = host
         self.port = port
-        self.promptHandler = promptHandler
     }
 
     func validateHostKey(
@@ -43,52 +39,26 @@ final class HostKeyValidationDelegate: NIOSSHClientServerAuthenticationDelegate 
             validationCompletePromise.succeed(())
 
         case .newHost(let fp):
-            let info = HostKeyPromptInfo(
-                host: host,
-                port: port,
-                fingerprint: fp,
-                existingFingerprint: nil,
-                isNewHost: true
-            )
-            bridgeToAsync(promise: validationCompletePromise, fingerprint: fp, info: info)
+            HostKeyVerifier.trustHost(host: host, port: port, fingerprint: fp)
+            validationCompletePromise.succeed(())
 
         case .mismatch(let expected, let actual):
-            let info = HostKeyPromptInfo(
-                host: host,
-                port: port,
-                fingerprint: actual,
-                existingFingerprint: expected,
-                isNewHost: false
+            validationCompletePromise.fail(
+                HostKeyValidationError.mismatch(
+                    host: host,
+                    port: port,
+                    expected: expected,
+                    actual: actual
+                )
             )
-            bridgeToAsync(promise: validationCompletePromise, fingerprint: actual, info: info)
-        }
-    }
-
-    private func bridgeToAsync(
-        promise: EventLoopPromise<Void>,
-        fingerprint: String,
-        info: HostKeyPromptInfo
-    ) {
-        let host = self.host
-        let port = self.port
-        let handler = self.promptHandler
-
-        promise.completeWithTask {
-            let accepted = await handler(info)
-            guard accepted else {
-                throw HostKeyValidationError.rejected
-            }
-            HostKeyVerifier.trustHost(host: host, port: port, fingerprint: fingerprint)
         }
     }
 
     private func serializePublicKey(_ key: NIOSSHPublicKey) -> Data {
-        // Convert to "algorithm base64key" format, extract the base64 portion, decode raw bytes
         let openSSH = String(openSSHPublicKey: key)
         let components = openSSH.split(separator: " ", maxSplits: 1)
         guard components.count == 2,
               let rawBytes = Data(base64Encoded: String(components[1])) else {
-            // Fallback: hash the full OpenSSH string representation
             return Data(openSSH.utf8)
         }
         return rawBytes
@@ -96,9 +66,12 @@ final class HostKeyValidationDelegate: NIOSSHClientServerAuthenticationDelegate 
 }
 
 enum HostKeyValidationError: Error, LocalizedError {
-    case rejected
+    case mismatch(host: String, port: Int, expected: String, actual: String)
 
     var errorDescription: String? {
-        "Host key verification was rejected by the user."
+        switch self {
+        case .mismatch(let host, let port, _, _):
+            return "Host key for \(host):\(port) has changed. This could indicate a man-in-the-middle attack. Remove the old key with 'Forget Host' and reconnect if this change is expected."
+        }
     }
 }

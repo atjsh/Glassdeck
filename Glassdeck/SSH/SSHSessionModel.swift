@@ -14,9 +14,13 @@ final class SSHSessionModel: Identifiable {
 
     // Connection lifecycle
     var status: SessionStatus = .disconnected
-    var connectionError: String?
     var connectedAt: Date?
     var reconnectState: ReconnectState = .idle
+
+    var connectionErrorMessage: String? {
+        if case .failed(let reason) = status { return reason }
+        return nil
+    }
 
     // SSH internals (managed by SessionManager)
     var connectionID: UUID?

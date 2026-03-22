@@ -224,7 +224,6 @@ enum UITestLaunchSupport {
             profile: connections[2]
         )
         inactive.status = .failed("Host key changed")
-        inactive.connectionError = "Host key changed"
         inactive.connectedAt = .now.addingTimeInterval(-18_000)
         inactive.terminalTitle = "docs@box"
         inactive.terminalSize = TerminalSize(columns: 96, rows: 26)
@@ -357,6 +356,7 @@ enum UITestLaunchSupport {
         activeAnimationPlayer = nil
         SessionPersistenceStore().clear()
         SessionCredentialStore().removeAll()
+        HostKeyVerifier.clearAllKnownHosts()
         UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
         for keyID in SSHKeyManager.shared.listKeys() {
             try? SSHKeyManager.shared.deleteKey(id: keyID)
@@ -366,13 +366,11 @@ enum UITestLaunchSupport {
     private static func startAnimationPlaybackIfPossible(for session: SSHSessionModel) {
         guard let surface = session.surface else {
             session.status = .failed("Animation scenario is missing a terminal surface.")
-            session.connectionError = "Animation scenario is missing a terminal surface."
             return
         }
 
         guard let framesPath = ProcessInfo.processInfo.environment[animationFramesEnvironmentKey], !framesPath.isEmpty else {
             session.status = .failed("Set \(animationFramesEnvironmentKey) to launch the animation scenario.")
-            session.connectionError = "Set \(animationFramesEnvironmentKey) to launch the animation scenario."
             return
         }
 
@@ -385,7 +383,6 @@ enum UITestLaunchSupport {
             try player.start()
         } catch {
             session.status = .failed(error.localizedDescription)
-            session.connectionError = error.localizedDescription
         }
     }
 

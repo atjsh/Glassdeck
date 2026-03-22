@@ -168,7 +168,7 @@ private struct SessionSummaryCard: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            if let message = session.connectionError, !message.isEmpty {
+            if let message = session.connectionErrorMessage, !message.isEmpty {
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.secondary)

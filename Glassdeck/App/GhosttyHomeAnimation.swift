@@ -249,6 +249,15 @@ struct GhosttyHomeAnimationSequence {
 }
 
 @MainActor
+private class WeakDisplayLinkTarget: NSObject {
+    private weak var owner: GhosttyHomeAnimationPlayer?
+    init(_ owner: GhosttyHomeAnimationPlayer) { self.owner = owner }
+    @objc func step(_ link: CADisplayLink) {
+        owner?.handleDisplayLink(link)
+    }
+}
+
+@MainActor
 final class GhosttyHomeAnimationPlayer: NSObject {
     struct ReplayMetrics {
         let frameCount: Int
@@ -277,7 +286,8 @@ final class GhosttyHomeAnimationPlayer: NSObject {
         guard displayLink == nil else { return }
         try applyCurrentFrame()
 
-        let link = CADisplayLink(target: self, selector: #selector(handleDisplayLink(_:)))
+        let target = WeakDisplayLinkTarget(self)
+        let link = CADisplayLink(target: target, selector: #selector(WeakDisplayLinkTarget.step))
         link.add(to: .main, forMode: .common)
         displayLink = link
         lastTimestamp = nil
@@ -308,7 +318,7 @@ final class GhosttyHomeAnimationPlayer: NSObject {
     }
 
     @objc
-    private func handleDisplayLink(_ link: CADisplayLink) {
+    fileprivate func handleDisplayLink(_ link: CADisplayLink) {
         if let lastTimestamp {
             accumulatedTime += link.timestamp - lastTimestamp
         }

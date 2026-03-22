@@ -111,14 +111,30 @@ package_xcframework() {
 verify_xcframework() {
     local device_library="$OUTPUT_XCFRAMEWORK/ios-arm64/$LIBRARY_BASENAME"
     local simulator_library="$OUTPUT_XCFRAMEWORK/ios-arm64-simulator/$LIBRARY_BASENAME"
+    local missing=()
 
-    if [ ! -f "$device_library" ] || [ ! -f "$simulator_library" ]; then
-        echo "error: xcframework does not contain expected static libraries." >&2
+    [ ! -f "$device_library" ] && missing+=("$device_library")
+    [ ! -f "$simulator_library" ] && missing+=("$simulator_library")
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "error: xcframework is missing static libraries:" >&2
+        for lib in "${missing[@]}"; do
+            echo "  - $lib" >&2
+        done
         exit 1
     fi
 
-    xcrun lipo -info "$device_library" >/dev/null
-    xcrun lipo -info "$simulator_library" >/dev/null
+    local lipo_output
+    if ! lipo_output=$(xcrun lipo -info "$device_library" 2>&1); then
+        echo "error: lipo verification failed for device library:" >&2
+        echo "  $lipo_output" >&2
+        exit 1
+    fi
+    if ! lipo_output=$(xcrun lipo -info "$simulator_library" 2>&1); then
+        echo "error: lipo verification failed for simulator library:" >&2
+        echo "  $lipo_output" >&2
+        exit 1
+    fi
 }
 
 require_cmd xcodebuild

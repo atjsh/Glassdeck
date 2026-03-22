@@ -40,3 +40,4 @@ Frameworks/*
 .idea/
 .vscode/
 buildServer.json
+.xcodebuildmcp/

@@ -87,8 +87,10 @@ targets:
         excludes:
           - App/Info.plist
           - App/LaunchScreen.storyboard
+          - Resources/AppIcon.icon
           - Resources/Assets.xcassets
     resources:
+      - path: Glassdeck/Resources/AppIcon.icon
       - path: Glassdeck/Resources/Assets.xcassets
       - path: Glassdeck/App/LaunchScreen.storyboard
     dependencies:

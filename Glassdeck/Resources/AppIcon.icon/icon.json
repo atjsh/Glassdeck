@@ -1,0 +1,153 @@
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.12157,0.18039,0.27451,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "backdeck-default.png",
+          "image-name-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "backdeck-dark.png"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "backdeck-tinted.png"
+            }
+          ],
+          "name" : "Back Deck",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.2
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.08
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "frontdeck-default.png",
+          "image-name-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "frontdeck-dark.png"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "frontdeck-tinted.png"
+            }
+          ],
+          "name" : "Front Deck",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.24
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.12
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "terminalstrip-default.png",
+          "image-name-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "terminalstrip-dark.png"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "terminalstrip-tinted.png"
+            }
+          ],
+          "name" : "Terminal Strip",
+          "position" : {
+            "scale" : 0.9,
+            "translation-in-points" : [
+              0,
+              -118
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.18
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "cursor-default.png",
+          "image-name-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "cursor-dark.png"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "cursor-tinted.png"
+            }
+          ],
+          "name" : "Cursor",
+          "position" : {
+            "scale" : 0.34,
+            "translation-in-points" : [
+              174,
+              -118
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.14
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

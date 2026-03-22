@@ -38,6 +38,7 @@
 		598BCD44FE9D6F0306092196 /* RemoteControlStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */; };
 		5DB4B3F84B79B402AAFE96AB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E110E69F51C992B909FD3F4E /* AppSettings.swift */; };
 		63BEE521B80268F960861803 /* SessionLifecycleCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E2C3044276437BE6B658CB6 /* SessionLifecycleCoordinator.swift */; };
+		6ED04EB9CA08EE94FA8BB1FA /* AppLaunchRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEB5D5C88E284763FBA319E /* AppLaunchRoutingTests.swift */; };
 		6F7FA86F088FF746A5721929 /* ConnectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFC61F836376E1B0ECA7D7 /* ConnectionListView.swift */; };
 		81A4566DAF3E90F9337870D4 /* SSHReconnectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */; };
 		86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872846C614A5D2CEB0A1A11F /* ExternalDisplaySceneDelegate.swift */; };
@@ -78,6 +79,9 @@
 		EF8A64ADB0AB9E25EACAAC77 /* GhosttyHomeAnimationPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 166D466D503804B9CECD314F /* GhosttyHomeAnimationPerformanceTests.swift */; };
 		FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */; };
 		FE75665145DEA201B649B8F4 /* SessionCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5058DAC24DC8B7271035A590 /* SessionCredentialStore.swift */; };
+		DFE360F0137A2638BAFB64BF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 319F1DC9BBE088038459FF93 /* Assets.xcassets */; };
+		74E18D4946F00B4C7C6DF637 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */; };
+		10B828BF4E9E52710AA3B9A9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -197,6 +201,7 @@
 		D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTTypes.swift; sourceTree = "<group>"; };
 		D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManager.swift; sourceTree = "<group>"; };
 		DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPManagerTests.swift; sourceTree = "<group>"; };
+		DFEB5D5C88E284763FBA319E /* AppLaunchRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchRoutingTests.swift; sourceTree = "<group>"; };
 		E110E69F51C992B909FD3F4E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		E3647E6D1BA75126F5047157 /* TerminalViewProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalViewProtocol.swift; sourceTree = "<group>"; };
 		E834C2043B25F09FF46E75D3 /* AppChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppChrome.swift; sourceTree = "<group>"; };
@@ -207,6 +212,9 @@
 		F70D15BB314CA4F2DD7B78F8 /* SFTPBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPBrowserView.swift; sourceTree = "<group>"; };
 		FA2CF4A869284921964E6599 /* InputCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputCoordinator.swift; sourceTree = "<group>"; };
 		FDC49790314EB278D4F06E53 /* GlassdeckAppUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassdeckAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		319F1DC9BBE088038459FF93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "Glassdeck/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+		2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = "Glassdeck/App/LaunchScreen.storyboard"; sourceTree = SOURCE_ROOT; };
+		D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = AppIcon.icon; path = "Glassdeck/Resources/AppIcon.icon"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -319,6 +327,7 @@
 		4ADC0C9E661A5D0776311DFB /* GlassdeckAppTests */ = {
 			isa = PBXGroup;
 			children = (
+				DFEB5D5C88E284763FBA319E /* AppLaunchRoutingTests.swift */,
 				166D466D503804B9CECD314F /* GhosttyHomeAnimationPerformanceTests.swift */,
 				962B4A5C86B4D01BEC03E7CE /* RemoteControlStateTests.swift */,
 				B2B0FD52A1FD108E8E0D2A46 /* SessionPersistenceTests.swift */,
@@ -372,6 +381,9 @@
 		81C09AD83E84E16394593843 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				319F1DC9BBE088038459FF93 /* Assets.xcassets */,
+				2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */,
+				D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -499,6 +511,7 @@
 			buildConfigurationList = 0D3B0656306317838ED269F9 /* Build configuration list for PBXNativeTarget "GlassdeckApp" */;
 			buildPhases = (
 				D6939D1BC15A09733DBD4FFD /* Sources */,
+				A112B0F00C0DEBEEF0011001 /* Resources */,
 				8F88127EE06465ACABC217D7 /* Frameworks */,
 				C67616A3CCD62074FA384BF6 /* Embed Frameworks */,
 			);
@@ -627,6 +640,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A112B0F00C0DEBEEF0011001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFE360F0137A2638BAFB64BF /* Assets.xcassets in Resources */,
+				74E18D4946F00B4C7C6DF637 /* LaunchScreen.storyboard in Resources */,
+				10B828BF4E9E52710AA3B9A9 /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		341C06B40E4E9B1D57D583E4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -696,6 +722,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6ED04EB9CA08EE94FA8BB1FA /* AppLaunchRoutingTests.swift in Sources */,
 				10173DBC0E9259E14E27EF09 /* ConnectionModelTests.swift in Sources */,
 				EF8A64ADB0AB9E25EACAAC77 /* GhosttyHomeAnimationPerformanceTests.swift in Sources */,
 				10EB1C42BD0813571ECF9291 /* GhosttyVTPlatformTests.swift in Sources */,

@@ -15,6 +15,10 @@ struct SFTPPreviewDocument: Identifiable, Equatable {
     var id: String { path }
 }
 
+private enum SFTPBrowserRoute: Hashable {
+    case directory(path: String)
+}
+
 @MainActor
 @Observable
 final class SFTPBrowserModel {
@@ -308,6 +312,9 @@ final class SFTPBrowserModel {
 struct SFTPBrowserView: View {
     @State private var model: SFTPBrowserModel
     @State private var showUploadImporter = false
+    @State private var navigationPath: [SFTPBrowserRoute] = []
+    private let initialPath: String
+    private let shouldBootstrap: Bool
 
     init(
         profile: ConnectionProfile,
@@ -315,76 +322,50 @@ struct SFTPBrowserView: View {
         manager: any SFTPManaging = SFTPManager()
     ) {
         _model = State(initialValue: SFTPBrowserModel(profile: profile, password: password, manager: manager))
+        initialPath = "."
+        shouldBootstrap = true
+    }
+
+    private init(model: SFTPBrowserModel, path: String) {
+        _model = State(initialValue: model)
+        initialPath = path
+        shouldBootstrap = false
+    }
+
+    private func restorePathIfNeeded() {
+        guard shouldBootstrap || model.connectionID != nil else { return }
+        guard model.currentPath != initialPath else { return }
+
+        Task {
+            do {
+                try await model.load(path: initialPath)
+            } catch {
+                model.errorMessage = error.localizedDescription
+            }
+        }
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 Section {
                     statusHeader
                 }
 
                 if model.connectionID == nil {
-                    Section("Connect") {
-                        if model.requiresPassword {
-                            SecureField("Password", text: $model.password)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            Button("Connect") {
-                                Task { await model.connect() }
-                            }
-                            .disabled(model.password.isEmpty)
-                        } else {
-                            Button {
-                                Task { await model.connect() }
-                            } label: {
-                                Label("Connect", systemImage: "network")
-                            }
-                        }
-                    }
+                    connectSection
                 } else {
-                    Section("Current Path") {
-                        Text(model.currentPath)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
-                    }
-
+                    currentPathSection
                     if model.isLoading {
-                        Section {
-                            ProgressView("Loading directory")
-                        }
+                        loadingSection
                     }
-
-                    Section("Contents") {
-                        if model.entries.isEmpty {
-                            ContentUnavailableView(
-                                "Empty Directory",
-                                systemImage: "folder",
-                                description: Text("No files were returned for this path.")
-                            )
-                        } else {
-                            ForEach(model.entries) { entry in
-                                Button {
-                                    Task { await model.open(entry) }
-                                } label: {
-                                    SFTPBrowserRow(entry: entry)
-                                }
-                                .buttonStyle(.plain)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        Task { await model.delete(entry) }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    contentSection
                 }
             }
             .navigationTitle(model.title)
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("sftp-browser-view")
+            .navigationDestination(for: SFTPBrowserRoute.self, destination: destinationView)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -417,7 +398,10 @@ struct SFTPBrowserView: View {
                 }
             }
             .task {
-                await model.bootstrap()
+                if shouldBootstrap {
+                    await model.bootstrap()
+                }
+                restorePathIfNeeded()
             }
             .fileImporter(
                 isPresented: $showUploadImporter,
@@ -503,6 +487,94 @@ struct SFTPBrowserView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sftp-browser-view")
+    }
+
+    @ViewBuilder
+    private var connectSection: some View {
+        Section("Connect") {
+            if model.requiresPassword {
+                SecureField("Password", text: $model.password)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button("Connect") {
+                    Task { await model.connect() }
+                }
+                .disabled(model.password.isEmpty)
+            } else {
+                Button {
+                    Task { await model.connect() }
+                } label: {
+                    Label("Connect", systemImage: "network")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var currentPathSection: some View {
+        Section("Current Path") {
+            Text(model.currentPath)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
+        }
+    }
+
+    @ViewBuilder
+    private var loadingSection: some View {
+        Section {
+            ProgressView("Loading directory")
+        }
+    }
+
+    @ViewBuilder
+    private var contentSection: some View {
+        Section("Contents") {
+            if model.entries.isEmpty {
+                ContentUnavailableView(
+                    "Empty Directory",
+                    systemImage: "folder",
+                    description: Text("No files were returned for this path.")
+                )
+            } else {
+                ForEach(model.entries) { entry in
+                    entryRow(for: entry)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func entryRow(for entry: SFTPBrowserEntry) -> some View {
+        Group {
+            if entry.isDirectory {
+                NavigationLink(value: SFTPBrowserRoute.directory(path: entry.path)) {
+                    SFTPBrowserRow(entry: entry)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    Task { await model.open(entry) }
+                } label: {
+                    SFTPBrowserRow(entry: entry)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                Task { await model.delete(entry) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(for route: SFTPBrowserRoute) -> some View {
+        switch route {
+        case .directory(let path):
+            SFTPBrowserView(model: model, path: path)
+        }
     }
 
     @ViewBuilder

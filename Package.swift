@@ -25,8 +25,7 @@ var targets: [Target] = [
             "App/Info.plist"
         ],
         resources: [
-            .process("Resources/Assets.xcassets"),
-            .process("App/LaunchScreen.storyboard")
+            .process("Resources/Assets.xcassets")
         ]
     ),
     .binaryTarget(

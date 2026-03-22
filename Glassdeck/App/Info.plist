@@ -50,8 +50,11 @@
 	<array>
 		<string>location</string>
 	</array>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>AppBackground</string>
+	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Glassdeck can optionally use location-backed background activity to keep active SSH sessions alive while you switch away from the app.</string>
 	<key>UIRequiredDeviceCapabilities</key>

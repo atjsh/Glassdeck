@@ -69,6 +69,10 @@ struct ConnectionsRootView: View {
         return filteredConnections.filter { !recentIDs.contains($0.id) }
     }
 
+    private var appBackgroundColor: Color {
+        Color(uiColor: .systemGroupedBackground)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -81,9 +85,11 @@ struct ConnectionsRootView: View {
                     ) {
                         activeSheet = .newConnection
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("connections-empty-state")
                 } else if filteredConnections.isEmpty {
                     ContentUnavailableView.search(text: searchText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
                         if searchText.isEmpty, !recentConnections.isEmpty {
@@ -100,10 +106,14 @@ struct ConnectionsRootView: View {
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(appBackgroundColor)
                     .listStyle(.insetGrouped)
                     .accessibilityIdentifier("connections-list")
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(appBackgroundColor)
             .navigationTitle("Connections")
             .searchable(text: $searchText, prompt: "Search by name, host, or user")
             .toolbar {
@@ -145,6 +155,7 @@ struct ConnectionsRootView: View {
                 }
             }
         }
+        .background(appBackgroundColor)
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .newConnection:

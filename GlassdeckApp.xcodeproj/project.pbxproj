@@ -80,7 +80,6 @@
 		FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */; };
 		FE75665145DEA201B649B8F4 /* SessionCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5058DAC24DC8B7271035A590 /* SessionCredentialStore.swift */; };
 		DFE360F0137A2638BAFB64BF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 319F1DC9BBE088038459FF93 /* Assets.xcassets */; };
-		74E18D4946F00B4C7C6DF637 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */; };
 		10B828BF4E9E52710AA3B9A9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
@@ -213,7 +212,6 @@
 		FA2CF4A869284921964E6599 /* InputCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputCoordinator.swift; sourceTree = "<group>"; };
 		FDC49790314EB278D4F06E53 /* GlassdeckAppUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlassdeckAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		319F1DC9BBE088038459FF93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "Glassdeck/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
-		2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = "Glassdeck/App/LaunchScreen.storyboard"; sourceTree = SOURCE_ROOT; };
 		D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = AppIcon.icon; path = "Glassdeck/Resources/AppIcon.icon"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -382,7 +380,6 @@
 			isa = PBXGroup;
 			children = (
 				319F1DC9BBE088038459FF93 /* Assets.xcassets */,
-				2C9AFBD1D3AA6003B006F0E1 /* LaunchScreen.storyboard */,
 				D12C7EF7E4C0A1F669DFECA9 /* AppIcon.icon */,
 			);
 			path = Resources;
@@ -646,7 +643,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				DFE360F0137A2638BAFB64BF /* Assets.xcassets in Resources */,
-				74E18D4946F00B4C7C6DF637 /* LaunchScreen.storyboard in Resources */,
 				10B828BF4E9E52710AA3B9A9 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

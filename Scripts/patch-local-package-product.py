@@ -83,7 +83,6 @@ RESOURCE_PHASE_LABEL = "Resources"
 
 APP_RESOURCES = (
     ResourceSpec("Assets.xcassets", "folder.assetcatalog", "Glassdeck/Resources/Assets.xcassets"),
-    ResourceSpec("LaunchScreen.storyboard", "file.storyboard", "Glassdeck/App/LaunchScreen.storyboard"),
     ResourceSpec("AppIcon.icon", "folder.iconcomposer.icon", "Glassdeck/Resources/AppIcon.icon"),
 )
 

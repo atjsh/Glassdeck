@@ -97,73 +97,71 @@ struct TerminalSettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("terminal-settings-target-picker")
+
+                    DisclosureGroup("Appearance") {
+                        Picker("Color Scheme", selection: colorSchemeBinding) {
+                            ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
+                                HStack {
+                                    Circle()
+                                        .fill(Color(
+                                            red: Double(scheme.backgroundColor.r) / 255,
+                                            green: Double(scheme.backgroundColor.g) / 255,
+                                            blue: Double(scheme.backgroundColor.b) / 255
+                                        ))
+                                        .frame(width: 16, height: 16)
+                                    Text(scheme.rawValue)
+                                }
+                                .tag(scheme)
+                            }
+                        }
+
+                        HStack {
+                            Text("Font Size")
+                            Spacer()
+                            Text("\(Int(selectedTerminalConfig.fontSize.rounded()))pt")
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("terminal-settings-font-size-value")
+                            Stepper("", value: fontSizeBinding, in: 8...32, step: 1)
+                                .labelsHidden()
+                                .accessibilityIdentifier("terminal-settings-font-size-stepper")
+                        }
+
+                        Picker("Cursor", selection: cursorStyleBinding) {
+                            ForEach(TerminalConfiguration.CursorStyle.allCases, id: \.self) { style in
+                                Text(style.rawValue.capitalized).tag(style)
+                            }
+                        }
+
+                        Toggle("Cursor Blink", isOn: cursorBlinkBinding)
+                    }
+
+                    DisclosureGroup("Behavior") {
+                        HStack {
+                            Text("Scrollback Lines")
+                            Spacer()
+                            Text("\(selectedTerminalConfig.scrollbackLines)")
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("terminal-settings-scrollback-value")
+                            Stepper(
+                                "",
+                                value: scrollbackLinesBinding,
+                                in: 1_000...100_000,
+                                step: 1_000
+                            )
+                            .labelsHidden()
+                            .accessibilityIdentifier("terminal-settings-scrollback-stepper")
+                        }
+
+                        Toggle("Bell Sound", isOn: bellSoundBinding)
+
+                        Text("Applying a profile live preserves the SSH connection, but the visible terminal view may be recreated.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text("Terminal Profile")
                 } footer: {
                     Text("iPhone and External Monitor profiles are stored separately and apply immediately to matching live sessions.")
-                }
-
-                Section {
-                    Picker("Color Scheme", selection: colorSchemeBinding) {
-                        ForEach(TerminalColorScheme.allCases, id: \.self) { scheme in
-                            HStack {
-                                Circle()
-                                    .fill(Color(
-                                        red: Double(scheme.backgroundColor.r) / 255,
-                                        green: Double(scheme.backgroundColor.g) / 255,
-                                        blue: Double(scheme.backgroundColor.b) / 255
-                                    ))
-                                    .frame(width: 16, height: 16)
-                                Text(scheme.rawValue)
-                            }
-                            .tag(scheme)
-                        }
-                    }
-
-                    HStack {
-                        Text("Font Size")
-                        Spacer()
-                        Text("\(Int(selectedTerminalConfig.fontSize.rounded()))pt")
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("terminal-settings-font-size-value")
-                        Stepper("", value: fontSizeBinding, in: 8...32, step: 1)
-                            .labelsHidden()
-                            .accessibilityIdentifier("terminal-settings-font-size-stepper")
-                    }
-
-                    Picker("Cursor", selection: cursorStyleBinding) {
-                        ForEach(TerminalConfiguration.CursorStyle.allCases, id: \.self) { style in
-                            Text(style.rawValue.capitalized).tag(style)
-                        }
-                    }
-
-                    Toggle("Cursor Blink", isOn: cursorBlinkBinding)
-                } header: {
-                    Text("Appearance")
-                }
-
-                Section {
-                    HStack {
-                        Text("Scrollback Lines")
-                        Spacer()
-                        Text("\(selectedTerminalConfig.scrollbackLines)")
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("terminal-settings-scrollback-value")
-                        Stepper(
-                            "",
-                            value: scrollbackLinesBinding,
-                            in: 1_000...100_000,
-                            step: 1_000
-                        )
-                        .labelsHidden()
-                        .accessibilityIdentifier("terminal-settings-scrollback-stepper")
-                    }
-
-                    Toggle("Bell Sound", isOn: bellSoundBinding)
-                } header: {
-                    Text("Behavior")
-                } footer: {
-                    Text("Applying a profile live preserves the SSH connection, but the visible terminal view may be recreated.")
                 }
 
                 Section {

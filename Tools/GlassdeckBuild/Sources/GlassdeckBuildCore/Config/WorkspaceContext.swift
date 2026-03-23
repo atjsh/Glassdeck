@@ -15,12 +15,13 @@ public struct WorkspaceContext: Equatable, Sendable {
     ) -> WorkspaceContext {
         let fileManager = FileManager.default
         var candidate = URL(fileURLWithPath: path).standardizedFileURL
+        let projectMarker = "GlassdeckApp.xcodeproj"
 
         while true {
             let nestedProjectRoot = candidate.appendingPathComponent(projectRootName)
             if fileManager.fileExists(
                 atPath: nestedProjectRoot
-                    .appendingPathComponent("GlassdeckApp.xcodeproj")
+                    .appendingPathComponent(projectMarker)
                     .path
             ) {
                 return WorkspaceContext(
@@ -29,15 +30,14 @@ public struct WorkspaceContext: Equatable, Sendable {
                 )
             }
 
-            if candidate.lastPathComponent == projectRootName,
-               fileManager.fileExists(
-                   atPath: candidate
-                       .appendingPathComponent("GlassdeckApp.xcodeproj")
-                       .path
-               ) {
+            if fileManager.fileExists(
+                atPath: candidate
+                    .appendingPathComponent(projectMarker)
+                    .path
+            ) {
                 return WorkspaceContext(
                     workspaceRoot: candidate.deletingLastPathComponent(),
-                    projectRootName: projectRootName
+                    projectRootName: candidate.lastPathComponent
                 )
             }
 

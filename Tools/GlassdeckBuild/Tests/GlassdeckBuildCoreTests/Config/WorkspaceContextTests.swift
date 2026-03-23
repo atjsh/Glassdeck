@@ -20,6 +20,33 @@ final class WorkspaceContextTests: XCTestCase {
         XCTAssertEqual(current.projectRoot, expectedProjectRoot)
     }
 
+    func testCurrentDetectsProjectRootFromAlternateWorktreeName() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let worktreeRoot = tempRoot.appendingPathComponent("glassdeck-ui-harness")
+        let nestedPackageDirectory = worktreeRoot
+            .appendingPathComponent("Tools/GlassdeckBuild")
+
+        try fileManager.createDirectory(
+            at: nestedPackageDirectory,
+            withIntermediateDirectories: true
+        )
+        try fileManager.createDirectory(
+            at: worktreeRoot.appendingPathComponent("GlassdeckApp.xcodeproj"),
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? fileManager.removeItem(at: tempRoot)
+        }
+
+        let current = WorkspaceContext.current(at: nestedPackageDirectory.path)
+
+        XCTAssertEqual(current.workspaceRoot.path, tempRoot.path)
+        XCTAssertEqual(current.projectRoot.path, worktreeRoot.path)
+        XCTAssertEqual(current.projectRootName, "glassdeck-ui-harness")
+    }
+
     func testWorkerScopeDefaults() {
         let worker = WorkerScope(id: 7)
         XCTAssertEqual(worker.slug, "worker-7")

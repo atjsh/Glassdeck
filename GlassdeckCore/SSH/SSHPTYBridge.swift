@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Bridges an interactive shell session to a terminal engine.
 ///
@@ -6,6 +7,7 @@ import Foundation
 /// the remote shell. The bridge is UI-agnostic and can be exercised entirely
 /// with test doubles.
 public actor SSHPTYBridge {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHPTYBridge")
     private var terminal: any TerminalIO
     private var shell: (any InteractiveShell)?
     private var isActive = false

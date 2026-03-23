@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Handles automatic reconnection after SSH connection drops.
 ///
@@ -6,6 +7,7 @@ import Foundation
 /// Integrates with SessionManager to re-establish connections transparently.
 /// Distinguishes transient failures (retry) from permanent failures (fail fast).
 public actor SSHReconnectManager {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHReconnectManager")
     private var reconnectTasks: [UUID: Task<Void, Never>] = [:]
 
     public struct Config: Sendable {
@@ -71,6 +73,7 @@ public actor SSHReconnectManager {
                 onStatusChange(.attempting(attempt: attempt, maxAttempts: config.maxAttempts))
 
                 // Wait before attempting
+                // Task.sleep throws on cancellation; ignore intentionally
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled else { break }
 

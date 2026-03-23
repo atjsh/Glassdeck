@@ -1,4 +1,5 @@
 import Foundation
+import os
 import NIOCore
 import NIOPosix
 import NIOSSH
@@ -10,6 +11,7 @@ import SSHClient
 /// SwiftNIO SSH for the underlying transport. Each connection is
 /// tracked by UUID and supports shell request and disconnect.
 public actor SSHConnectionManager {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHConnectionManager")
     private var connections: [UUID: ManagedConnection] = [:]
     private let eventLoopGroup: EventLoopGroup
 
@@ -85,8 +87,10 @@ public actor SSHConnectionManager {
             try await sshConnection.start()
             connections[id]?.status = .connected
         } catch {
-            connections[id]?.status = .failed(error.localizedDescription)
-            throw error
+            let categorized = SSHConnectionFailure.categorize(error, host: profile.host, port: profile.port)
+            Self.logger.error("SSH connection failed to \(profile.host):\(profile.port): \(categorized.localizedDescription)")
+            connections[id]?.status = .failed(categorized.localizedDescription)
+            throw categorized
         }
 
         return id
@@ -174,6 +178,64 @@ public actor SSHConnectionManager {
             connections[id]?.status = .failed("Connection failed")
         @unknown default:
             break
+        }
+    }
+
+    /// Categorizes SSH connection failures for user-facing error messages.
+    public enum SSHConnectionFailure: Error, LocalizedError, Sendable {
+        case networkUnreachable(underlying: String)
+        case dnsResolutionFailed(host: String)
+        case connectionRefused(host: String, port: Int)
+        case connectionTimeout(host: String)
+        case authenticationFailed(method: String)
+        case hostKeyMismatch(host: String)
+        case protocolError(detail: String)
+        case unknown(underlying: String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .networkUnreachable(let underlying):
+                return "Network unreachable: \(underlying)"
+            case .dnsResolutionFailed(let host):
+                return "Could not resolve host '\(host)'"
+            case .connectionRefused(let host, let port):
+                return "Connection refused by \(host):\(port)"
+            case .connectionTimeout(let host):
+                return "Connection to '\(host)' timed out"
+            case .authenticationFailed(let method):
+                return "Authentication failed (\(method))"
+            case .hostKeyMismatch(let host):
+                return "Host key mismatch for '\(host)' — possible MITM attack"
+            case .protocolError(let detail):
+                return "SSH protocol error: \(detail)"
+            case .unknown(let underlying):
+                return "Connection failed: \(underlying)"
+            }
+        }
+
+        /// Categorize a raw error into a specific SSH failure type.
+        public static func categorize(_ error: Error, host: String = "", port: Int = 22) -> SSHConnectionFailure {
+            let description = error.localizedDescription.lowercased()
+            
+            if description.contains("network is unreachable") || description.contains("no route to host") {
+                return .networkUnreachable(underlying: error.localizedDescription)
+            }
+            if description.contains("could not resolve") || description.contains("nodename nor servname") {
+                return .dnsResolutionFailed(host: host)
+            }
+            if description.contains("connection refused") {
+                return .connectionRefused(host: host, port: port)
+            }
+            if description.contains("timed out") || description.contains("timeout") {
+                return .connectionTimeout(host: host)
+            }
+            if description.contains("authentication") || description.contains("auth") {
+                return .authenticationFailed(method: "unknown")
+            }
+            if description.contains("host key") {
+                return .hostKeyMismatch(host: host)
+            }
+            return .unknown(underlying: error.localizedDescription)
         }
     }
 

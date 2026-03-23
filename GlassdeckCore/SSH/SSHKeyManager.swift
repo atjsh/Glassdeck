@@ -1,10 +1,44 @@
 import Foundation
+import os
 import Security
+
+/// Abstracts Keychain operations for testability.
+public protocol KeychainProvider: Sendable {
+    func add(query: [String: Any]) -> OSStatus
+    @discardableResult
+    func delete(query: [String: Any]) -> OSStatus
+    func copyMatching(query: [String: Any]) -> (OSStatus, AnyObject?)
+}
+
+/// Default implementation that delegates to the real iOS Keychain.
+public struct SystemKeychainProvider: KeychainProvider {
+    public init() {}
+
+    public func add(query: [String: Any]) -> OSStatus {
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    public func delete(query: [String: Any]) -> OSStatus {
+        SecItemDelete(query as CFDictionary)
+    }
+
+    public func copyMatching(query: [String: Any]) -> (OSStatus, AnyObject?) {
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return (status, result)
+    }
+}
 
 /// Manages SSH keys: generation, import, and secure Keychain storage.
 public final class SSHKeyManager: Sendable {
     public static let shared = SSHKeyManager()
-    private init() {}
+
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHKeyManager")
+    private let keychainProvider: KeychainProvider
+
+    public init(keychainProvider: KeychainProvider = SystemKeychainProvider()) {
+        self.keychainProvider = keychainProvider
+    }
 
     private static let keychainService = "com.glassdeck.ssh-keys"
 
@@ -26,7 +60,11 @@ public final class SSHKeyManager: Sendable {
 
     /// Public convenience: save a key with just ID and data.
     public func savePrivateKey(id: String, keyData: Data) {
-        try? storePrivateKey(id: id, name: id, data: keyData)
+        do {
+            try storePrivateKey(id: id, name: id, data: keyData)
+        } catch {
+            Self.logger.error("Failed to save private key '\(id)': \(error.localizedDescription)")
+        }
     }
 
     public func publicKeyString(id: String) throws -> String {
@@ -45,7 +83,7 @@ public final class SSHKeyManager: Sendable {
             kSecAttrService as String: Self.keychainService,
             kSecAttrAccount as String: id,
         ]
-        SecItemDelete(deleteQuery as CFDictionary)
+        _ = keychainProvider.delete(query: deleteQuery)
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -56,7 +94,7 @@ public final class SSHKeyManager: Sendable {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let status = keychainProvider.add(query: query)
         guard status == errSecSuccess else {
             throw KeychainError.storeFailed(status)
         }
@@ -71,8 +109,7 @@ public final class SSHKeyManager: Sendable {
             kSecReturnData as String: true,
         ]
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, result) = keychainProvider.copyMatching(query: query)
         guard status == errSecSuccess else { return nil }
         return result as? Data
     }
@@ -85,7 +122,7 @@ public final class SSHKeyManager: Sendable {
             kSecAttrAccount as String: id,
         ]
 
-        let status = SecItemDelete(query as CFDictionary)
+        let status = keychainProvider.delete(query: query)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.deleteFailed(status)
         }
@@ -100,8 +137,7 @@ public final class SSHKeyManager: Sendable {
             kSecMatchLimit as String: kSecMatchLimitAll,
         ]
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, result) = keychainProvider.copyMatching(query: query)
         guard status == errSecSuccess,
               let items = result as? [[String: Any]] else {
             return []
@@ -121,8 +157,7 @@ public final class SSHKeyManager: Sendable {
             kSecMatchLimit as String: kSecMatchLimitAll,
         ]
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, result) = keychainProvider.copyMatching(query: query)
         guard status == errSecSuccess,
               let items = result as? [[String: Any]] else {
             return []

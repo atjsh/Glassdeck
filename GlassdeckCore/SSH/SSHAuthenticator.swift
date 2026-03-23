@@ -3,6 +3,7 @@ import Foundation
 import NIOCore
 import NIOSSH
 import SSHClient
+import os
 
 /// Handles SSH authentication: password and public key.
 ///
@@ -12,6 +13,8 @@ import SSHClient
 /// - Key generation (Ed25519, P256)
 /// - OpenSSH private key parsing (unencrypted PEM format)
 public struct SSHAuthenticator: Sendable {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHAuthenticator")
+
     public enum AuthResult: Sendable {
         case success
         case failure(String)
@@ -62,12 +65,18 @@ public struct SSHAuthenticator: Sendable {
 
     private static func parsePrivateKey(_ data: Data) throws -> NIOSSHPrivateKey {
         if data.count == 32 {
-            if let ed25519Key = try? Curve25519.Signing.PrivateKey(rawRepresentation: data) {
+            do {
+                let ed25519Key = try Curve25519.Signing.PrivateKey(rawRepresentation: data)
                 return NIOSSHPrivateKey(ed25519Key: ed25519Key)
+            } catch {
+                logger.warning("Ed25519 key parse failed, trying P256: \(error.localizedDescription)")
             }
 
-            if let p256Key = try? P256.Signing.PrivateKey(rawRepresentation: data) {
+            do {
+                let p256Key = try P256.Signing.PrivateKey(rawRepresentation: data)
                 return NIOSSHPrivateKey(p256Key: p256Key)
+            } catch {
+                logger.warning("P256 key parse failed: \(error.localizedDescription)")
             }
         }
 

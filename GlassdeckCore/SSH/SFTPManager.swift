@@ -358,10 +358,9 @@ public struct LiveSFTPClientSessionProvider: SFTPClientSessionProviding {
     }
 }
 
-private final class LiveSFTPClientSession: SFTPClientSession, @unchecked Sendable {
+private actor LiveSFTPClientSession: SFTPClientSession {
     private let connection: SSHConnection
     private let client: SFTPClient
-    private let callbackQueue = DispatchQueue(label: "glassdeck.sftp.session")
 
     init(connection: SSHConnection, client: SFTPClient) {
         self.connection = connection

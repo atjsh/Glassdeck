@@ -1,6 +1,7 @@
 import Foundation
 import Crypto
 import Security
+import os
 
 /// Manages SSH host key fingerprint verification (TOFU — Trust On First Use).
 ///
@@ -8,6 +9,7 @@ import Security
 /// On first connection to a host, the fingerprint is saved. On subsequent
 /// connections, it's compared against the stored value to detect MITM attacks.
 public struct HostKeyVerifier: Sendable {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "HostKeyVerifier")
     private static let keychainService = "com.glassdeck.known-hosts"
 
     enum VerificationResult: Sendable {
@@ -72,23 +74,35 @@ public struct HostKeyVerifier: Sendable {
 
     private static func loadKnownHosts() -> [String: String] {
         // Try Keychain first
-        if let data = loadFromKeychain(),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            return decoded
+        if let data = loadFromKeychain() {
+            do {
+                let decoded = try JSONDecoder().decode([String: String].self, from: data)
+                return decoded
+            } catch {
+                logger.error("Failed to decode known hosts from Keychain: \(error.localizedDescription)")
+            }
         }
         // Migrate from legacy UserDefaults if present
-        if let legacyData = UserDefaults.standard.data(forKey: "glassdeck.known-hosts"),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: legacyData) {
-            saveKnownHosts(decoded)
-            UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
-            return decoded
+        if let legacyData = UserDefaults.standard.data(forKey: "glassdeck.known-hosts") {
+            do {
+                let decoded = try JSONDecoder().decode([String: String].self, from: legacyData)
+                saveKnownHosts(decoded)
+                UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
+                return decoded
+            } catch {
+                logger.error("Failed to decode legacy known hosts: \(error.localizedDescription)")
+            }
         }
         return [:]
     }
 
     private static func saveKnownHosts(_ hosts: [String: String]) {
-        guard let data = try? JSONEncoder().encode(hosts) else { return }
-        saveToKeychain(data)
+        do {
+            let data = try JSONEncoder().encode(hosts)
+            saveToKeychain(data)
+        } catch {
+            logger.error("Failed to encode known hosts: \(error.localizedDescription)")
+        }
     }
 
     private static func loadFromKeychain() -> Data? {

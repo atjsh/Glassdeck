@@ -1,9 +1,12 @@
 import Foundation
 import Observation
+import os
 
 /// App-wide settings and preferences.
 @Observable
 public final class AppSettings {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "AppSettings")
+
     public static let defaultTerminalConfigStorageKey = "glassdeck.terminal-config"
     public static let defaultIPhoneTerminalConfigStorageKey = "\(defaultTerminalConfigStorageKey).iphone"
     public static let defaultExternalMonitorTerminalConfigStorageKey = "\(defaultTerminalConfigStorageKey).external-monitor"
@@ -174,8 +177,12 @@ public final class AppSettings {
     }
 
     private func saveTerminalConfig(_ configuration: TerminalConfiguration, forKey key: String) {
-        guard let data = try? JSONEncoder().encode(configuration) else { return }
-        defaults.set(data, forKey: key)
+        do {
+            let data = try JSONEncoder().encode(configuration)
+            defaults.set(data, forKey: key)
+        } catch {
+            Self.logger.error("Failed to encode terminal config for key '\(key)': \(error.localizedDescription)")
+        }
     }
 
     private static func loadTerminalConfig(
@@ -183,7 +190,12 @@ public final class AppSettings {
         forKey key: String
     ) -> TerminalConfiguration? {
         guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(TerminalConfiguration.self, from: data)
+        do {
+            return try JSONDecoder().decode(TerminalConfiguration.self, from: data)
+        } catch {
+            logger.error("Failed to decode terminal config for key '\(key)': \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private static func defaultExternalMonitorTerminalConfiguration() -> TerminalConfiguration {

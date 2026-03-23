@@ -1,9 +1,12 @@
 import Foundation
 import Observation
+import os
 
 /// Manages connection profile persistence and state.
 @Observable
 public final class ConnectionStore {
+    private static let logger = Logger(subsystem: "com.glassdeck", category: "ConnectionStore")
+
     public private(set) var connections: [ConnectionProfile] = []
     private let defaults: UserDefaults
 
@@ -49,16 +52,21 @@ public final class ConnectionStore {
     // MARK: - Persistence (UserDefaults for now; SwiftData in Xcode 26 build)
 
     private func saveConnections() {
-        if let data = try? JSONEncoder().encode(connections) {
+        do {
+            let data = try JSONEncoder().encode(connections)
             defaults.set(data, forKey: storageKey)
+        } catch {
+            Self.logger.error("Failed to encode connections: \(error.localizedDescription)")
         }
     }
 
     private func loadConnections() {
-        guard let data = defaults.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([ConnectionProfile].self, from: data) else {
-            return
+        guard let data = defaults.data(forKey: storageKey) else { return }
+        do {
+            let decoded = try JSONDecoder().decode([ConnectionProfile].self, from: data)
+            connections = decoded
+        } catch {
+            Self.logger.error("Failed to decode connections: \(error.localizedDescription)")
         }
-        connections = decoded
     }
 }

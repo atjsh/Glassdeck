@@ -2,3 +2,7 @@
 	path = Vendor/ghostty-fork
 	url = https://github.com/atjsh/ghostty
 	branch = glassdeck-submodule
+[submodule "Vendor/swift-ssh-client"]
+	path = Vendor/swift-ssh-client
+	url = https://github.com/atjsh/swift-ssh-client.git
+	branch = glassdeck-submodule

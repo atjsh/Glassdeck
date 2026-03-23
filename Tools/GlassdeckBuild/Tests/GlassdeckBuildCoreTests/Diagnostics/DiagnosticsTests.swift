@@ -100,6 +100,39 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(details.contains("glassdeck-build deps ghostty"))
     }
 
+    func testRepoStateChecksDoesNotWarnForGitfileSubmoduleLayout() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gb-diagnostics-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Frameworks"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("GlassdeckApp.xcodeproj"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Vendor/ghostty-fork"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Vendor/swift-ssh-client"),
+            withIntermediateDirectories: true
+        )
+        try "gitdir: ../../.git/modules/Vendor/swift-ssh-client\n".write(
+            to: tempRoot.appendingPathComponent("Vendor/swift-ssh-client/.git"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let checks = RepoStateChecks(fileManager: FileManager.default)
+        let issues = checks.run(at: tempRoot)
+
+        XCTAssertFalse(issues.contains(where: { $0.check == "standalone-swift-ssh-client-checkout" }))
+    }
+
     func testDoctorReportRendersInPriorityOrder() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("gb-diagnostics-\(UUID().uuidString)")

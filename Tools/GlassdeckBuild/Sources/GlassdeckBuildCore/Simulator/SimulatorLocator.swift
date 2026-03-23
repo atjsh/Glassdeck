@@ -16,6 +16,19 @@ public enum SimulatorLocatorError: Error, Equatable {
     case invalidCommandOutput
 }
 
+extension SimulatorLocatorError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case let .noSimulatorFound(simulator):
+            return "No simulator found for identifier or name: \(simulator)"
+        case let .ambiguousSimulatorName(simulator, identifiers):
+            return "Multiple simulators found for name \(simulator). Specify a UDID. Matches: \(identifiers.joined(separator: ", "))"
+        case .invalidCommandOutput:
+            return "Unable to parse simulator list from simctl output."
+        }
+    }
+}
+
 public struct SimulatorLocator {
     public let processRunner: ProcessRunner
     public let simctlExecutable: String

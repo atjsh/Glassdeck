@@ -27,7 +27,7 @@ final class TestCommandTests: XCTestCase {
             ]
         )
 
-        let request = try command.executionRequest()
+        let request = try command.executionRequest(simulatorIdentifier: "SIM-1234")
 
         XCTAssertEqual(request.action, .test)
         XCTAssertEqual(request.scheme, .unit)
@@ -66,10 +66,11 @@ final class TestCommandTests: XCTestCase {
             processRunner: ScriptedProcessRunner(responses: [])
         )
 
-        let invocation = try command.previewInvocation(using: context)
+        let invocation = try command.previewInvocation(using: context, simulatorIdentifier: "SIM-1234")
         let renderedArguments = invocation.arguments.joined(separator: " ")
 
         XCTAssertTrue(invocation.arguments.contains("test-without-building"))
+        XCTAssertTrue(invocation.arguments.contains("platform=iOS Simulator,id=SIM-1234"))
         XCTAssertTrue(invocation.arguments.contains("GlassdeckAppUI"))
         XCTAssertTrue(renderedArguments.contains("/tmp/ws/Glassdeck/.build/glassdeck-build/results/test/"))
         XCTAssertEqual(invocation.outputMode, .captureAndStreamTimestampedFiltered(.xcodebuild))

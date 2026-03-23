@@ -1,6 +1,11 @@
 import Foundation
 
-public struct GhosttyMaterializer {
+public protocol GhosttyMaterializing {
+    func materializeFramework(from source: URL, to destination: URL) throws
+    func cacheFramework(from source: URL, to destination: URL) throws
+}
+
+public struct GhosttyMaterializer: GhosttyMaterializing {
     public let fileManager: FileManager
 
     public init(fileManager: FileManager = .default) {

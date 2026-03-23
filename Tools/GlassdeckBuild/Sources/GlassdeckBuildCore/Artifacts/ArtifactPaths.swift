@@ -23,6 +23,7 @@ public struct CommandArtifactPaths: Sendable {
     public let resultBundle: URL
     public let resultLog: URL
     public let artifactRoot: URL
+    public let layout: ArtifactLayout
     public let summary: URL
 }
 
@@ -32,6 +33,18 @@ public struct ArtifactPaths {
         case unableToCreateAlias(URL, String)
     }
 
+    public static let logFileName = ArtifactLayout.logFileName
+    public static let resultBundleFileName = ArtifactLayout.resultBundleFileName
+    public static let summaryJSONFileName = ArtifactLayout.summaryJSONFileName
+    public static let summaryFileName = ArtifactLayout.summaryFileName
+    public static let indexFileName = ArtifactLayout.indexFileName
+    public static let diagnosticsDirectoryName = ArtifactLayout.diagnosticsDirectoryName
+    public static let attachmentsDirectoryName = ArtifactLayout.attachmentsDirectoryName
+    public static let appStdoutStderrFileName = ArtifactLayout.appStdoutStderrFileName
+    public static let recordingFileName = ArtifactLayout.recordingFileName
+    public static let screenFileName = ArtifactLayout.screenFileName
+    public static let terminalFileName = ArtifactLayout.terminalFileName
+    public static let uiTreeFileName = ArtifactLayout.uiTreeFileName
     public static let defaultRoot = ".build/glassdeck-build"
 
     public let repoRoot: URL
@@ -100,6 +113,7 @@ public struct ArtifactPaths {
         let runRoot = artifactsRoot
             .appendingPathComponent(commandName)
             .appendingPathComponent(run.identifier)
+        let layout = ArtifactLayout(artifactRoot: runRoot)
 
         let resultRoot = resultsRoot.appendingPathComponent(commandName)
         let logRoot = logsRoot.appendingPathComponent(commandName)
@@ -111,7 +125,8 @@ public struct ArtifactPaths {
             resultBundle: resultRoot.appendingPathComponent("\(run.identifier).xcresult"),
             resultLog: logRoot.appendingPathComponent("\(run.identifier).log"),
             artifactRoot: runRoot,
-            summary: runRoot.appendingPathComponent("summary.txt")
+            layout: layout,
+            summary: layout.summary
         )
     }
 

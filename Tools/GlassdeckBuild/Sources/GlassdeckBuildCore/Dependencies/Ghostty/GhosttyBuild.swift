@@ -1,5 +1,15 @@
 import Foundation
 
+public struct GhosttyMaterializationState: Codable, Equatable, Sendable {
+    public let commit: String
+    public let profile: GhosttyBuildProfile
+
+    public init(commit: String, profile: GhosttyBuildProfile) {
+        self.commit = commit
+        self.profile = profile
+    }
+}
+
 public enum GhosttyBuildError: Error, LocalizedError {
     case buildFailed(ProcessResult)
 
@@ -23,16 +33,25 @@ public enum GhosttyBuildError: Error, LocalizedError {
 public final class GhosttyBuild {
     public let submodule: GhosttySubmodule
     public let cache: GhosttyArtifactCache
-    public let materializer: GhosttyMaterializer
+    public let materializer: any GhosttyMaterializing
     public let processRunner: ProcessRunner
     public let frameworkDestination: URL
     public let zigExecutable: String
     public let fileManager: FileManager
 
+    public var materializationStatePath: URL {
+        frameworkDestination
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(frameworkDestination.lastPathComponent).state.json")
+    }
+
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
     public init(
         submodule: GhosttySubmodule,
         cache: GhosttyArtifactCache,
-        materializer: GhosttyMaterializer = GhosttyMaterializer(),
+        materializer: any GhosttyMaterializing = GhosttyMaterializer(),
         processRunner: ProcessRunner = DefaultProcessRunner(),
         frameworkDestination: URL,
         zigExecutable: String = "/usr/bin/env",
@@ -66,10 +85,16 @@ public final class GhosttyBuild {
     public func prepare(profile: GhosttyBuildProfile = .debug) async throws -> URL {
         try submodule.validateExists()
         let commit = try await submodule.currentRevision()
+        let desiredState = GhosttyMaterializationState(commit: commit, profile: profile)
         let cachedFramework = cache.xcframeworkPath(commit: commit, profile: profile)
 
         if fileManager.fileExists(atPath: cachedFramework.path) {
+            if fileManager.fileExists(atPath: frameworkDestination.path),
+               readMaterializationState() == desiredState {
+                return frameworkDestination
+            }
             try materializer.materializeFramework(from: cachedFramework, to: frameworkDestination)
+            try writeMaterializationState(desiredState)
             return frameworkDestination
         }
 
@@ -83,6 +108,30 @@ public final class GhosttyBuild {
             .appendingPathComponent("GhosttyKit.xcframework")
         try materializer.cacheFramework(from: builtFramework, to: cachedFramework)
         try materializer.materializeFramework(from: cachedFramework, to: frameworkDestination)
+        try writeMaterializationState(desiredState)
         return frameworkDestination
+    }
+
+    private func readMaterializationState() -> GhosttyMaterializationState? {
+        guard fileManager.fileExists(atPath: materializationStatePath.path),
+              let data = try? Data(contentsOf: materializationStatePath),
+              let state = try? decoder.decode(GhosttyMaterializationState.self, from: data)
+        else {
+            return nil
+        }
+        return state
+    }
+
+    private func writeMaterializationState(_ state: GhosttyMaterializationState) throws {
+        let parent = materializationStatePath.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: parent.path) {
+            try fileManager.createDirectory(
+                at: parent,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+        }
+        let payload = try encoder.encode(state)
+        try payload.write(to: materializationStatePath, options: .atomic)
     }
 }

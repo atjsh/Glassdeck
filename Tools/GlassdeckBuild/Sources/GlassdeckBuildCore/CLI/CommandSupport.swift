@@ -5,6 +5,28 @@ enum CommandSupport {
         WorkerScope(id: id)
     }
 
+    static func executionContext(
+        workspace: WorkspaceContext = .current(),
+        simulatorName: String,
+        workerID: Int,
+        processRunner: ProcessRunner = DefaultProcessRunner()
+    ) -> CommandExecutionContext {
+        let workerScope = workerScope(id: workerID)
+        let artifactPaths = artifactPaths(workspace: workspace, worker: workerScope)
+        return CommandExecutionContext(
+            workspace: workspace,
+            workerScope: workerScope,
+            projectContext: projectContext(workspace: workspace, simulatorName: simulatorName),
+            artifactPaths: artifactPaths,
+            processRunner: processRunner,
+            ghosttyBuilder: ghosttyBuilder(
+                workspace: workspace,
+                worker: workerScope,
+                processRunner: processRunner
+            )
+        )
+    }
+
     static func artifactPaths(
         workspace: WorkspaceContext,
         worker: WorkerScope

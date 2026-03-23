@@ -69,6 +69,37 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(issues.contains(where: { $0.check == "standalone-swift-ssh-client-checkout" }))
     }
 
+    func testRepoStateChecksTreatMissingGhosttyFrameworkAsLocalReadinessGuidance() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gb-diagnostics-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Frameworks"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("GlassdeckApp.xcodeproj"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Vendor/ghostty-fork"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: tempRoot.appendingPathComponent("Vendor/swift-ssh-client"),
+            withIntermediateDirectories: true
+        )
+
+        let checks = RepoStateChecks(fileManager: FileManager.default)
+        let issues = checks.run(at: tempRoot)
+        let issue = try XCTUnwrap(issues.first(where: { $0.check == "ghostty-framework" }))
+        let details = try XCTUnwrap(issue.details)
+
+        XCTAssertTrue(issue.message.contains("GhosttyKit.xcframework"))
+        XCTAssertTrue(details.contains("glassdeck-build deps ghostty"))
+    }
+
     func testDoctorReportRendersInPriorityOrder() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("gb-diagnostics-\(UUID().uuidString)")

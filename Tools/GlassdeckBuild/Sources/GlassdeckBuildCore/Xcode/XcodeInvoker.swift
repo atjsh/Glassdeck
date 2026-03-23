@@ -32,7 +32,7 @@ public struct XcodeRunResult: Sendable {
     public let paths: CommandArtifactPaths
     public let summaryPath: URL
     public let indexPath: URL
-    public let exportedXCResultSummary: URL?
+    public let xcresultExport: XCResultExportResult?
 }
 
 public enum XcodeInvokerError: Error, LocalizedError {
@@ -128,22 +128,22 @@ public final class XcodeInvoker {
 
         try writeLog(processResult, to: paths.resultLog)
 
-        let artifactLog = paths.artifactRoot.appendingPathComponent("log.txt")
-        try makeSymlink(from: artifactLog, to: paths.resultLog)
+        try makeSymlink(from: paths.layout.log, to: paths.resultLog)
 
-        var exportedXCResultSummary: URL?
+        var xcresultExport: XCResultExportResult?
         var summaryAnomalies: [String] = []
 
         if fileManager.fileExists(atPath: paths.resultBundle.path) {
-            let artifactBundle = paths.artifactRoot.appendingPathComponent("result.xcresult")
-            try makeSymlink(from: artifactBundle, to: paths.resultBundle)
+            try makeSymlink(from: paths.layout.resultBundle, to: paths.resultBundle)
 
             do {
                 let resolvedBundle = try resultBundleLocator.resolve(preferredPath: paths.resultBundle)
-                exportedXCResultSummary = try await xcresultExporter.export(
+                let exportResult = try await xcresultExporter.export(
                     resultBundle: resolvedBundle,
                     outputDirectory: paths.artifactRoot
                 )
+                xcresultExport = exportResult
+                summaryAnomalies.append(contentsOf: exportResult.anomalies)
             } catch {
                 summaryAnomalies.append("xcresult-export-failed: \(error)")
             }
@@ -167,17 +167,25 @@ public final class XcodeInvoker {
             startedAt: nowProvider(),
             clock: nowProvider
         )
-        indexBuilder.record(phase: "01-command", kind: "log", relativePath: "log.txt")
+        indexBuilder.record(
+            phase: "01-command",
+            kind: "log",
+            relativePath: paths.layout.relativePath(for: paths.layout.log)
+        )
         if fileManager.fileExists(atPath: paths.resultBundle.path) {
-            indexBuilder.record(phase: "02-result-bundle", kind: "xcresult", relativePath: "result.xcresult")
+            indexBuilder.record(
+                phase: "02-result-bundle",
+                kind: "xcresult",
+                relativePath: paths.layout.relativePath(for: paths.layout.resultBundle)
+            )
         }
-        if exportedXCResultSummary != nil {
-            indexBuilder.record(phase: "03-export", kind: "json", relativePath: "summary.json")
+        if let xcresultExport {
+            indexBuilder.merge(xcresultExport.entries)
         }
         indexBuilder.record(
             phase: "99-summary",
             kind: "text",
-            relativePath: summaryPath.lastPathComponent,
+            relativePath: paths.layout.relativePath(for: summaryPath),
             anomaly: summaryAnomalies.isEmpty ? nil : summaryAnomalies.joined(separator: ", ")
         )
         let indexPath = try manifestWriter.write(
@@ -198,7 +206,7 @@ public final class XcodeInvoker {
             paths: paths,
             summaryPath: summaryPath,
             indexPath: indexPath,
-            exportedXCResultSummary: exportedXCResultSummary
+            xcresultExport: xcresultExport
         )
     }
 

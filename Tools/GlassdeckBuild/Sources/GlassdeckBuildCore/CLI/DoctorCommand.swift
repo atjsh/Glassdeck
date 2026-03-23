@@ -15,12 +15,16 @@ public struct DoctorCommand: AsyncParsableCommand {
 
     public init() {}
 
+    func dryRunPreview(workspace: WorkspaceContext = .current()) -> String {
+        "doctor \(workspace.projectRoot.path)"
+    }
+
     public mutating func run() async throws {
         let workspace = WorkspaceContext.current()
         let report = DoctorChecks().run(repoRoot: workspace.projectRoot)
 
         if dryRun {
-            print("doctor \(workspace.projectRoot.path)")
+            print(dryRunPreview(workspace: workspace))
             return
         }
 

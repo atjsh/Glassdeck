@@ -1,6 +1,6 @@
 import Foundation
 
-public enum GhosttyBuildProfile: String, Sendable {
+public enum GhosttyBuildProfile: String, Sendable, Codable {
     case debug
     case releaseFast = "release-fast"
 

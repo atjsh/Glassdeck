@@ -38,7 +38,17 @@ public struct ArtifactsCommand: AsyncParsableCommand {
         }
 
         print(target.path)
-        let summary = target.appendingPathComponent("summary.txt")
+        let layout = ArtifactLayout(artifactRoot: target)
+        let existingPaths = layout.stableInspectionPaths.filter {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+        if !existingPaths.isEmpty {
+            for path in existingPaths {
+                print(path.path)
+            }
+        }
+
+        let summary = layout.summary
         if let content = try? String(contentsOf: summary, encoding: .utf8) {
             print(content)
         }

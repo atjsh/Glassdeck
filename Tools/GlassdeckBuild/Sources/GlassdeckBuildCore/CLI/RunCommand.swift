@@ -21,72 +21,93 @@ public struct RunCommand: AsyncParsableCommand {
 
     public init() {}
 
-    public mutating func run() async throws {
-        let workspace = WorkspaceContext.current()
-        let workerScope = CommandSupport.workerScope(id: worker)
-        let processRunner = DefaultProcessRunner()
-        let locator = SimulatorLocator(processRunner: processRunner)
-        let simulatorIdentifier = try await locator.resolve(simulator)
-        let boot = SimulatorBoot(processRunner: processRunner)
-        let projectContext = CommandSupport.projectContext(workspace: workspace, simulatorName: simulator)
-        let artifactPaths = CommandSupport.artifactPaths(workspace: workspace, worker: workerScope)
-        let invoker = XcodeInvoker(
-            projectContext: projectContext,
-            processRunner: processRunner,
-            artifactPaths: artifactPaths
-        )
-
-        let request = XcodeCommandRequest(
+    func buildRequest(simulatorIdentifier: String) -> XcodeCommandRequest {
+        XcodeCommandRequest(
             action: .build,
             scheme: SchemeSelector(rawValue: scheme),
             simulatorIdentifier: simulatorIdentifier
         )
+    }
 
-        let previewRun = artifactPaths.makeRun(command: "build", runId: request.scheme.artifactRunID)
+    func previewInvocations(
+        using context: CommandExecutionContext,
+        simulatorIdentifier: String
+    ) -> [ProcessInvocation] {
+        let request = buildRequest(simulatorIdentifier: simulatorIdentifier)
+        let invoker = XcodeInvoker(
+            projectContext: context.projectContext,
+            processRunner: context.processRunner,
+            artifactPaths: context.artifactPaths
+        )
+        let previewRun = context.artifactPaths.makeRun(
+            command: request.action.artifactCommand,
+            runId: request.scheme.artifactRunID
+        )
         let previewBuildInvocation = invoker.makeInvocation(
             for: request,
-            resultBundlePath: artifactPaths.paths(for: previewRun).resultBundle
+            resultBundlePath: context.artifactPaths.paths(for: previewRun).resultBundle
         )
-        let previewAppPath = projectContext.builtAppPath(derivedDataPath: artifactPaths.derivedDataRoot)
+        let previewAppPath = context.projectContext.builtAppPath(
+            derivedDataPath: context.artifactPaths.derivedDataRoot
+        )
         let installInvocation = ProcessInvocation(
             executable: "/usr/bin/xcrun",
             arguments: ["simctl", "install", simulatorIdentifier, previewAppPath.path],
-            workingDirectory: workspace.projectRoot
+            workingDirectory: context.workspace.projectRoot
         )
         let launchInvocation = ProcessInvocation(
             executable: "/usr/bin/xcrun",
-            arguments: ["simctl", "launch", simulatorIdentifier, projectContext.appBundleIdentifier],
-            workingDirectory: workspace.projectRoot
+            arguments: ["simctl", "launch", simulatorIdentifier, context.projectContext.appBundleIdentifier],
+            workingDirectory: context.workspace.projectRoot
+        )
+        return [previewBuildInvocation, installInvocation, launchInvocation]
+    }
+
+    public mutating func run() async throws {
+        let processRunner = DefaultProcessRunner()
+        let context = CommandSupport.executionContext(
+            simulatorName: simulator,
+            workerID: worker,
+            processRunner: processRunner
+        )
+        let locator = SimulatorLocator(processRunner: processRunner)
+        let simulatorIdentifier = try await locator.resolve(simulator)
+        let boot = SimulatorBoot(processRunner: processRunner)
+        let invoker = XcodeInvoker(
+            projectContext: context.projectContext,
+            processRunner: processRunner,
+            artifactPaths: context.artifactPaths
+        )
+        let request = buildRequest(simulatorIdentifier: simulatorIdentifier)
+        let previewChain = previewInvocations(
+            using: context,
+            simulatorIdentifier: simulatorIdentifier
         )
 
         if dryRun {
-            print(CommandLineRendering.render(previewBuildInvocation))
-            print(CommandLineRendering.render(installInvocation))
-            print(CommandLineRendering.render(launchInvocation))
+            for invocation in previewChain {
+                print(CommandLineRendering.render(invocation))
+            }
             return
         }
 
-        _ = try await CommandSupport.ghosttyBuilder(
-            workspace: workspace,
-            worker: workerScope,
-            processRunner: processRunner
-        ).prepare()
+        _ = try await context.ghosttyBuilder.prepare()
         try await boot.boot(simulatorIdentifier: simulatorIdentifier)
         _ = try await invoker.execute(request)
         _ = try await processRunner.run(
             ProcessInvocation(
                 executable: "/usr/bin/xcrun",
-                arguments: ["simctl", "install", simulatorIdentifier, projectContext.builtAppPath(derivedDataPath: artifactPaths.derivedDataRoot).path],
-                workingDirectory: workspace.projectRoot
+                arguments: ["simctl", "install", simulatorIdentifier, context.projectContext.builtAppPath(derivedDataPath: context.artifactPaths.derivedDataRoot).path],
+                workingDirectory: context.workspace.projectRoot
             )
         )
         _ = try await processRunner.run(
             ProcessInvocation(
                 executable: "/usr/bin/xcrun",
-                arguments: ["simctl", "launch", simulatorIdentifier, projectContext.appBundleIdentifier],
-                workingDirectory: workspace.projectRoot
+                arguments: ["simctl", "launch", simulatorIdentifier, context.projectContext.appBundleIdentifier],
+                workingDirectory: context.workspace.projectRoot
             )
         )
-        print(projectContext.appBundleIdentifier)
+        print(context.projectContext.appBundleIdentifier)
     }
 }

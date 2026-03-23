@@ -6,7 +6,7 @@ public struct ArtifactManifestWriter {
         case writeFailed(URL, String)
     }
 
-    public static let indexFileName = "index.json"
+    public static let indexFileName = ArtifactLayout.indexFileName
 
     public let encoder: JSONEncoder
     public let decoder: JSONDecoder
@@ -43,7 +43,7 @@ public struct ArtifactManifestWriter {
     public func writeSummary(
         _ lines: [String],
         to directory: URL,
-        fileName: String = "summary.txt"
+        fileName: String = ArtifactLayout.summaryFileName
     ) throws -> URL {
         try createParentDirectoryIfNeeded(directory)
         let destination = directory.appendingPathComponent(fileName)

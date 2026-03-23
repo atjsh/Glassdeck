@@ -50,7 +50,7 @@ public struct RepoStateChecks {
         if let issue = ensureDirectoryExists(frameworkRoot, area: "Repository", check: "framework-root") {
             issues.append(issue)
         }
-        if let issue = ensureDirectoryExists(ghosttyKit, area: "Repository", check: "ghostty-framework") {
+        if let issue = validateGhosttyFrameworkReadiness(ghosttyKit) {
             issues.append(issue)
         }
 
@@ -159,6 +159,19 @@ public struct RepoStateChecks {
             severity: .warning,
             message: "\(dependencyName) is still a standalone nested git checkout.",
             details: "Convert this dependency to a pinned submodule or remove its embedded .git directory."
+        )
+    }
+
+    private func validateGhosttyFrameworkReadiness(_ url: URL) -> DiagnosticIssue? {
+        guard !existsDirectory(url) else {
+            return nil
+        }
+        return DiagnosticIssue(
+            area: "Repository",
+            check: "ghostty-framework",
+            severity: .warning,
+            message: "Local GhosttyKit.xcframework is not materialized yet: \(url.path)",
+            details: "Run `swift run --package-path Tools/GlassdeckBuild glassdeck-build deps ghostty` to prepare the local framework before build/test commands that need it."
         )
     }
 

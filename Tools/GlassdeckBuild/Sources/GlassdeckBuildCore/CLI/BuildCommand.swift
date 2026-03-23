@@ -24,38 +24,48 @@ public struct BuildCommand: AsyncParsableCommand {
 
     public init() {}
 
-    public mutating func run() async throws {
-        let workspace = WorkspaceContext.current()
-        let workerScope = CommandSupport.workerScope(id: worker)
-        let projectContext = CommandSupport.projectContext(workspace: workspace, simulatorName: simulator)
-        let artifactPaths = CommandSupport.artifactPaths(workspace: workspace, worker: workerScope)
-        let invoker = XcodeInvoker(
-            projectContext: projectContext,
-            artifactPaths: artifactPaths
-        )
-        let request = XcodeCommandRequest(
+    func executionRequest() -> XcodeCommandRequest {
+        XcodeCommandRequest(
             action: buildForTesting ? .buildForTesting : .build,
             scheme: SchemeSelector(rawValue: scheme)
         )
+    }
 
-        let previewRun = artifactPaths.makeRun(
+    func previewInvocation(using context: CommandExecutionContext) -> ProcessInvocation {
+        let request = executionRequest()
+        let previewRun = context.artifactPaths.makeRun(
             command: request.action.artifactCommand,
             runId: request.scheme.artifactRunID
         )
-        let previewInvocation = invoker.makeInvocation(
+        return XcodeInvoker(
+            projectContext: context.projectContext,
+            processRunner: context.processRunner,
+            artifactPaths: context.artifactPaths
+        ).makeInvocation(
             for: request,
-            resultBundlePath: artifactPaths.paths(for: previewRun).resultBundle
+            resultBundlePath: context.artifactPaths.paths(for: previewRun).resultBundle
         )
+    }
+
+    public mutating func run() async throws {
+        let context = CommandSupport.executionContext(
+            simulatorName: simulator,
+            workerID: worker
+        )
+        let invoker = XcodeInvoker(
+            projectContext: context.projectContext,
+            processRunner: context.processRunner,
+            artifactPaths: context.artifactPaths
+        )
+        let request = executionRequest()
+        let previewInvocation = previewInvocation(using: context)
 
         if dryRun {
             print(CommandLineRendering.render(previewInvocation))
             return
         }
 
-        _ = try await CommandSupport.ghosttyBuilder(
-            workspace: workspace,
-            worker: workerScope
-        ).prepare()
+        _ = try await context.ghosttyBuilder.prepare()
         let result = try await invoker.execute(request)
         print(result.summaryPath.path)
     }

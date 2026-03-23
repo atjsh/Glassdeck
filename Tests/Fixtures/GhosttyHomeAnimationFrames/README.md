@@ -1,6 +1,4 @@
-These frames were copied from:
-
-`/Users/jeonseonghun/git-atjsh/ghostty-org/website/terminals/home/animation_frames`
+These frames were copied from the Ghostty website repository (`website/terminals/home/animation_frames`).
 
 Upstream source: Ghostty website terminal home animation assets.
 

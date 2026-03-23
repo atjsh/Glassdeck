@@ -43,6 +43,36 @@ final class SimulatorLocatorTests: XCTestCase {
         XCTAssertEqual(fuzzy, "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")
     }
 
+    func testResolveRejectsAmbiguousExactNameMatch() async {
+        let fixtureOutput = """
+            == Devices ==
+              iPhone 17 Pro (AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA) (Shutdown)
+              iPhone 17 Pro (BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB) (Shutdown)
+        """
+        let runner = ScriptedProcessRunner(
+            responses: [
+                ScriptedResponse(result: ProcessResult(exitCode: 0, standardOutput: fixtureOutput))
+            ]
+        )
+
+        let locator = SimulatorLocator(processRunner: runner)
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await locator.resolve("iPhone 17 Pro")
+        } errorHandler: { error in
+            XCTAssertEqual(
+                error as? SimulatorLocatorError,
+                .ambiguousSimulatorName(
+                    "iPhone 17 Pro",
+                    [
+                        "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+                        "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB",
+                    ]
+                )
+            )
+        }
+    }
+
     func testResolveUnknownSimulatorFails() async {
         let runner = ScriptedProcessRunner(
             responses: [
@@ -61,12 +91,14 @@ extension XCTestCase {
         _ expression: @escaping () async throws -> Void,
         _ message: @autoclosure () -> String = "",
         file: StaticString = #filePath,
-        line: UInt = #line
+        line: UInt = #line,
+        errorHandler: ((Error) -> Void)? = nil
     ) async {
         do {
             try await expression()
             XCTFail(message())
         } catch {
+            errorHandler?(error)
         }
     }
 }

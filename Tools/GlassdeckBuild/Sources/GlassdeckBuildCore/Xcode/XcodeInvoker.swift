@@ -57,6 +57,8 @@ public final class XcodeInvoker {
     public let fileManager: FileManager
     public let nowProvider: @Sendable () -> Date
     public let xcodebuildExecutable: String
+    public let outputMode: ProcessOutputMode
+    public let retainedOutputByteLimit: Int?
 
     public init(
         projectContext: XcodeProjectContext,
@@ -68,7 +70,9 @@ public final class XcodeInvoker {
         resultBundleLocator: ResultBundleLocator = ResultBundleLocator(),
         fileManager: FileManager = .default,
         nowProvider: @escaping @Sendable () -> Date = Date.init,
-        xcodebuildExecutable: String = "/usr/bin/xcodebuild"
+        xcodebuildExecutable: String = "/usr/bin/xcodebuild",
+        outputMode: ProcessOutputMode = .captureAndStreamTimestampedFiltered(.xcodebuild),
+        retainedOutputByteLimit: Int? = 64 * 1024
     ) {
         self.projectContext = projectContext
         self.processRunner = processRunner
@@ -80,11 +84,16 @@ public final class XcodeInvoker {
         self.fileManager = fileManager
         self.nowProvider = nowProvider
         self.xcodebuildExecutable = xcodebuildExecutable
+        self.outputMode = outputMode
+        self.retainedOutputByteLimit = retainedOutputByteLimit
     }
 
     public func makeInvocation(
         for request: XcodeCommandRequest,
-        resultBundlePath: URL
+        resultBundlePath: URL,
+        capturedStandardOutputPath: URL? = nil,
+        capturedStandardErrorPath: URL? = nil,
+        retainedOutputByteLimit: Int? = nil
     ) -> ProcessInvocation {
         let configuration = request.configuration ?? projectContext.defaultConfiguration
         var arguments: [String] = [
@@ -103,7 +112,11 @@ public final class XcodeInvoker {
         return ProcessInvocation(
             executable: xcodebuildExecutable,
             arguments: arguments,
-            workingDirectory: projectContext.workspace.projectRoot
+            workingDirectory: projectContext.workspace.projectRoot,
+            capturedStandardOutputPath: capturedStandardOutputPath,
+            capturedStandardErrorPath: capturedStandardErrorPath,
+            retainedOutputByteLimit: retainedOutputByteLimit,
+            outputMode: outputMode
         )
     }
 
@@ -122,11 +135,28 @@ public final class XcodeInvoker {
         try ensureParentDirectory(for: paths.resultLog)
         try ensureDirectory(paths.artifactRoot)
 
-        let invocation = makeInvocation(for: request, resultBundlePath: paths.resultBundle)
+        let capturedStandardOutputPath = paths.artifactRoot.appendingPathComponent(".xcodebuild-stdout.log")
+        let capturedStandardErrorPath = paths.artifactRoot.appendingPathComponent(".xcodebuild-stderr.log")
+        let invocation = makeInvocation(
+            for: request,
+            resultBundlePath: paths.resultBundle,
+            capturedStandardOutputPath: capturedStandardOutputPath,
+            capturedStandardErrorPath: capturedStandardErrorPath,
+            retainedOutputByteLimit: retainedOutputByteLimit
+        )
+        defer {
+            try? removeItemIfExists(at: capturedStandardOutputPath)
+            try? removeItemIfExists(at: capturedStandardErrorPath)
+        }
         let outcome = await runProcessCapturingFailure(invocation)
         let processResult = outcome.result
 
-        try writeLog(processResult, to: paths.resultLog)
+        try writeLog(
+            standardOutputPath: capturedStandardOutputPath,
+            standardErrorPath: capturedStandardErrorPath,
+            fallbackResult: processResult,
+            to: paths.resultLog
+        )
 
         try makeSymlink(from: paths.layout.log, to: paths.resultLog)
 
@@ -228,14 +258,56 @@ public final class XcodeInvoker {
         }
     }
 
-    private func writeLog(_ result: ProcessResult, to destination: URL) throws {
-        let rendered = [
-            "[stdout]",
-            result.standardOutput,
-            "[stderr]",
-            result.standardError,
-        ].joined(separator: "\n")
-        try rendered.write(to: destination, atomically: true, encoding: .utf8)
+    private func writeLog(
+        standardOutputPath: URL,
+        standardErrorPath: URL,
+        fallbackResult: ProcessResult,
+        to destination: URL
+    ) throws {
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        guard fileManager.createFile(atPath: destination.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        let destinationHandle = try FileHandle(forWritingTo: destination)
+        defer { destinationHandle.closeFile() }
+
+        destinationHandle.write(Data("[stdout]\n".utf8))
+        try appendLogContents(
+            from: standardOutputPath,
+            fallback: fallbackResult.standardOutput,
+            to: destinationHandle
+        )
+        destinationHandle.write(Data("\n[stderr]\n".utf8))
+        try appendLogContents(
+            from: standardErrorPath,
+            fallback: fallbackResult.standardError,
+            to: destinationHandle
+        )
+    }
+
+    private func appendLogContents(
+        from source: URL,
+        fallback: String,
+        to destinationHandle: FileHandle
+    ) throws {
+        guard fileManager.fileExists(atPath: source.path) else {
+            destinationHandle.write(Data(fallback.utf8))
+            return
+        }
+
+        let sourceHandle = try FileHandle(forReadingFrom: source)
+        defer { sourceHandle.closeFile() }
+
+        while true {
+            let chunk = sourceHandle.readData(ofLength: 64 * 1024)
+            if chunk.isEmpty {
+                return
+            }
+            destinationHandle.write(chunk)
+        }
     }
 
     private func buildSummaryLines(
@@ -287,5 +359,11 @@ public final class XcodeInvoker {
             try fileManager.removeItem(at: destination)
         }
         try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
+    }
+
+    private func removeItemIfExists(at path: URL) throws {
+        if fileManager.fileExists(atPath: path.path) {
+            try fileManager.removeItem(at: path)
+        }
     }
 }

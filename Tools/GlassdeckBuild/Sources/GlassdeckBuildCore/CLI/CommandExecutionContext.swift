@@ -23,4 +23,13 @@ public struct CommandExecutionContext {
         self.processRunner = processRunner
         self.ghosttyBuilder = ghosttyBuilder
     }
+
+    public func xcodeCommandExecutor(
+        outputMode: ProcessOutputMode = .captureAndStreamTimestampedFiltered(.xcodebuild)
+    ) -> XcodeCommandExecutor {
+        XcodeCommandExecutor(
+            context: self,
+            outputMode: outputMode
+        )
+    }
 }

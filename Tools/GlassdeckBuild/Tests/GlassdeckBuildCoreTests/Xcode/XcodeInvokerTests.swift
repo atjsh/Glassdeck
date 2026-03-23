@@ -89,6 +89,7 @@ final class XcodeInvokerTests: XCTestCase {
         XCTAssertTrue(invocation.arguments.contains("platform=iOS Simulator,id=SIM-1234"))
         XCTAssertTrue(invocation.arguments.contains("/tmp/out.xcresult"))
         XCTAssertTrue(invocation.arguments.contains("SIMCTL_CHILD_FOO=BAR"))
+        XCTAssertEqual(invocation.outputMode, .captureAndStreamTimestampedFiltered(.xcodebuild))
     }
 
     func testExecuteWritesMergedIndexEntriesAndUpdatesLatestAlias() async throws {

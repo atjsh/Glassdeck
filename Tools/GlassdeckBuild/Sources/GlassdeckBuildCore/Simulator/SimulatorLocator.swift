@@ -10,8 +10,9 @@ public struct SimctlDevice: Sendable, Equatable {
     }
 }
 
-public enum SimulatorLocatorError: Error {
+public enum SimulatorLocatorError: Error, Equatable {
     case noSimulatorFound(String)
+    case ambiguousSimulatorName(String, [String])
     case invalidCommandOutput
 }
 
@@ -51,8 +52,14 @@ public struct SimulatorLocator {
             return identifierOrName
         }
 
-        if let exact = devices.first(where: { $0.name == identifierOrName }) {
-            return exact.identifier
+        let exactMatches = devices
+            .filter { $0.name == identifierOrName }
+            .map(\.identifier)
+        if exactMatches.count == 1, let match = exactMatches.first {
+            return match
+        }
+        if exactMatches.count > 1 {
+            throw SimulatorLocatorError.ambiguousSimulatorName(identifierOrName, exactMatches)
         }
 
         let lowered = identifierOrName.lowercased()

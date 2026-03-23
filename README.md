@@ -195,13 +195,13 @@ swift run --package-path Tools/GlassdeckBuild glassdeck-build artifacts --comman
 | ----------------------- | ---------------------------------------------------- |
 | `--worker <id>`         | Isolate workspace artifacts for parallel workers       |
 | `--scheme <name>`       | Select build/run/test scheme (`app`, `unit`, `ui`)    |
-| `--simulator <name>`    | Simulator name (e.g. `iPhone 17`) for run/test paths  |
+| `--simulator <target>`  | Simulator by name or exact UDID (`iPhone 17` or `48B...`) for run/test paths. Duplicate exact names now fail to avoid ambiguous device selection. |
 | `--dry-run`             | Print the computed xcodebuild/utility command only     |
 | `--only-testing <target>` | Forward xcodebuild test filtering flags              |
 
 ### Simulator target
 
-Default: `iPhone 17` on latest iOS runtime. Override with `SIMULATOR_ID=<udid>`.
+Default: `iPhone 17` on latest iOS runtime. Prefer explicit UDID with `SIMULATOR_ID=<udid>` or `--simulator <udid>` when scripts run in environments with duplicated names.
 
 ### Build artifacts
 

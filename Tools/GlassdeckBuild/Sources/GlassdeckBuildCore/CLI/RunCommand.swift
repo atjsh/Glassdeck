@@ -19,6 +19,9 @@ public struct RunCommand: AsyncParsableCommand {
     @Flag(help: "Print generated command only.")
     var dryRun: Bool = false
 
+    @Option(help: "xcodebuild output mode: filtered (default), full, or quiet.")
+    var xcodeOutputMode: XcodeOutputMode = .filtered
+
     public init() {}
 
     func buildRequest(simulatorIdentifier: String) -> XcodeCommandRequest {
@@ -34,19 +37,9 @@ public struct RunCommand: AsyncParsableCommand {
         simulatorIdentifier: String
     ) -> [ProcessInvocation] {
         let request = buildRequest(simulatorIdentifier: simulatorIdentifier)
-        let invoker = XcodeInvoker(
-            projectContext: context.projectContext,
-            processRunner: context.processRunner,
-            artifactPaths: context.artifactPaths
-        )
-        let previewRun = context.artifactPaths.makeRun(
-            command: request.action.artifactCommand,
-            runId: request.scheme.artifactRunID
-        )
-        let previewBuildInvocation = invoker.makeInvocation(
-            for: request,
-            resultBundlePath: context.artifactPaths.paths(for: previewRun).resultBundle
-        )
+        let previewBuildInvocation = context
+            .xcodeCommandExecutor(outputMode: xcodeOutputMode.processOutputMode)
+            .previewInvocation(for: request)
         let previewAppPath = context.projectContext.builtAppPath(
             derivedDataPath: context.artifactPaths.derivedDataRoot
         )
@@ -73,11 +66,7 @@ public struct RunCommand: AsyncParsableCommand {
         let locator = SimulatorLocator(processRunner: processRunner)
         let simulatorIdentifier = try await locator.resolve(simulator)
         let boot = SimulatorBoot(processRunner: processRunner)
-        let invoker = XcodeInvoker(
-            projectContext: context.projectContext,
-            processRunner: processRunner,
-            artifactPaths: context.artifactPaths
-        )
+        let executor = context.xcodeCommandExecutor(outputMode: xcodeOutputMode.processOutputMode)
         let request = buildRequest(simulatorIdentifier: simulatorIdentifier)
         let previewChain = previewInvocations(
             using: context,
@@ -93,7 +82,7 @@ public struct RunCommand: AsyncParsableCommand {
 
         _ = try await context.ghosttyBuilder.prepare()
         try await boot.boot(simulatorIdentifier: simulatorIdentifier)
-        _ = try await invoker.execute(request)
+        _ = try await executor.execute(request)
         _ = try await processRunner.run(
             ProcessInvocation(
                 executable: "/usr/bin/xcrun",

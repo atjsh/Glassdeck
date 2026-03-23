@@ -195,13 +195,13 @@ swift run --package-path Tools/GlassdeckBuild glassdeck-build artifacts --comman
 | ----------------------- | ---------------------------------------------------- |
 | `--worker <id>`         | 병렬 실행 시 아티팩트 디렉터리 분리                   |
 | `--scheme <name>`       | 빌드/실행/테스트 스킴 선택 (`app`, `unit`, `ui`)       |
-| `--simulator <name>`    | 실행/테스트 대상 시뮬레이터 지정 (`iPhone 17`)       |
+| `--simulator <target>`  | 실행/테스트 대상 시뮬레이터를 이름 또는 UDID로 지정 (`iPhone 17` 또는 `48B...`). 동일한 이름이 중복될 경우 선택이 중단됩니다. |
 | `--dry-run`             | 생성된 명령만 출력                                   |
 | `--only-testing <target>` | 특정 테스트 타겟만 xcodebuild 전달                  |
 
 ### 시뮬레이터 타겟
 
-기본값: 최신 iOS 런타임의 `iPhone 17`. `SIMULATOR_ID=<udid>`로 재정의 가능.
+기본값: 최신 iOS 런타임의 `iPhone 17`. 중복 이름 회피를 위해 `SIMULATOR_ID=<udid>` 또는 `--simulator <udid>` 사용을 권장합니다.
 
 ### 빌드 아티팩트
 

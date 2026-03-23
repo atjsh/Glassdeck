@@ -10,7 +10,7 @@ public struct BuildCommand: AsyncParsableCommand {
     @Option(help: "Scheme alias or name to build.")
     var scheme: String = "app"
 
-    @Option(help: "Simulator name used for xcodebuild destination.")
+    @Option(help: "Simulator name or identifier used for xcodebuild destination.")
     var simulator: String = "iPhone 17"
 
     @Option(name: .long, help: "Worker index for scoped layouts.")
@@ -22,29 +22,32 @@ public struct BuildCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Run xcodebuild build-for-testing instead of build.")
     var buildForTesting: Bool = false
 
+    @Option(help: "xcodebuild output mode: filtered (default), full, or quiet.")
+    var xcodeOutputMode: XcodeOutputMode = .filtered
+
     public init() {}
 
-    func executionRequest() -> XcodeCommandRequest {
+    func executionRequest(simulatorIdentifier: String? = nil) -> XcodeCommandRequest {
         XcodeCommandRequest(
             action: buildForTesting ? .buildForTesting : .build,
-            scheme: SchemeSelector(rawValue: scheme)
+            scheme: SchemeSelector(rawValue: scheme),
+            simulatorIdentifier: simulatorIdentifier
         )
     }
 
-    func previewInvocation(using context: CommandExecutionContext) -> ProcessInvocation {
-        let request = executionRequest()
-        let previewRun = context.artifactPaths.makeRun(
-            command: request.action.artifactCommand,
-            runId: request.scheme.artifactRunID
-        )
-        return XcodeInvoker(
-            projectContext: context.projectContext,
-            processRunner: context.processRunner,
-            artifactPaths: context.artifactPaths
-        ).makeInvocation(
-            for: request,
-            resultBundlePath: context.artifactPaths.paths(for: previewRun).resultBundle
-        )
+    func resolvedExecutionRequest(using processRunner: ProcessRunner) async throws -> XcodeCommandRequest {
+        let simulatorIdentifier = try await SimulatorLocator(processRunner: processRunner).resolve(simulator)
+        return executionRequest(simulatorIdentifier: simulatorIdentifier)
+    }
+
+    func previewInvocation(
+        using context: CommandExecutionContext,
+        request: XcodeCommandRequest? = nil
+    ) -> ProcessInvocation {
+        let request = request ?? executionRequest()
+        return context
+            .xcodeCommandExecutor(outputMode: xcodeOutputMode.processOutputMode)
+            .previewInvocation(for: request)
     }
 
     public mutating func run() async throws {
@@ -52,13 +55,9 @@ public struct BuildCommand: AsyncParsableCommand {
             simulatorName: simulator,
             workerID: worker
         )
-        let invoker = XcodeInvoker(
-            projectContext: context.projectContext,
-            processRunner: context.processRunner,
-            artifactPaths: context.artifactPaths
-        )
-        let request = executionRequest()
-        let previewInvocation = previewInvocation(using: context)
+        let executor = context.xcodeCommandExecutor(outputMode: xcodeOutputMode.processOutputMode)
+        let request = try await resolvedExecutionRequest(using: context.processRunner)
+        let previewInvocation = previewInvocation(using: context, request: request)
 
         if dryRun {
             print(CommandLineRendering.render(previewInvocation))
@@ -66,7 +65,7 @@ public struct BuildCommand: AsyncParsableCommand {
         }
 
         _ = try await context.ghosttyBuilder.prepare()
-        let result = try await invoker.execute(request)
+        let result = try await executor.execute(request)
         print(result.summaryPath.path)
     }
 }

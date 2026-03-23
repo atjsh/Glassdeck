@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0B93B58B59D4DD72F32A79FD /* GlassdeckCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		10173DBC0E9259E14E27EF09 /* ConnectionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */; };
-		10EB1C42BD0813571ECF9291 /* GhosttyVTPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */; };
 		131E3D6DF8E11DEBCEEB7C97 /* GlassdeckCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; };
 		1370592A0BF881763A97EB60 /* TerminalIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A41F781492401F7FB04B39F /* TerminalIO.swift */; };
 		13DC2A8B327222C369BE1635 /* SSHPTYBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BBC3E86CE1C00CA623A96D /* SSHPTYBridge.swift */; };
@@ -18,7 +17,6 @@
 		1A26E9797AF482E3591E0DBE /* RemoteTrackpadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */; };
 		1AD85BA84B4CF6D1C17B5985 /* TerminalTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36286365FB2BA217E77A74F1 /* TerminalTypes.swift */; };
 		1CFC0247F93C87A78D1471E1 /* HostKeyVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C0E8BDE6FB844C55279C64 /* HostKeyVerifier.swift */; };
-		21ED504312C7033EA00337C0 /* GhosttyVTTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */; };
 		238456104395F3D1E0677A22 /* SSHConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */; };
 		23E2FD7ED2F5433A0789C115 /* InputCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2CF4A869284921964E6599 /* InputCoordinator.swift */; };
 		2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */; };
@@ -67,7 +65,6 @@
 		B09C93F4EB70032DD152954A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240707A2CC1ADF499F20C22D /* AppDelegate.swift */; };
 		B50F17463B3EA1EAF79C43A8 /* SSHAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */; };
 		B9238B2A05296209F5F4A9C9 /* InteractiveShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7197037A07EEDF4779EC844A /* InteractiveShell.swift */; };
-		C30CA3444947ABF8B76B16C0 /* GhosttyVTBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */; };
 		C3F1F893FF605228DDF16520 /* PointerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */; };
 		C51405D26C0AA665BE8FE928 /* SSHCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */; };
 		C7D5DDC6609F76479E9A47E6 /* TerminalContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4CC05A3A4E1897A4F52A56 /* TerminalContainerView.swift */; };
@@ -75,7 +72,9 @@
 		D1964747F9CF8E51F7DFD01E /* SSHSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */; };
 		D210599485BA66D3F7D966A8 /* SSHClient in Frameworks */ = {isa = PBXBuildFile; productRef = 2106CF0362740D6BD93337A5 /* SSHClient */; };
 		D2AC0FBEB4FBF562A58E08CA /* SFTPManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */; };
-		D2FF02B43A760FE684E8EB3E /* CGhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */; };
+		E4D3C2B1A0F9E8D7C6B5A4F3 /* GhosttyKitSurfaceIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* GhosttyKitSurfaceIO.swift */; };
+		F2E1D0C9B8A7F6E5D4C3B2A1 /* GhosttyKitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* GhosttyKitApp.swift */; };
+		D2FF02B43A760FE684E8EB3E /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8F06341A8AD18B71A6B543C /* GhosttyKit.xcframework */; };
 		D5E29A59037E517DF350DCD5 /* NIOSSH in Frameworks */ = {isa = PBXBuildFile; productRef = E42CC0280A1E0E604DC0D9C3 /* NIOSSH */; };
 		D91C292466C7379C3E509D27 /* GlassdeckCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = ED3686A208098920A06115A0 /* GlassdeckCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DD559BDF8B2ECE9879936124 /* SSHReconnectManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */; };
@@ -161,7 +160,6 @@
 		20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveUITests.swift; sourceTree = "<group>"; };
 		21009691205AE27E102D8B7C /* ConnectionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionProfile.swift; sourceTree = "<group>"; };
 		240707A2CC1ADF499F20C22D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTBindings.swift; sourceTree = "<group>"; };
 		2726D79F764F8BC99E7FFC03 /* KeyboardInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputHandler.swift; sourceTree = "<group>"; };
 		29BBC3E86CE1C00CA623A96D /* SSHPTYBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHPTYBridge.swift; sourceTree = "<group>"; };
 		314D2F8ADC57EFF45DF89639 /* RemoteTrackpadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadCoordinator.swift; sourceTree = "<group>"; };
@@ -181,7 +179,6 @@
 		5F2353D639444D0AE2A52D12 /* ExternalTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTerminalView.swift; sourceTree = "<group>"; };
 		5F343B05EF3C7B5943E5ED93 /* ConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStore.swift; sourceTree = "<group>"; };
 		602A2ADD7567B432B3F34EE2 /* TerminalRenderPerformanceLiveDockerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderPerformanceLiveDockerTests.swift; sourceTree = "<group>"; };
-		68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTPlatformTests.swift; sourceTree = "<group>"; };
 		6A3EF8F91D12A07C0009DE23 /* SSHSessionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHSessionModel.swift; sourceTree = "<group>"; };
 		6A41F781492401F7FB04B39F /* TerminalIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalIO.swift; sourceTree = "<group>"; };
 		702A42675CA14F0EA26EA4ED /* ConnectionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFormView.swift; sourceTree = "<group>"; };
@@ -211,9 +208,10 @@
 		C181B166BD2A79C753076DF3 /* UITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
 		C3105D44E097230A7374ACEC /* RemoteControlMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlMode.swift; sourceTree = "<group>"; };
 		C8B5CB256BA567E878E4D8D1 /* SessionPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceStore.swift; sourceTree = "<group>"; };
-		C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CGhosttyVT.xcframework; path = Frameworks/CGhosttyVT.xcframework; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* GhosttyKitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyKitApp.swift; sourceTree = "<group>"; };
+		B3C4D5E6F7A8B9C0D1E2F3A4 /* GhosttyKitSurfaceIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyKitSurfaceIO.swift; sourceTree = "<group>"; };
+		C8F06341A8AD18B71A6B543C /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = Frameworks/GhosttyKit.xcframework; sourceTree = "<group>"; };
 		D174DF02D5CBB837DA4309BF /* TerminalSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettingsView.swift; sourceTree = "<group>"; };
-		D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyVTTypes.swift; sourceTree = "<group>"; };
 		D96AB30841BD270FCDE8FC75 /* SSHReconnectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHReconnectManager.swift; sourceTree = "<group>"; };
 		DC0C0EE5A5F3A1805AC4375C /* SFTPManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTPManagerTests.swift; sourceTree = "<group>"; };
 		DFEB5D5C88E284763FBA319E /* AppLaunchRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchRoutingTests.swift; sourceTree = "<group>"; };
@@ -236,7 +234,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D2FF02B43A760FE684E8EB3E /* CGhosttyVT.xcframework in Frameworks */,
+				D2FF02B43A760FE684E8EB3E /* GhosttyKit.xcframework in Frameworks */,
 				D5E29A59037E517DF350DCD5 /* NIOSSH in Frameworks */,
 				D210599485BA66D3F7D966A8 /* SSHClient in Frameworks */,
 			);
@@ -264,6 +262,7 @@
 		0046AC4DF5FFBF88C93B7406 /* Terminal */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* GhosttyKitApp.swift */,
 				BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */,
 				E3647E6D1BA75126F5047157 /* TerminalViewProtocol.swift */,
 			);
@@ -311,8 +310,7 @@
 		14D27717859BC6B91D1F93ED /* Terminal */ = {
 			isa = PBXGroup;
 			children = (
-				2496D0E69A7D3AD9498BC16C /* GhosttyVTBindings.swift */,
-				D5E1DFEA89FE2C3AEB2EFF1F /* GhosttyVTTypes.swift */,
+				B3C4D5E6F7A8B9C0D1E2F3A4 /* GhosttyKitSurfaceIO.swift */,
 				AAEA7042758FD9637994E45A /* TerminalConfiguration.swift */,
 				6A41F781492401F7FB04B39F /* TerminalIO.swift */,
 				36286365FB2BA217E77A74F1 /* TerminalTypes.swift */,
@@ -389,7 +387,6 @@
 			isa = PBXGroup;
 			children = (
 				78CD44241AEAA8D1790FA335 /* ConnectionModelTests.swift */,
-				68AF52BAFA87B527A86672B7 /* GhosttyVTPlatformTests.swift */,
 				922D71C258024B8D8795875D /* HostKeyValidationDelegateTests.swift */,
 				F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */,
 				A27F6605DC5BBB61EB429D4D /* SSHReconnectManagerTests.swift */,
@@ -507,7 +504,7 @@
 		BE8FB6B28A69D44009E90589 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C8F06341A8AD18B71A6B543C /* CGhosttyVT.xcframework */,
+				C8F06341A8AD18B71A6B543C /* GhosttyKit.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -681,8 +678,7 @@
 				5DB4B3F84B79B402AAFE96AB /* AppSettings.swift in Sources */,
 				1661B8ADE4D9B9DE6F9154F7 /* ConnectionProfile.swift in Sources */,
 				45631027515F25DDDE00D894 /* ConnectionStore.swift in Sources */,
-				C30CA3444947ABF8B76B16C0 /* GhosttyVTBindings.swift in Sources */,
-				21ED504312C7033EA00337C0 /* GhosttyVTTypes.swift in Sources */,
+				E4D3C2B1A0F9E8D7C6B5A4F3 /* GhosttyKitSurfaceIO.swift in Sources */,
 				3106BE335D07473338E8E2AC /* HostKeyValidationDelegate.swift in Sources */,
 				1CFC0247F93C87A78D1471E1 /* HostKeyVerifier.swift in Sources */,
 				B9238B2A05296209F5F4A9C9 /* InteractiveShell.swift in Sources */,
@@ -713,6 +709,7 @@
 				86A19B78C76C2231C55739AC /* ExternalDisplaySceneDelegate.swift in Sources */,
 				59147CEDC7E11F0E371FFA08 /* ExternalTerminalView.swift in Sources */,
 				40CA69F2D440F85FE652AA75 /* GhosttyHomeAnimation.swift in Sources */,
+				F2E1D0C9B8A7F6E5D4C3B2A1 /* GhosttyKitApp.swift in Sources */,
 				4D39521E309D66B02163B6AF /* GhosttyTerminalView.swift in Sources */,
 				8A9CD3DA1EECC95D2D41DA4C /* GlassdeckApp.swift in Sources */,
 				E69B87144634AFD2108CB61B /* GlassdeckEnvironment.swift in Sources */,
@@ -749,7 +746,6 @@
 				6ED04EB9CA08EE94FA8BB1FA /* AppLaunchRoutingTests.swift in Sources */,
 				10173DBC0E9259E14E27EF09 /* ConnectionModelTests.swift in Sources */,
 				EF8A64ADB0AB9E25EACAAC77 /* GhosttyHomeAnimationPerformanceTests.swift in Sources */,
-				10EB1C42BD0813571ECF9291 /* GhosttyVTPlatformTests.swift in Sources */,
 				50818416DC1AAFC93DE513B0 /* HostKeyValidationDelegateTests.swift in Sources */,
 				598BCD44FE9D6F0306092196 /* RemoteControlStateTests.swift in Sources */,
 				D2AC0FBEB4FBF562A58E08CA /* SFTPManagerTests.swift in Sources */,

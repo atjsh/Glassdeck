@@ -1,12 +1,12 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-let cGhosttyVTPath = "Frameworks/CGhosttyVT.xcframework"
+let ghosttyKitPath = "Frameworks/GhosttyKit.xcframework"
 
 var glassdeckCoreDependencies: [Target.Dependency] = [
     .product(name: "NIOSSH", package: "swift-nio-ssh"),
     .product(name: "SSHClient", package: "swift-ssh-client"),
-    .target(name: "CGhosttyVT", condition: .when(platforms: [.iOS])),
+    .target(name: "GhosttyKit", condition: .when(platforms: [.iOS])),
 ]
 
 var targets: [Target] = [
@@ -19,6 +19,7 @@ var targets: [Target] = [
         name: "Glassdeck",
         dependencies: [
             "GlassdeckCore",
+            .target(name: "GhosttyKit", condition: .when(platforms: [.iOS])),
         ],
         path: "Glassdeck",
         exclude: [
@@ -29,8 +30,8 @@ var targets: [Target] = [
         ]
     ),
     .binaryTarget(
-        name: "CGhosttyVT",
-        path: cGhosttyVTPath
+        name: "GhosttyKit",
+        path: ghosttyKitPath
     ),
     .testTarget(
         name: "GlassdeckCoreTests",

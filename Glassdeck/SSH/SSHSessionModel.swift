@@ -26,8 +26,6 @@ final class SSHSessionModel: Identifiable {
     var connectionID: UUID?
     var bridge: SSHPTYBridge?
     var surface: GhosttySurface?
-    /// Terminal engine persists across surface recreations to preserve state.
-    var engine: GhosttyVTTerminalEngine?
     var requestedManualDisconnect = false
     var connectionPassword: String?
 

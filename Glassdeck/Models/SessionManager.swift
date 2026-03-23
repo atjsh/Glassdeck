@@ -36,7 +36,7 @@ final class SessionManager {
     /// Whether the connection picker sheet is shown.
     var showConnectionPicker = false
 
-    private let connectionManager = SSHConnectionManager()
+    private let shellProvider: any ShellSessionProvider
     private var reconnectManager: SSHReconnectManager
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let persistenceStore: SessionPersistenceStore
@@ -47,11 +47,13 @@ final class SessionManager {
     init(
         appSettings: AppSettings = AppSettings(),
         persistenceStore: SessionPersistenceStore = SessionPersistenceStore(),
-        credentialStore: SessionCredentialStore = SessionCredentialStore()
+        credentialStore: SessionCredentialStore = SessionCredentialStore(),
+        shellProvider: any ShellSessionProvider = SSHShellSessionProvider()
     ) {
         self.appSettings = appSettings
         self.persistenceStore = persistenceStore
         self.credentialStore = credentialStore
+        self.shellProvider = shellProvider
         self.reconnectManager = SSHReconnectManager(
             config: Self.reconnectConfig(from: appSettings)
         )
@@ -526,8 +528,8 @@ final class SessionManager {
 
         if let connectionID = session.connectionID {
             Task {
-                await connectionManager.disconnect(id: connectionID)
-                await connectionManager.remove(id: connectionID)
+                await shellProvider.disconnect(connectionID: connectionID)
+                await shellProvider.removeConnection(connectionID: connectionID)
             }
         }
         session.connectionID = nil
@@ -609,28 +611,12 @@ final class SessionManager {
                     return true
                 }
 
-                do {
-                    let replacementSurface = try GhosttySurface(
-                        configuration: resolvedConfiguration,
-                        metricsPreset: metricsPreset
-                    )
-                    replacementSurface.frame = surface.frame
-                    replacementSurface.bounds = surface.bounds
-                    replacementSurface.title = session.terminalTitle
-                    surface.onResize = nil
-                    surface.onStateChange = nil
-                    surface.onSoftwareKeyboardPresentationChange = nil
-                    session.surface = replacementSurface
-                    bind(surface: replacementSurface, to: session)
-                    applySessionPresentationState(to: replacementSurface, session: session)
-                    applySurfaceState(replacementSurface.stateSnapshot, to: session)
-                    return true
-                } catch {
-                    session.status = .failed(error.localizedDescription)
-                    persistSessions()
-                    notifySessionChanges()
-                    return false
-                }
+                // Update config in-place when possible to preserve terminal state
+                surface.updateConfiguration(resolvedConfiguration)
+                bind(surface: surface, to: session)
+                applySessionPresentationState(to: surface, session: session)
+                applySurfaceState(surface.stateSnapshot, to: session)
+                return true
             }
 
             bind(surface: surface, to: session)
@@ -743,24 +729,18 @@ final class SessionManager {
     ) async {
         let previousSurface = session.surface
 
-        do {
-            let surface: GhosttySurface
-            if let existingEngine = session.engine {
-                // Reuse the existing engine to preserve terminal state (scrollback, modes, colors)
-                surface = try GhosttySurface(configuration: configuration, engine: existingEngine)
-            } else {
-                surface = try GhosttySurface(configuration: configuration)
-                session.engine = surface.engine
-            }
+        // Try updating config in-place first to preserve terminal state
+        if let previousSurface {
+            previousSurface.updateConfiguration(configuration)
+            applySessionPresentationState(to: previousSurface, session: session)
+            applySurfaceState(previousSurface.stateSnapshot, to: session)
+            persistSessions()
+            notifySessionChanges()
+            return
+        }
 
-            if let previousSurface {
-                previousSurface.onResize = nil
-                previousSurface.onStateChange = nil
-                previousSurface.onSoftwareKeyboardPresentationChange = nil
-                surface.frame = previousSurface.frame
-                surface.bounds = previousSurface.bounds
-                surface.title = session.terminalTitle
-            }
+        do {
+            let surface = try GhosttySurface(configuration: configuration)
 
             session.surface = surface
             bind(surface: surface, to: session)
@@ -810,14 +790,14 @@ final class SessionManager {
         await teardownRemoteResources(for: session)
 
         do {
-            let connectionID = try await connectionManager.connect(
+            let connectionID = try await shellProvider.connect(
                 to: session.profile,
                 password: password
             )
             session.connectionID = connectionID
             session.status = .authenticating
 
-            let shell = try await connectionManager.openShell(
+            let shell = try await shellProvider.openShell(
                 connectionID: connectionID,
                 configuration: ShellLaunchConfiguration(
                     term: "xterm-256color",
@@ -1057,8 +1037,8 @@ final class SessionManager {
         }
 
         if let connectionID {
-            await connectionManager.disconnect(id: connectionID)
-            await connectionManager.remove(id: connectionID)
+            await shellProvider.disconnect(connectionID: connectionID)
+            await shellProvider.removeConnection(connectionID: connectionID)
         }
     }
 }

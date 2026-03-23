@@ -39,30 +39,6 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
         )
     }
 
-    func testHomeAnimationFrameProjectionContainsVisibleRowsAndDistinctDefaultColors() throws {
-        let sequence = try GhosttyHomeAnimationSequence.load(from: animationFixturesURL())
-        let engine = try GhosttyVTTerminalEngine(
-            options: GhosttyVTTerminalOptions(
-                columns: UInt16(GhosttyHomeAnimationSequence.expectedColumns),
-                rows: UInt16(GhosttyHomeAnimationSequence.expectedRows),
-                scrollbackLines: 0
-            )
-        )
-
-        engine.write(sequence.frames[GhosttyHomeAnimationSequence.startFrameIndex].payload)
-        let projection = try engine.snapshotProjection(clearDirty: true)
-
-        XCTAssertNotEqual(
-            projection.foregroundColor,
-            projection.backgroundColor,
-            "Expected Ghostty replay frames to resolve distinct default foreground and background colors."
-        )
-        XCTAssertTrue(
-            projection.rowsProjection.contains { !visibleTextRow(from: $0).isEmpty },
-            "Expected Ghostty replay frames to populate visible terminal rows."
-        )
-    }
-
     func testHomeAnimationReplayAverageFrameTimeStaysWithinBudget() throws {
         let sequence = try GhosttyHomeAnimationSequence.load(from: animationFixturesURL())
         let harness = try makeSurfaceHarness(for: sequence.terminalSize)
@@ -80,32 +56,10 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
             harness.surface.stateSnapshot.renderFailureReason,
             "Expected Ghostty home animation replay to remain renderable."
         )
-        XCTAssertFalse(
-            harness.surface.stateSnapshot.visibleTextSummary.isEmpty,
-            "Expected Ghostty home animation replay to leave visible terminal text."
-        )
         XCTAssertLessThanOrEqual(
             metrics.averageFrameDuration,
             performanceBudget,
             "Expected Ghostty home animation replay average frame time to stay within \(formattedMilliseconds(performanceBudget)) ms, but observed \(formattedMilliseconds(metrics.averageFrameDuration)) ms."
-        )
-    }
-
-    func testHomeAnimationReplayProducesSoftwareMirrorImage() throws {
-        let sequence = try GhosttyHomeAnimationSequence.load(from: animationFixturesURL())
-        let harness = try makeSurfaceHarness(for: sequence.terminalSize)
-        defer { harness.window.isHidden = true }
-
-        let player = GhosttyHomeAnimationPlayer(
-            surface: harness.surface,
-            sequence: sequence
-        )
-
-        _ = try player.replayLoop()
-
-        XCTAssertTrue(
-            harness.surface.hasSoftwareMirrorImage,
-            "Expected Ghostty home animation replay to produce a software-mirror image on simulator."
         )
     }
 
@@ -169,7 +123,7 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
                 .first(where: { $0.activationState != .unattached })
         else {
             XCTFail("Expected an attached UIWindowScene for Ghostty animation performance tests.")
-            throw GhosttyVTError.unavailable
+            throw GhosttySurfaceError.appNotInitialized
         }
 
         let window = UIWindow(windowScene: windowScene)
@@ -217,20 +171,5 @@ final class GhosttyHomeAnimationPerformanceTests: XCTestCase {
 
     private func formattedMilliseconds(_ duration: TimeInterval) -> String {
         String(format: "%.2f", duration * 1_000)
-    }
-
-    private func visibleTextRow(from row: GhosttyVTRowProjection) -> String {
-        row.cells
-            .sorted { $0.column < $1.column }
-            .compactMap { cell -> String? in
-                switch cell.width {
-                case .spacerHead, .spacerTail:
-                    nil
-                case .narrow, .wide:
-                    cell.text.isEmpty ? " " : cell.text
-                }
-            }
-            .joined()
-            .trimmingCharacters(in: .whitespaces)
     }
 }

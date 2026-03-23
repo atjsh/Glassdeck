@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import SwiftUI
 import GlassdeckCore
 
@@ -115,4 +114,3 @@ struct ConnectionStatusPill: View {
     }
 }
 
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import SwiftUI
 
@@ -278,4 +277,3 @@ struct ConnectionPickerSheet: View {
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import Security
 
@@ -88,4 +87,3 @@ final class SessionCredentialStore {
         }
     }
 }
-#endif

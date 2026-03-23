@@ -8,6 +8,8 @@ import os
 /// with test doubles.
 public actor SSHPTYBridge {
     private static let logger = Logger(subsystem: "com.glassdeck", category: "SSHPTYBridge")
+    private static let shellWriteCoalesceInterval: Duration = .milliseconds(5)
+    private static let debugTerminalInput = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private var terminal: any TerminalIO
     private var shell: (any InteractiveShell)?
     private var isActive = false
@@ -15,6 +17,8 @@ public actor SSHPTYBridge {
     private var currentSize = TerminalSize(columns: 80, rows: 24)
     private var onDisconnect: (@Sendable () -> Void)?
     private var terminalOutputHandler: (@Sendable (Data) -> Void)?
+    private var pendingShellInput = Data()
+    private var shellWriteTask: Task<Void, Never>?
 
     public init(terminal: any TerminalIO) {
         self.terminal = terminal
@@ -23,10 +27,13 @@ public actor SSHPTYBridge {
     public func start(shell: any InteractiveShell) async {
         self.shell = shell
         isActive = true
+        pendingShellInput.removeAll(keepingCapacity: false)
+        shellWriteTask?.cancel()
+        shellWriteTask = nil
 
         let outputHandler: @Sendable (Data) -> Void = { [weak self] data in
             guard let self else { return }
-            Task { await self.sendToShell(data) }
+            Task { await self.enqueueShellInput(data) }
         }
         terminalOutputHandler = outputHandler
         await terminal.setOutputHandler(outputHandler)
@@ -53,6 +60,7 @@ public actor SSHPTYBridge {
         isActive = false
         readTask?.cancel()
         readTask = nil
+        clearPendingShellInput()
 
         if let shell {
             await shell.close()
@@ -75,6 +83,10 @@ public actor SSHPTYBridge {
         await terminal.setOutputHandler(isActive ? terminalOutputHandler : nil)
     }
 
+    public func sendInput(_ data: Data) async {
+        await enqueueShellInput(data)
+    }
+
     public func resize(
         columns: Int,
         rows: Int,
@@ -91,21 +103,65 @@ public actor SSHPTYBridge {
         }
     }
 
-    private func sendToShell(_ data: Data) async {
-        guard isActive, let shell else { return }
+    private func enqueueShellInput(_ data: Data) async {
+        guard isActive, !data.isEmpty else { return }
+        debugLog("enqueue len=\(data.count) data=\(Self.debugDescription(for: data))")
+        pendingShellInput.append(data)
+        guard shellWriteTask == nil else { return }
 
-        do {
-            try await shell.write(data)
-        } catch {
-            await handleDisconnect()
+        shellWriteTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.shellWriteCoalesceInterval)
+            guard !Task.isCancelled, let self else { return }
+            await self.drainPendingShellInput()
         }
+    }
+
+    private func drainPendingShellInput() async {
+        defer { shellWriteTask = nil }
+        guard isActive, let shell else {
+            pendingShellInput.removeAll(keepingCapacity: false)
+            return
+        }
+
+        while isActive && !Task.isCancelled {
+            let payload = pendingShellInput
+            guard !payload.isEmpty else { return }
+            pendingShellInput.removeAll(keepingCapacity: true)
+            debugLog("drain len=\(payload.count) data=\(Self.debugDescription(for: payload))")
+
+            do {
+                try await shell.write(payload)
+            } catch {
+                pendingShellInput.removeAll(keepingCapacity: false)
+                await handleDisconnect()
+                return
+            }
+        }
+    }
+
+    private func clearPendingShellInput() {
+        pendingShellInput.removeAll(keepingCapacity: false)
+        shellWriteTask?.cancel()
+        shellWriteTask = nil
     }
 
     private func handleDisconnect() async {
         guard isActive else { return }
         isActive = false
+        clearPendingShellInput()
         terminalOutputHandler = nil
         await terminal.setOutputHandler(nil)
         onDisconnect?()
+    }
+
+    private func debugLog(_ message: String) {
+        guard Self.debugTerminalInput else { return }
+        NSLog("SSHPTYBridge %@", message)
+    }
+
+    private static func debugDescription(for data: Data) -> String {
+        String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
     }
 }

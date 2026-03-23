@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import SwiftUI
 
 struct GlassdeckEmptyState: View {
@@ -53,4 +52,3 @@ struct InlineStatusBanner: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
-#endif

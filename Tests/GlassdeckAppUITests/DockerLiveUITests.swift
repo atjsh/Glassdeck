@@ -44,53 +44,17 @@ final class DockerLiveUITests: XCTestCase {
 
     func testSSHKeyAuthFlowCapturesGhosttyScreenshot() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        let app = launchLiveDockerApp(configuration: configuration)
-
-        let toolbarMenu = app.buttons["connections-toolbar-menu"].firstMatch
-        XCTAssertTrue(toolbarMenu.waitForExistence(timeout: UITestTimeout.standard))
-        toolbarMenu.tap()
-        app.buttons["connections-menu-ssh-keys"].firstMatch.tap()
-
-        XCTAssertTrue(app.navigationBars["SSH Keys"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
-        app.buttons["ssh-key-import-clipboard-button"].firstMatch.tap()
-        let importedKeyRow = app.descendants(matching: .any)
-            .matching(identifier: "ssh-key-row")
-            .firstMatch
-        XCTAssertTrue(importedKeyRow.waitForExistence(timeout: UITestTimeout.long))
-        app.buttons["dismiss-button"].firstMatch.tap()
-
-        createConnection(
-            app: app,
-            name: "Docker Key",
-            host: configuration.host,
-            port: configuration.port,
-            username: configuration.username,
-            authMethod: .sshKey
+        let app = launchSeededLiveDockerSSHKeyApp(
+            configuration: configuration,
+            connectionName: "Docker Key",
+            connectedCommand: "find\n"
         )
-
-        app.buttons["connection-manage-ssh-keys-button"].firstMatch.tap()
-        let storedKeyRow = app.descendants(matching: .any)
-            .matching(identifier: "ssh-key-row")
-            .firstMatch
-        XCTAssertTrue(storedKeyRow.waitForExistence(timeout: UITestTimeout.standard))
-        storedKeyRow.tap()
-        app.navigationBars["SSH Keys"].buttons.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["connection-selected-ssh-key"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
-        app.buttons["connection-save-button"].firstMatch.tap()
-
-        let connectionRow = app.buttons[connectionRowIdentifier(name: "Docker Key", host: configuration.host)].firstMatch
-        XCTAssertTrue(connectionRow.waitForExistence(timeout: UITestTimeout.standard))
-        connectionRow.tap()
 
         assertConnectedTerminal(for: app)
-
-        enterTerminalCommand(
-            "echo GLASSDECK_UI_KEY_OK; ls /home/glassdeck/testdata\n",
-            in: app
-        )
-
-        waitForTerminalRenderSummary(containing: "GLASSDECK_UI_KEY_OK", in: app)
+        waitForTerminalToBecomeUsable(in: app, timeout: 30)
         waitForTerminalRenderSummary(containing: "preview.txt", in: app)
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        assertScreenshotIsNotBlank(of: terminalSurface, named: "docker-key-terminal")
         captureTerminalDiagnostics(in: app, named: "docker-key-terminal")
     }
 
@@ -234,6 +198,29 @@ final class DockerLiveUITests: XCTestCase {
         )
     }
 
+    private func launchSeededLiveDockerSSHKeyApp(
+        configuration: LiveDockerUITestConfiguration,
+        connectionName: String,
+        connectedCommand: String? = nil
+    ) -> XCUIApplication {
+        let clipboardSeed = (try? Data(contentsOf: URL(fileURLWithPath: configuration.privateKeyPath)))
+            .map { $0.base64EncodedString() } ?? ""
+        var environment = liveDockerLaunchEnvironment(from: configuration)
+        environment["GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64"] = clipboardSeed
+        environment["GLASSDECK_UI_TEST_SEED_LIVE_SSH_SESSION"] = "1"
+        environment["GLASSDECK_UI_TEST_SEED_LIVE_SSH_NAME"] = connectionName
+        if let connectedCommand {
+            environment["GLASSDECK_UI_TEST_CONNECTED_TERMINAL_COMMAND_BASE64"] =
+                Data(connectedCommand.utf8).base64EncodedString()
+        }
+
+        return launchHostBackedUITestApp(
+            openActiveSession: true,
+            additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
+            additionalEnvironment: environment
+        )
+    }
+
     private func createConnection(
         app: XCUIApplication,
         name: String,
@@ -271,15 +258,11 @@ final class DockerLiveUITests: XCTestCase {
     }
 
     private func enterTerminalCommand(_ command: String, in app: XCUIApplication) {
-        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
-        XCTAssertTrue(terminalSurface.waitForExistence(timeout: UITestTimeout.long))
-        terminalSurface.tap()
-        waitForTerminalKeyboardState(presented: true, in: app, timeout: UITestTimeout.long)
-
         let terminalInput = app.descendants(matching: .any)
             .matching(identifier: "session-keyboard-host")
             .firstMatch
         XCTAssertTrue(terminalInput.waitForExistence(timeout: UITestTimeout.long))
+        terminalInput.tap()
         terminalInput.typeText(command)
     }
 }

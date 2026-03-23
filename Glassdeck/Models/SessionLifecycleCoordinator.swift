@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import Observation
@@ -101,4 +100,3 @@ final class SessionLifecycleCoordinator: SessionManagerLifecycleDelegate {
         }
     }
 }
-#endif

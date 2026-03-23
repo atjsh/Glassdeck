@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import Observation
 
@@ -29,4 +28,3 @@ final class InputCoordinator {
         sendInput(Data(text.utf8))
     }
 }
-#endif

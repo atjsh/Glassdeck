@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import SwiftUI
 
@@ -416,4 +415,3 @@ private struct DismissButton: View {
             .accessibilityIdentifier("dismiss-button")
     }
 }
-#endif

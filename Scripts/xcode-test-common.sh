@@ -8,8 +8,6 @@ XCODE_TEST_DEFAULT_UNIT_SIM_DERIVED_DATA="$XCODE_TEST_ROOT/.build/DerivedData-Si
 XCODE_TEST_DEFAULT_UI_SIM_DERIVED_DATA="$XCODE_TEST_ROOT/.build/DerivedData-UISim"
 
 XCODE_TEST_PROJECT="$XCODE_TEST_ROOT/GlassdeckApp.xcodeproj"
-XCODE_TEST_PROJECT_SPEC="$XCODE_TEST_ROOT/project.yml"
-XCODE_TEST_GENERATE_SCRIPT="$XCODE_TEST_ROOT/Scripts/generate-xcodeproj.sh"
 
 XCODE_TEST_LOG_FILE=""
 XCODE_TEST_RESULT_BUNDLE=""
@@ -33,14 +31,10 @@ ensure_xcode_test_tools() {
   command -v xcrun >/dev/null 2>&1 || xcode_test_die "xcrun is required."
 }
 
-ensure_generated_project() {
+ensure_native_project() {
   local project="$1"
-  local project_spec="$2"
-  local generate_script="$3"
 
-  if [[ ! -d "$project" ]] || [[ "$project_spec" -nt "$project/project.pbxproj" ]]; then
-    "$generate_script"
-  fi
+  [[ -d "$project" ]] || xcode_test_die "Expected checked-in Xcode project at $project."
 }
 
 reset_xcode_action_mode() {
@@ -260,7 +254,7 @@ parse_standard_args() {
 
 prepare_simulator() {
   ensure_xcode_test_tools
-  ensure_generated_project "$XCODE_TEST_PROJECT" "$XCODE_TEST_PROJECT_SPEC" "$XCODE_TEST_GENERATE_SCRIPT"
+  ensure_native_project "$XCODE_TEST_PROJECT"
   SIMULATOR_ID="$(resolve_simulator_id "${SIMULATOR_NAME:-iPhone 17}")"
   boot_simulator "$SIMULATOR_ID"
 }
@@ -268,7 +262,7 @@ prepare_simulator() {
 prepare_device() {
   ensure_xcodebuild_tool
   [[ -n "${DEVICE_ID:-}" ]] || xcode_test_die "Set DEVICE_ID to a connected iOS device UDID."
-  ensure_generated_project "$XCODE_TEST_PROJECT" "$XCODE_TEST_PROJECT_SPEC" "$XCODE_TEST_GENERATE_SCRIPT"
+  ensure_native_project "$XCODE_TEST_PROJECT"
 }
 
 # run_sim_test RUNNER SCHEME DERIVED_DATA [ENV_ARGS...] [-- EXTRA_XCODEBUILD_ARGS...]

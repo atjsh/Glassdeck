@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 
@@ -67,4 +66,3 @@ final class SessionPersistenceStore {
         defaults.removeObject(forKey: storageKey)
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import SwiftUI
 
@@ -47,4 +46,3 @@ struct DisplayRoutingPicker: View {
         }
     }
 }
-#endif

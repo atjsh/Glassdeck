@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 @testable import Glassdeck
 import GlassdeckCore
 import XCTest
@@ -28,4 +27,3 @@ final class SessionKeyboardIMETests: XCTestCase {
         surface.deleteBackward()
     }
 }
-#endif

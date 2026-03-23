@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import SwiftUI
 import UIKit
@@ -280,4 +279,3 @@ final class RemoteTrackpadInteractionSurface: UIView, UIGestureRecognizerDelegat
         trackpadCoordinator?.dragHoldChanged(state: recognizer.state)
     }
 }
-#endif

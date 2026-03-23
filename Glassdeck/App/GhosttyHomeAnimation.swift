@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import QuartzCore
@@ -365,4 +364,3 @@ final class GhosttyHomeAnimationPlayer: NSObject {
         }
     }
 }
-#endif

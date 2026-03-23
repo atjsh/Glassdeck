@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 @preconcurrency import CoreLocation
 import Foundation
 import Observation
@@ -131,4 +130,3 @@ final class SessionBackgroundPersistenceController: NSObject, @preconcurrency CL
         statusMessage = message
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import CoreGraphics
 import Foundation
 import GlassdeckCore
@@ -125,4 +124,3 @@ struct RemotePointerOverlayState: Sendable, Equatable {
         isDragging: false
     )
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import SwiftUI
 
 struct SessionRecoveryState {
@@ -40,4 +39,3 @@ struct SessionRecoveryPanel: View {
         .accessibilityIdentifier("session-recovery-panel")
     }
 }
-#endif

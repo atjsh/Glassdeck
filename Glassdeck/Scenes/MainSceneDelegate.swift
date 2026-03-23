@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import UIKit
 import SwiftUI
 
@@ -30,4 +29,3 @@ class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
         GlassdeckEnvironment.lifecycleCoordinator.handleAppDidEnterBackground()
     }
 }
-#endif

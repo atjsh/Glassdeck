@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import Observation
@@ -28,6 +27,8 @@ final class SSHSessionModel: Identifiable {
     var surface: GhosttySurface?
     var requestedManualDisconnect = false
     var connectionPassword: String?
+    var pendingUITestConnectedCommand: String?
+    var pendingSyntheticTerminalSeed: SessionManager.SyntheticTerminalSeed?
 
     // Terminal state
     var terminalTitle: String?
@@ -38,6 +39,7 @@ final class SSHSessionModel: Identifiable {
     var terminalRenderFailureReason: String?
     var terminalVisibleTextSummary = ""
     var terminalHasRenderedFrame = false
+    var terminalPresentationDebugSummary = ""
     var terminalAnimationProgress: GhosttyHomeAnimationProgress?
     var terminalInteractionGeometry: RemoteTerminalGeometry = .zero
     var terminalInteractionCapabilities = GhosttyVTInteractionCapabilities(
@@ -68,6 +70,10 @@ final class SSHSessionModel: Identifiable {
     var isConnected: Bool {
         if case .connected = status { return true }
         return false
+    }
+
+    var isAwaitingSyntheticPreviewSurface: Bool {
+        pendingSyntheticTerminalSeed != nil && surface == nil
     }
 
     var isLiveForRemoteControl: Bool {
@@ -133,4 +139,3 @@ final class SSHSessionModel: Identifiable {
         }
     }
 }
-#endif

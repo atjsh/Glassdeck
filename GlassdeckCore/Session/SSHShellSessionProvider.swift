@@ -33,6 +33,6 @@ public final class SSHShellSessionProvider: ShellSessionProvider {
     }
 
     public func removeConnection(connectionID: UUID) async {
-        connectionManager.remove(id: connectionID)
+        await connectionManager.remove(id: connectionID)
     }
 }

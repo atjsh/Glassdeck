@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import Foundation
 
@@ -34,4 +33,3 @@ enum GlassdeckEnvironment {
         SessionCredentialStore().removeAll()
     }
 }
-#endif

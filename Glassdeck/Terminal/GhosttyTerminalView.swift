@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import AudioToolbox
 import Foundation
 import GhosttyKit
@@ -21,6 +20,7 @@ struct GhosttySurfaceState: Sendable, Equatable {
     let interactionGeometry: RemoteTerminalGeometry
     let interactionCapabilities: GhosttyVTInteractionCapabilities
     let softwareKeyboardPresented: Bool
+    let presentationDebugSummary: String
 }
 
 struct GhosttySurfaceMetricsPreset: Equatable {
@@ -127,6 +127,8 @@ enum GhosttySurfaceError: Error, LocalizedError {
 @MainActor
 final class GhosttySurface: UIView, UIKeyInput {
     private static let bellSoundID: SystemSoundID = 1103
+    private static let debugTerminalInput = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private static let initialSurfaceFrame = CGRect(x: 0, y: 0, width: 800, height: 600)
     private static let resizeDebounceInterval: Duration = .milliseconds(16)
     private static let logger = Logger(subsystem: "com.glassdeck", category: "GhosttyTerminalView")
 
@@ -201,7 +203,8 @@ final class GhosttySurface: UIView, UIKeyInput {
             animationProgress: currentAnimationProgress,
             interactionGeometry: interactionGeometry,
             interactionCapabilities: currentInteractionCapabilities,
-            softwareKeyboardPresented: currentSoftwareKeyboardPresented
+            softwareKeyboardPresented: currentSoftwareKeyboardPresented,
+            presentationDebugSummary: presentationDebugSummary()
         )
     }
 
@@ -267,7 +270,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         self.configuration = configuration
         self.metricsPreset = metricsPreset
         self.surfaceIO = GhosttyKitSurfaceIO()
-        super.init(frame: .zero)
+        super.init(frame: Self.initialSurfaceFrame)
         try createSurface()
         setupView()
         setupNotificationObservers()
@@ -277,7 +280,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         fatalError("init(coder:) not supported")
     }
 
-    deinit {
+    isolated deinit {
         resizeDebounceTask?.cancel()
         if let titleObserver {
             NotificationCenter.default.removeObserver(titleObserver)
@@ -312,9 +315,10 @@ final class GhosttySurface: UIView, UIKeyInput {
             ghostty_surface_process_output(
                 surface,
                 ptr.assumingMemoryBound(to: CChar.self),
-                buf.count
+                UInt(buf.count)
             )
         }
+        ghostty_surface_draw(surface)
     }
 
     func setAnimationAccentRows(_ accentColumnsByRow: [Int: IndexSet]?) {
@@ -383,17 +387,19 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func insertText(_ text: String) {
-        guard let surface else { return }
+        guard let surface, !text.isEmpty else { return }
+        debugLog("insertText \(Self.debugDescription(for: text))")
         text.withCString { cstr in
-            ghostty_surface_text(surface, cstr, text.utf8.count)
+            ghostty_surface_write_no_encode(surface, cstr, UInt(text.utf8.count))
         }
     }
 
     func deleteBackward() {
         guard let surface else { return }
+        debugLog("deleteBackward")
         let del = "\u{7f}"
         del.withCString { cstr in
-            ghostty_surface_text(surface, cstr, del.utf8.count)
+            ghostty_surface_write_no_encode(surface, cstr, UInt(del.utf8.count))
         }
     }
 
@@ -401,7 +407,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         guard let surface else { return }
         if let markedText, !markedText.isEmpty {
             markedText.withCString { cstr in
-                ghostty_surface_preedit(surface, cstr, markedText.utf8.count)
+                ghostty_surface_preedit(surface, cstr, UInt(markedText.utf8.count))
             }
         } else {
             ghostty_surface_preedit(surface, nil, 0)
@@ -425,9 +431,9 @@ final class GhosttySurface: UIView, UIKeyInput {
 
     override func paste(_ sender: Any?) {
         guard let surface, let string = UIPasteboard.general.string else { return }
-        let bracketed = "\u{1b}[200~\(string)\u{1b}[201~"
-        bracketed.withCString { cstr in
-            ghostty_surface_text(surface, cstr, bracketed.utf8.count)
+        debugLog("paste \(Self.debugDescription(for: string))")
+        string.withCString { cstr in
+            ghostty_surface_text(surface, cstr, UInt(string.utf8.count))
         }
     }
 
@@ -574,7 +580,8 @@ final class GhosttySurface: UIView, UIKeyInput {
             keyEvent.keycode = UInt32(ghosttyKey.rawValue)
             keyEvent.composing = false
 
-            if action != .release, let chars = key.characters, !chars.isEmpty {
+            let chars = key.characters
+            if action != .release, !chars.isEmpty {
                 let handled: Bool = chars.withCString { cstr in
                     keyEvent.text = cstr
                     return ghostty_surface_key(surface, keyEvent)
@@ -700,6 +707,19 @@ final class GhosttySurface: UIView, UIKeyInput {
         ghostty_surface_mouse_pos(surface, location.x, location.y, GHOSTTY_MODS_NONE)
     }
 
+    private func syncHostedLayerGeometry(scale: CGFloat) {
+        guard let hostedLayers = metalLayer.sublayers, !hostedLayers.isEmpty else { return }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for hostedLayer in hostedLayers {
+            hostedLayer.frame = bounds
+            hostedLayer.contentsScale = scale
+            hostedLayer.setNeedsDisplay()
+        }
+        CATransaction.commit()
+    }
+
     private func updateLayout() {
         guard bounds.width > 0, bounds.height > 0 else { return }
         guard let surface else { return }
@@ -711,6 +731,7 @@ final class GhosttySurface: UIView, UIKeyInput {
             width: bounds.width * scale,
             height: bounds.height * scale
         )
+        syncHostedLayerGeometry(scale: scale)
 
         ghostty_surface_set_content_scale(surface, Double(scale), Double(scale))
         ghostty_surface_set_size(
@@ -776,13 +797,11 @@ final class GhosttySurface: UIView, UIKeyInput {
 
         let sizeChanged = newTerminalSize != previousTerminalSize || newPixelSize != previousPixelSize
 
-        if let surface {
-            let captured = ghostty_surface_mouse_captured(surface)
-            currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
-                supportsMousePlacement: captured,
-                supportsScrollReporting: captured
-            )
-        }
+        let captured = ghostty_surface_mouse_captured(surface)
+        currentInteractionCapabilities = GhosttyVTInteractionCapabilities(
+            supportsMousePlacement: captured,
+            supportsScrollReporting: captured
+        )
 
         guard sizeChanged else {
             publishState()
@@ -833,6 +852,25 @@ final class GhosttySurface: UIView, UIKeyInput {
         onStateChange?(stateSnapshot)
     }
 
+    private func presentationDebugSummary() -> String {
+        let scale = max(currentDisplayScale, 1)
+        let drawableSize = metalLayer.drawableSize
+        let hostedLayers = metalLayer.sublayers ?? []
+        let firstHostedLayerFrame = hostedLayers.first?.frame ?? .zero
+        let firstHostedLayerBounds = hostedLayers.first?.bounds ?? .zero
+
+        return [
+            "view=\(Int(bounds.width.rounded()))x\(Int(bounds.height.rounded()))",
+            "scale=\(String(format: "%.2f", scale))",
+            "drawable=\(Int(drawableSize.width.rounded()))x\(Int(drawableSize.height.rounded()))",
+            "sublayers=\(hostedLayers.count)",
+            "firstFrame=\(Int(firstHostedLayerFrame.width.rounded()))x\(Int(firstHostedLayerFrame.height.rounded()))",
+            "firstBounds=\(Int(firstHostedLayerBounds.width.rounded()))x\(Int(firstHostedLayerBounds.height.rounded()))",
+            "renderCount=\(renderCount)",
+            "window=\(window == nil ? 0 : 1)",
+        ].joined(separator: " ")
+    }
+
     private static func readVisibleText(from surface: ghostty_surface_t) -> String {
         let sizeInfo = ghostty_surface_size(surface)
         guard sizeInfo.columns > 0, sizeInfo.rows > 0 else { return "" }
@@ -865,7 +903,7 @@ final class GhosttySurface: UIView, UIKeyInput {
         }
         return String(
             bytesNoCopy: UnsafeMutableRawPointer(mutating: ptr),
-            length: textResult.text_len,
+            length: Int(textResult.text_len),
             encoding: .utf8,
             freeWhenDone: false
         ) ?? ""
@@ -898,6 +936,8 @@ final class GhosttySurface: UIView, UIKeyInput {
         lines.append("cursor-style = \(cursorStyle)")
         lines.append("cursor-style-blink = \(terminal.cursorBlink)")
         lines.append("scrollback-limit = \(terminal.scrollbackLines)")
+        lines.append("command = /bin/cat")
+        lines.append("wait-after-command = false")
 
         do {
             try lines.joined(separator: "\n").write(to: tmpFile, atomically: true, encoding: .utf8)
@@ -1076,4 +1116,16 @@ private extension String {
     }
 }
 
-#endif
+private extension GhosttySurface {
+    func debugLog(_ message: String) {
+        guard Self.debugTerminalInput else { return }
+        NSLog("GhosttySurface %@", message)
+    }
+
+    static func debugDescription(for text: String) -> String {
+        text
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
+}
+

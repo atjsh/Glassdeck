@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import UIKit
 
 /// Handles mouse and trackpad input for the terminal.
@@ -34,4 +33,3 @@ final class PointerInputHandler: NSObject, UIPointerInteractionDelegate {
         return UIPointerStyle(shape: .verticalBeam(length: 20))
     }
 }
-#endif

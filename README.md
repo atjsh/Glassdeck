@@ -2,34 +2,37 @@
 
 ![Glassdeck Terminal Screenshot](.github/media/glassdeck-simulator.png)
 
-An iOS 26 SSH client powered by a real terminal engine.
+A SSH app for iOS built with [GhosttyKit](https://github.com/ghostty-org/ghostty).
 
 [한국어](README-ko.md)
 
 ## Features
 
 **Terminal & Shell**
-*   **SSH terminal sessions**: Full VT100/xterm emulation via libghostty-vt (GhosttyTerminal, GhosttyRenderState, key/mouse encoders).
-*   **PTY shell**: Bidirectional async bridge (SSHPTYBridge actor) with runtime resize.
-*   **Glassdeck-owned Metal renderer**: Core Image based, does NOT depend on GhosttyKit.
-*   **Render coalescing**: `scheduleRender()` with UIKit `layoutSubviews` batching to consolidate rapid state changes.
-*   **Local scrollback**: 10,000 lines default, configurable 1K–100K, Metal-accelerated viewport scrolling.
+
+- **SSH terminal sessions**: Full VT100/xterm emulation via GhosttyKit terminal APIs.
+- **PTY shell**: Bidirectional async bridge (SSHPTYBridge actor) with runtime resize.
+- **Terminal rendering**: Powered by GhosttyKit with Glassdeck-owned surface integration and lifecycle code.
+- **Render coalescing**: `scheduleRender()` with UIKit `layoutSubviews` batching to consolidate rapid state changes.
+- **Local scrollback**: 10,000 lines default, configurable 1K–100K, Metal-accelerated viewport scrolling.
 
 **Connectivity**
-*   **Auto-reconnection**: Exponential backoff (5 attempts, 1–30s delay, 2× multiplier), transient vs permanent failure classification.
-*   **Session persistence & restore**: JSON snapshots to UserDefaults, auto-restore on foreground, optional Core Location background keep-alive.
-*   **Connection profiles**: CRUD with JSON persistence, password or SSH key auth, notes, last-connected date.
-*   **TOFU host key verification**: Keychain-backed known_hosts, SHA-256 fingerprints, auto-trust new / reject mismatch.
+
+- **Auto-reconnection**: Exponential backoff (5 attempts, 1–30s delay, 2× multiplier), transient vs permanent failure classification.
+- **Session persistence & restore**: JSON snapshots to UserDefaults, auto-restore on foreground, optional Core Location background keep-alive.
+- **Connection profiles**: CRUD with JSON persistence, password or SSH key auth, notes, last-connected date.
+- **TOFU host key verification**: Keychain-backed known_hosts, SHA-256 fingerprints, auto-trust new / reject mismatch.
 
 **Input & Hardware**
-*   **Hardware keyboard**: 90+ UIKeyCommands (Ctrl+letter, arrows, function keys, Tab, Escape, PageUp/Down, Home/End).
-*   **Touch/pointer input**: UIPointerInteraction with I-beam cursor, full SGR mouse reporting, drag tracking.
-*   **IME support** (Experimental): UITextInput with marked text / composing flag.
+
+- **Hardware keyboard**: 90+ UIKeyCommands (Ctrl+letter, arrows, function keys, Tab, Escape, PageUp/Down, Home/End).
+- **Touch/pointer input**: UIPointerInteraction with I-beam cursor, full SGR mouse reporting, drag tracking.
+- **IME support** (Experimental): UITextInput with marked text / composing flag.
 
 **Advanced Tools**
-*   **SFTP**: Browse, preview (UTF-8, 8KB default), upload, delete, download, iOS share sheet export.
-*   **External display routing**: Dedicated scene delegate, remote pointer overlay, display routing picker.
-*   **Terminal settings**: Per-display-target profiles (iPhone vs external monitor), 8 color schemes, font size, cursor style, bell.
+
+- **External display routing**: Dedicated scene delegate, remote pointer overlay, display routing picker.
+- **Terminal settings**: Per-display-target profiles (iPhone vs external monitor), 8 color schemes, font size, cursor style, bell.
 
 ## Repository Layout
 
@@ -43,21 +46,24 @@ Glassdeck/
 │   ├── Scenes/              Main + external display scene delegates
 │   ├── SSH/                 SSH session observable model
 │   ├── Terminal/            GhosttySurface UIView, Metal renderer, SwiftUI wrapper
-│   ├── Views/               All SwiftUI views (connections, terminal, SFTP, settings, etc.)
+│   ├── Views/               All SwiftUI views (connections, terminal, settings, etc.)
 │   └── Resources/           Assets.xcassets, AppIcon.icon
 ├── GlassdeckCore/           Shared library — the single source of truth for SSH, terminal, models
 │   ├── Models/              ConnectionProfile, ConnectionStore, AppSettings, RemoteControlMode
-│   ├── SSH/                 SSHConnectionManager, SFTPManager, SSHPTYBridge, SSHAuthenticator,
+│   ├── SSH/                 SSHConnectionManager, SSHPTYBridge, SSHAuthenticator,
 │   │                        HostKeyVerifier, SSHReconnectManager, SSHKeyManager, etc.
-│   └── Terminal/            GhosttyVTBindings, TerminalConfiguration (8 themes), TerminalIO, types
-├── Frameworks/              Vendored CGhosttyVT.xcframework (static library, iOS device + simulator)
-├── GlassdeckApp.xcodeproj/  Generated Xcode project (xcodegen from project.yml)
+│   └── Terminal/            GhosttyKitSurfaceIO, TerminalConfiguration (8 themes), TerminalIO, types
+├── Frameworks/              GhosttyKit.xcframework (locally materialized dependency artifact)
+├── GlassdeckApp.xcodeproj/  Checked-in native Xcode project
 ├── Scripts/                 Build, run, test automation
+├── Tools/
+│   └── GlassdeckBuild/      Native host-side build/test orchestration runner
+│       ├── Package.swift
+│       └── Package.resolved
 ├── Tests/                   Unit, UI, integration, performance tests
 ├── Vendor/                  Forked swift-ssh-client dependency
 ├── Backlogs/                Code review findings and backlog tracking
-├── Package.swift            SPM manifest (swift-tools-version: 6.2)
-├── project.yml              xcodegen project definition
+├── AGENTS.md                Repo-specific workflow rules for Codex and sub-agents
 ├── LICENSE                  MIT
 ├── README.md                English documentation
 └── README-ko.md             Korean documentation
@@ -66,7 +72,7 @@ Glassdeck/
 ## Architecture
 
 ```
-SwiftUI Views (ConnectionListView, SessionTabView, TerminalContainerView, SFTPBrowserView)
+SwiftUI Views (ConnectionListView, SessionTabView, TerminalContainerView)
        │
 SessionManager (orchestrator — @MainActor, 1082 lines)
 SessionLifecycleCoordinator (lifecycle events, persistence, restore)
@@ -76,66 +82,56 @@ SessionLifecycleCoordinator (lifecycle events, persistence, restore)
 SSH Layer       Terminal UI        Input Layer
 SSHConnectionManager  GhosttySurface (UIView)  KeyboardInputHandler
 SSHAuthenticator      Metal renderer (CI)      PointerInputHandler
-SSHPTYBridge          GhosttyVTBindings        SessionKeyboardInputHost
+SSHPTYBridge          GhosttyKitSurfaceIO        SessionKeyboardInputHost
 HostKeyVerifier       TerminalConfiguration    RemoteTrackpadCoordinator
 SSHReconnectManager
-SFTPManager
        │
 GlassdeckCore (shared library — only source of truth)
        │
-External: libghostty-vt (C) · swift-ssh-client · SwiftNIO SSH · Swift Crypto
+External: GhosttyKit · swift-ssh-client · SwiftNIO SSH · Swift Crypto
 ```
 
-**Data flow**: User connects → SSHConnectionManager authenticates (password/key) → HostKeyVerifier checks TOFU → shell opened with PTY → SSHPTYBridge bridges shell↔terminal bidirectionally → GhosttyVTBindings processes VT sequences → GhosttySurface renders via Metal → Input flows back through VT encoding → shell.
+**Data flow**: User connects → SSHConnectionManager authenticates (password/key) → HostKeyVerifier checks TOFU → shell opened with PTY → SSHPTYBridge bridges shell↔terminal bidirectionally → GhosttyKitSurfaceIO passes VT stream to GhosttyKit → GhosttySurface renders via Metal → Input flows back through VT encoding → shell.
 
 ## Terminal Engine
 
-*   `GhosttyVTBindings.swift` (1,217 lines) — owns GhosttyTerminal, GhosttyRenderState, key encoder, mouse encoder.
-*   `GhosttyVTTypes.swift` — pure Swift render projection and input descriptor types.
-*   `GhosttyTerminalView.swift` — UIView + CAMetalLayer, Core Image Metal renderer, UIKit input bridge.
-*   The renderer is Glassdeck-owned; this repo does NOT depend on GhosttyKit.
-*   The VT C API is upstream WIP — vendored static xcframework must stay in sync.
+- `GhosttyKitSurfaceIO.swift` — Swift adapter between terminal I/O and GhosttyKit callbacks.
+- `GhosttyTerminalView.swift` — UIKit + Metal surface wrapper and input bridge.
+- Terminal behavior is powered by `GhosttyKit`.
+- The vendored terminal framework should stay in sync with the managed Ghostty source state.
 
 ## Vendored Ghostty Build
 
-`Frameworks/CGhosttyVT.xcframework` — static library, committed in-repo.
+`Frameworks/GhosttyKit.xcframework` — local dependency artifact used by the checked-in
+Xcode project. It is gitignored/untracked by default and materialized as needed.
 
-Rebuild from local Ghostty checkout:
+Build or refresh from managed Ghostty source:
+
 ```bash
-./Scripts/build-cghosttyvt.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build deps ghostty
 ```
 
-**Defaults**:
-*   Device: aarch64-ios
-*   Simulator ARM64: aarch64-ios-simulator -Dcpu=apple_a17
-*   Optional x86_64 simulator: INCLUDE_X86_64_SIMULATOR=true
-*   SIMD: disabled (pure-static, device-safe)
-*   Requires: Zig 0.15.2+, xcodebuild, Ghostty source
+Common profile:
+
+- `--profile release-fast` for release-like artifacts.
+- `--profile debug` (default).
 
 ## Development
 
-### Regenerate Xcode project
+### Native Xcode workflow
 
-Generate Xcode project from `project.yml` via xcodegen:
+Builds use the checked-in `GlassdeckApp.xcodeproj` and `glassdeck-build` runner:
 
 ```bash
-./Scripts/generate-xcodeproj.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build build --scheme app
 ```
-
-Also patches generated .pbxproj to wire local SPM packages + resources via `patch-local-package-product.py`.
 
 ### Run on simulator
 
 Build & launch on iOS simulator:
 
 ```bash
-./Scripts/run-ios-sim.sh
-```
-
-Launch in animation demo mode with test fixtures:
-
-```bash
-./Scripts/run-animation-demo-sim.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build run --scheme app
 ```
 
 ### Run tests
@@ -143,31 +139,31 @@ Launch in animation demo mode with test fixtures:
 Unit tests on simulator:
 
 ```bash
-./Scripts/test-ios-sim.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme unit
 ```
 
 Live SSH integration tests vs Docker (auto-starts container, runs smoke checks first):
 
 ```bash
-./Scripts/test-live-docker-ssh.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme unit --only-testing "GlassdeckAppTests/Integration.test"
 ```
 
 Terminal rendering performance tests vs live Docker SSH:
 
 ```bash
-./Scripts/test-docker-render-perf.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme ui --only-testing "GlassdeckAppUITests/TerminalPerformance"
 ```
 
 Animation rendering performance tests (simulator):
 
 ```bash
-./Scripts/test-animation-render-sim.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme ui --only-testing "GlassdeckAppUITests/Animation"
 ```
 
 Animation rendering performance tests (device) - requires `DEVICE_ID`:
 
 ```bash
-./Scripts/test-animation-render-device.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme ui --only-testing "GlassdeckAppUITests/Animation"
 ```
 
 ### Run UI tests
@@ -175,30 +171,33 @@ Animation rendering performance tests (device) - requires `DEVICE_ID`:
 UI tests with screenshot capture + artifact export:
 
 ```bash
-./Scripts/test-docker-ui-sim.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme ui --only-testing "GlassdeckAppUITests/..."
 ```
 
 Verify animations visually render (screenshot diff):
 
 ```bash
-./Scripts/test-animation-demo-visible-sim.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme ui --only-testing "GlassdeckAppUITests/AnimationDemo"
 ```
 
 ### Test utilities
 
-Local web UI for reviewing screenshot test artifacts:
+Result lookup and artifact inspection from runner output:
 
 ```bash
-./Scripts/view-test-artifacts.py
+swift run --package-path Tools/GlassdeckBuild glassdeck-build artifacts --command build
+swift run --package-path Tools/GlassdeckBuild glassdeck-build artifacts --command test
 ```
 
 ### Common flags
-
-| Flag | Description |
-|------|-------------|
-| `--clean`, `--rebuild` | Force fresh build graph |
-| `--verbose` | Enable raw xcodebuild stream (`GLASSDECK_VERBOSE=1`) |
-| `--only-testing TARGET` | Run specific test target |
+    
+| Flag                    | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `--worker <id>`         | Isolate workspace artifacts for parallel workers       |
+| `--scheme <name>`       | Select build/run/test scheme (`app`, `unit`, `ui`)    |
+| `--simulator <name>`    | Simulator name (e.g. `iPhone 17`) for run/test paths  |
+| `--dry-run`             | Print the computed xcodebuild/utility command only     |
+| `--only-testing <target>` | Forward xcodebuild test filtering flags              |
 
 ### Simulator target
 
@@ -206,11 +205,12 @@ Default: `iPhone 17` on latest iOS runtime. Override with `SIMULATOR_ID=<udid>`.
 
 ### Build artifacts
 
-*   `.build/TestLogs/` — raw xcodebuild logs
-*   `.build/TestResults/` — xcresult bundles
-*   `.build/TestArtifacts/docker-ui/` — UI screenshot exports
+- `.build/glassdeck-build/logs/<command>/` — raw command logs
+- `.build/glassdeck-build/results/<command>/` — xcresult bundles
+- `.build/glassdeck-build/artifacts/<command>/latest/` — latest exported artifacts and summary
+- `.build/glassdeck-build/derived-data/<worker>/` — worker-scoped DerivedData reuse
 
-**Note**: If `project.yml` is newer than the project, scripts auto-regenerate via `generate-xcodeproj.sh`.
+**Note**: `GlassdeckApp.xcodeproj` is source-tracked; regenerate scripts are no longer part of normal workflow.
 
 ## Docker SSH Test Target
 
@@ -219,52 +219,52 @@ Canonical live test endpoint (replaces separate Raspberry Pi).
 **Requirements**: Docker Desktop on Mac.
 
 ```bash
-./Scripts/docker/start-test-ssh.sh
-./Scripts/docker/stop-test-ssh.sh
+swift run --package-path Tools/GlassdeckBuild glassdeck-build docker up
+swift run --package-path Tools/GlassdeckBuild glassdeck-build docker down
 ```
 
-*   **Port**: 22222 (default)
-*   **User**: glassdeck
-*   **Auth**: Password + Key both enabled
+- **Port**: 22222 (default)
+- **User**: glassdeck
+- **Auth**: Password + Key both enabled
 
 **Seeded home directory**:
-*   `~/bin/health-check.sh`
-*   `~/testdata/preview.txt`
-*   `~/testdata/nested/dir/info.txt`
-*   `~/testdata/nano-target.txt`
-*   `~/upload-target/`
+
+- `~/bin/health-check.sh`
+- `~/testdata/preview.txt`
+- `~/testdata/nested/dir/info.txt`
+- `~/testdata/nano-target.txt`
+- `~/upload-target/`
 
 **Note**: For physical iPhone testing, iPhone and Mac must be on the same LAN.
 
 ## Manual Smoke Checklist
 
-1.  Start Docker SSH: `./Scripts/docker/start-test-ssh.sh`
-2.  Or run full suite: `./Scripts/test-live-docker-ssh.sh`
+1.  Start Docker SSH: `swift run --package-path Tools/GlassdeckBuild glassdeck-build docker up`
+2.  Or run full suite: `swift run --package-path Tools/GlassdeckBuild glassdeck-build test --scheme unit --only-testing "GlassdeckAppTests/Integration.test"`
 3.  Launch app on simulator or iPhone
 4.  Create profile with printed host/port, connect via password auth
 5.  Create second profile or switch to SSH key auth
 6.  Run `~/bin/health-check.sh`, `pwd`, `ls ~/testdata`
 7.  Verify rendering, typing, paste, special keys, resize, disconnect, reconnect
-8.  Open SFTP browser → browse testdata, preview, upload, delete
-9.  With external monitor + physical keyboard: route session, test Mouse/Cursor mode, two-finger scroll, View Local Terminal, `nano --mouse ~/testdata/nano-target.txt`
+8.  With external monitor + physical keyboard: route session, test Mouse/Cursor mode, two-finger scroll, View Local Terminal, `nano --mouse ~/testdata/nano-target.txt`
 
 ## Dependencies
 
-| Dependency | Source | Purpose |
-|-----------|--------|---------|
-| libghostty-vt | Vendored xcframework | Terminal VT emulation engine |
-| swift-ssh-client | Vendor/ (fork) | High-level SSH client |
-| swift-nio-ssh | SPM (≥0.9.0) | Low-level SSH protocol |
-| swift-nio | SPM (≥2.65.0) | Async networking |
-| Swift Crypto | (via NIO SSH) | Ed25519/P256 keys, SHA-256 |
-| Core Location | System | Optional background keep-alive |
+| Dependency       | Source                                       | Purpose                        |
+| ---------------- | -------------------------------------------- | ------------------------------ |
+| GhosttyKit       | `Frameworks/GhosttyKit.xcframework` (materialized locally, untracked) | Terminal + rendering engine    |
+| swift-ssh-client | Vendor/ (fork)       | High-level SSH client          |
+| swift-nio-ssh    | SPM (≥0.9.0)         | Low-level SSH protocol         |
+| swift-nio        | SPM (≥2.65.0)        | Async networking               |
+| Swift Crypto     | (via NIO SSH)        | Ed25519/P256 keys, SHA-256     |
+| Core Location    | System               | Optional background keep-alive |
 
 ## Notes
 
-*   GlassdeckCore is the only source of truth for shared SSH, key, model, and terminal logic.
-*   The Metal renderer is Glassdeck-owned; no dependency on GhosttyKit.
-*   The VT C API is upstream WIP — vendored xcframework + rebuild script must stay in sync.
-*   Docker SSH server is the canonical acceptance target.
+- GlassdeckCore is the only source of truth for shared SSH, key, model, and terminal logic.
+- Terminal implementation is centered on GhosttyKit and a local host-side materialized xcframework.
+- `glassdeck-build deps ghostty` refreshes that dependency artifact when needed.
+- Docker SSH server is the canonical acceptance target.
 
 ## License
 

@@ -1,18 +1,14 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import UIKit
 import SwiftUI
 
 private enum SessionPresentationSheet: Identifiable {
-    case sftp(ConnectionProfile)
     case displayRouting
     case settings
     case help
 
     var id: String {
         switch self {
-        case .sftp(let profile):
-            "sftp-\(profile.id.uuidString)"
         case .displayRouting:
             "display-routing"
         case .settings:
@@ -28,7 +24,6 @@ struct SessionDetailView: View {
 
     @Environment(SessionManager.self) private var sessionManager
     @State private var activeSheet: SessionPresentationSheet?
-    @State private var appliedLaunchSheet = false
 
     private var session: SSHSessionModel? {
         sessionManager.session(with: sessionID)
@@ -49,16 +44,6 @@ struct SessionDetailView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session-detail-view")
         .toolbar(.hidden, for: .tabBar)
-        .task(id: session?.id) {
-            guard !appliedLaunchSheet else { return }
-            guard let session else { return }
-            if ProcessInfo.processInfo.arguments.contains("-uiTestPresentSFTP") {
-                try? await Task.sleep(for: .milliseconds(150))
-                guard !Task.isCancelled else { return }
-                activeSheet = .sftp(session.profile)
-            }
-            appliedLaunchSheet = true
-        }
     }
 }
 
@@ -107,19 +92,39 @@ private struct SessionDetailContent: View {
     }
 
     private var terminalRenderSummaryValue: String {
+        let presentationDebugLine: String? = {
+            guard exposesRenderSummaryForUITests else { return nil }
+            let summary = session.terminalPresentationDebugSummary
+            guard !summary.isEmpty else { return nil }
+            return "[presentation] \(summary)"
+        }()
+
         if !showingRemoteTrackpad && !terminalPresentationReady {
+            let pendingLine: String
             if session.surface == nil {
-                return "[terminal pending] Restoring terminal surface"
+                pendingLine = "[terminal pending] Restoring terminal surface"
+            } else {
+                pendingLine = "[terminal pending] Preparing terminal"
             }
-            return "[terminal pending] Preparing terminal"
+            return [pendingLine, presentationDebugLine]
+                .compactMap { $0 }
+                .joined(separator: "\n")
         }
         if session.terminalVisibleTextSummary.isEmpty {
-            return session.terminalRenderFailureReason ?? ""
+            return [session.terminalRenderFailureReason, presentationDebugLine]
+                .compactMap { $0?.isEmpty == false ? $0 : nil }
+                .joined(separator: "\n")
         }
+        let terminalSummary: String
         if let terminalRenderFailureReason = session.terminalRenderFailureReason {
-            return "\(session.terminalVisibleTextSummary)\n[render unavailable] \(terminalRenderFailureReason)"
+            terminalSummary =
+                "\(session.terminalVisibleTextSummary)\n[render unavailable] \(terminalRenderFailureReason)"
+        } else {
+            terminalSummary = session.terminalVisibleTextSummary
         }
-        return session.terminalVisibleTextSummary
+        return [terminalSummary, presentationDebugLine]
+            .compactMap { $0 }
+            .joined(separator: "\n")
     }
 
     private var terminalAnimationProgressValue: String? {
@@ -158,17 +163,6 @@ private struct SessionDetailContent: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 SessionTitleView(session: session)
-            }
-
-            if session.isConnected {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        activeSheet = .sftp(session.profile)
-                    } label: {
-                        Label("Files", systemImage: "folder")
-                    }
-                    .accessibilityIdentifier("session-files-button")
-                }
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -220,9 +214,6 @@ private struct SessionDetailContent: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .sftp(let profile):
-                SFTPBrowserView(profile: profile)
-                    .presentationDetents([.large])
             case .displayRouting:
                 DisplayRoutingPicker()
                     .presentationDetents([.medium, .large])
@@ -474,4 +465,3 @@ private struct SessionTitleView: View {
         .accessibilityIdentifier("session-detail-view")
     }
 }
-#endif

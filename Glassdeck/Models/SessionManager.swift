@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import Observation
@@ -42,6 +41,7 @@ final class SessionManager {
     @ObservationIgnored private let persistenceStore: SessionPersistenceStore
     @ObservationIgnored private let credentialStore: SessionCredentialStore
     @ObservationIgnored private var restoredPersistedSessions = false
+    @ObservationIgnored private var pendingUITestConnectedCommand: String?
     weak var lifecycleDelegate: SessionManagerLifecycleDelegate?
 
     init(
@@ -132,7 +132,9 @@ final class SessionManager {
     }
 
     func isSessionDetailPresentable(for session: SSHSessionModel) -> Bool {
-        shouldShowRemoteTrackpad(for: session) || isTerminalPresentationReady(for: session)
+        shouldShowRemoteTrackpad(for: session)
+            || isTerminalPresentationReady(for: session)
+            || session.pendingSyntheticTerminalSeed != nil
     }
 
     func terminalDisplayTarget(for session: SSHSessionModel) -> TerminalDisplayTarget {
@@ -158,19 +160,15 @@ final class SessionManager {
         restoredPersistedSessions = true
         guard let snapshot = persistenceStore.loadSnapshot() else { return }
 
-        sessions = snapshot.sessions.map(Self.session(from:))
-        activeSessionID = snapshot.activeSessionID
-        externalDisplaySessionID = snapshot.externalDisplaySessionID
+        applyPersistedSnapshot(snapshot, prepareSurfaces: false)
+    }
 
-        for session in sessions {
-            session.isOnExternalDisplay = session.id == externalDisplaySessionID
-            if session.profile.authMethod == .password {
-                session.connectionPassword = credentialStore.password(for: session.profile.id)
-            }
-        }
-
-        persistSessions()
-        notifySessionChanges()
+    func replaceSessionsFromPersistedSnapshot(
+        _ snapshot: PersistedSessionSnapshot,
+        prepareSurfaces: Bool
+    ) {
+        restoredPersistedSessions = true
+        applyPersistedSnapshot(snapshot, prepareSurfaces: prepareSurfaces)
     }
 
     func resumeRestorableSessionsIfNeeded() {
@@ -209,6 +207,10 @@ final class SessionManager {
 
     func refreshReconnectConfiguration() {
         refreshReconnectManager()
+    }
+
+    func setUITestConnectedCommand(_ command: String?) {
+        pendingUITestConnectedCommand = command
     }
 
     // MARK: - Connection Lifecycle
@@ -296,6 +298,11 @@ final class SessionManager {
 
         activeSessionID = id
         if let session = sessions.first(where: { $0.id == id }) {
+            if session.surface == nil,
+               session.pendingSyntheticTerminalSeed != nil,
+               UITestLaunchSupport.requiresPreviewSurface {
+                _ = prepareSurface(for: session)
+            }
             session.surface?.setFocused(focusSurface && shouldFocusSurface(for: session))
             session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
         }
@@ -431,34 +438,15 @@ final class SessionManager {
         }
     }
 
-    static func connectedSessionsHaveSurfaces(_ sessions: [SSHSessionModel]) -> Bool {
-        sessions.allSatisfy { !$0.isConnected || $0.surface != nil }
-    }
-
-    @discardableResult
-    func attachSyntheticSurfaceForPreview(
-        to session: SSHSessionModel,
+    func primeSyntheticPreviewSession(
+        _ session: SSHSessionModel,
         seed: SyntheticTerminalSeed
-    ) -> Bool {
-        guard
-            prepareSurface(
-                for: session,
-                configuration: seed.terminalConfiguration,
-                metricsPreset: seed.terminalMetricsPreset
-            ),
-            let surface = session.surface
-        else {
-            return false
-        }
-
-        applySyntheticPreviewLayout(to: surface, seed: seed)
-        surface.title = seed.title
-        if !seed.transcript.isEmpty {
-            surface.writeToTerminal(Data(seed.transcript.utf8))
-        }
-
-        applySurfaceState(surface.stateSnapshot, to: session)
-
+    ) {
+        session.pendingSyntheticTerminalSeed = seed
+        session.terminalTitle = seed.title
+        session.terminalVisibleTextSummary = seed.transcript
+        session.terminalHasRenderedFrame = false
+        session.terminalRenderFailureReason = nil
         if let terminalSize = seed.terminalSize {
             session.terminalSize = terminalSize
         }
@@ -474,10 +462,21 @@ final class SessionManager {
         if let interactionCapabilities = seed.interactionCapabilities {
             session.terminalInteractionCapabilities = interactionCapabilities
         }
-
         persistSessions()
         notifySessionChanges()
-        return true
+    }
+
+    @discardableResult
+    func attachSyntheticSurfaceForPreview(
+        to session: SSHSessionModel,
+        seed: SyntheticTerminalSeed
+    ) -> Bool {
+        primeSyntheticPreviewSession(session, seed: seed)
+        return prepareSurface(
+            for: session,
+            configuration: seed.terminalConfiguration,
+            metricsPreset: seed.terminalMetricsPreset
+        )
     }
 
     func replaceSessionsForPreview(
@@ -486,11 +485,6 @@ final class SessionManager {
         externalDisplaySessionID: UUID?,
         hasExternalDisplayConnected: Bool
     ) {
-        assert(
-            Self.connectedSessionsHaveSurfaces(previewSessions),
-            "Connected preview sessions must carry a bound GhosttySurface."
-        )
-
         sessions = previewSessions
         self.activeSessionID = activeSessionID
         self.externalDisplaySessionID = externalDisplaySessionID
@@ -504,7 +498,9 @@ final class SessionManager {
                 externalDisplaySessionID: externalDisplaySessionID,
                 session: session
             )
-            _ = prepareSurface(for: session)
+            if let surface = session.surface {
+                activateSurface(surface, for: session)
+            }
         }
         persistSessions()
         notifySessionChanges()
@@ -593,6 +589,29 @@ final class SessionManager {
         surface.layoutIfNeeded()
     }
 
+    private func applyPersistedSnapshot(
+        _ snapshot: PersistedSessionSnapshot,
+        prepareSurfaces: Bool
+    ) {
+        sessions = snapshot.sessions.map(Self.session(from:))
+        activeSessionID = snapshot.activeSessionID
+        externalDisplaySessionID = snapshot.externalDisplaySessionID
+
+        for session in sessions {
+            session.isOnExternalDisplay = session.id == externalDisplaySessionID
+            if session.profile.authMethod == .password {
+                session.connectionPassword = credentialStore.password(for: session.profile.id)
+            }
+
+            if prepareSurfaces {
+                _ = prepareSurface(for: session)
+            }
+        }
+
+        persistSessions()
+        notifySessionChanges()
+    }
+
     private func prepareSurface(
         for session: SSHSessionModel,
         configuration: TerminalConfiguration? = nil,
@@ -605,23 +624,17 @@ final class SessionManager {
         if let surface = session.surface {
             guard surface.terminalConfiguration == resolvedConfiguration else {
                 guard session.bridge == nil else {
-                    bind(surface: surface, to: session)
-                    applySessionPresentationState(to: surface, session: session)
-                    applySurfaceState(surface.stateSnapshot, to: session)
+                    activateSurface(surface, for: session)
                     return true
                 }
 
                 // Update config in-place when possible to preserve terminal state
                 surface.updateConfiguration(resolvedConfiguration)
-                bind(surface: surface, to: session)
-                applySessionPresentationState(to: surface, session: session)
-                applySurfaceState(surface.stateSnapshot, to: session)
+                activateSurface(surface, for: session)
                 return true
             }
 
-            bind(surface: surface, to: session)
-            applySessionPresentationState(to: surface, session: session)
-            applySurfaceState(surface.stateSnapshot, to: session)
+            activateSurface(surface, for: session)
             return true
         }
 
@@ -631,9 +644,7 @@ final class SessionManager {
                 metricsPreset: metricsPreset
             )
             session.surface = surface
-            bind(surface: surface, to: session)
-            applySessionPresentationState(to: surface, session: session)
-            applySurfaceState(surface.stateSnapshot, to: session)
+            activateSurface(surface, for: session)
             persistSessions()
             notifySessionChanges()
             return true
@@ -643,6 +654,44 @@ final class SessionManager {
             notifySessionChanges()
             return false
         }
+    }
+
+    private func activateSurface(_ surface: GhosttySurface, for session: SSHSessionModel) {
+        bind(surface: surface, to: session)
+        applyPendingSyntheticPreviewSeedIfNeeded(to: surface, session: session)
+        applySessionPresentationState(to: surface, session: session)
+        applySurfaceState(surface.stateSnapshot, to: session)
+    }
+
+    private func applyPendingSyntheticPreviewSeedIfNeeded(
+        to surface: GhosttySurface,
+        session: SSHSessionModel
+    ) {
+        guard let seed = session.pendingSyntheticTerminalSeed else { return }
+
+        applySyntheticPreviewLayout(to: surface, seed: seed)
+        surface.title = seed.title
+        if !seed.transcript.isEmpty {
+            surface.writeToTerminal(Data(seed.transcript.utf8))
+        }
+
+        if let terminalSize = seed.terminalSize {
+            session.terminalSize = terminalSize
+        }
+        if let terminalPixelSize = seed.terminalPixelSize {
+            session.terminalPixelSize = terminalPixelSize
+        }
+        if let scrollbackLines = seed.scrollbackLines {
+            session.scrollbackLines = scrollbackLines
+        }
+        if let interactionGeometry = seed.interactionGeometry {
+            session.terminalInteractionGeometry = interactionGeometry
+        }
+        if let interactionCapabilities = seed.interactionCapabilities {
+            session.terminalInteractionCapabilities = interactionCapabilities
+        }
+
+        session.pendingSyntheticTerminalSeed = nil
     }
 
     private func bind(surface: GhosttySurface, to session: SSHSessionModel) {
@@ -679,6 +728,7 @@ final class SessionManager {
         session.terminalRenderFailureReason = state.renderFailureReason
         session.terminalVisibleTextSummary = state.visibleTextSummary
         session.terminalHasRenderedFrame = state.hasRenderedFrame
+        session.terminalPresentationDebugSummary = state.presentationDebugSummary
         session.terminalAnimationProgress = state.animationProgress
         session.terminalInteractionGeometry = state.interactionGeometry
         session.terminalInteractionCapabilities = state.interactionCapabilities
@@ -823,6 +873,13 @@ final class SessionManager {
             session.reconnectState = isReconnect ? .reconnected : .idle
             session.remoteControlKeyboardFocused = shouldShowRemoteTrackpad(for: session)
             session.shouldRestoreConnectionOnForeground = true
+            if let command = pendingUITestConnectedCommand {
+                pendingUITestConnectedCommand = nil
+                Task {
+                    try? await Task.sleep(for: .milliseconds(150))
+                    await bridge.sendInput(Data(command.utf8))
+                }
+            }
             if session.profile.authMethod == .password, let password, !password.isEmpty {
                 try? credentialStore.storePassword(password, for: session.profile.id)
             }
@@ -1048,7 +1105,6 @@ final class SessionManager {
 extension Notification.Name {
     static let externalDisplaySessionChanged = Notification.Name("externalDisplaySessionChanged")
 }
-#endif
 
 private extension PersistedSessionDescriptor.Status {
     var requiresLiveResources: Bool {

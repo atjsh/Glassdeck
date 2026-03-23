@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import SwiftUI
@@ -29,7 +28,9 @@ struct TerminalSurfaceView: View {
     }
 
     var body: some View {
-        let connectedSurfaceInvariantBroken = session.isConnected && session.surface == nil
+        let connectedSurfaceInvariantBroken = session.isConnected
+            && session.surface == nil
+            && !session.isAwaitingSyntheticPreviewSurface
         let terminalRenderFailureReason = session.terminalRenderFailureReason
         let _ = Self.reportConnectedSurfaceInvariantViolation(
             for: session,
@@ -81,7 +82,11 @@ struct TerminalSurfaceView: View {
                 isFocused: session.isConnected,
                 softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented
             )
-            .frame(width: 1, height: 1)
+            .frame(
+                width: exposesUITestInputProxy ? 44 : 1,
+                height: exposesUITestInputProxy ? 44 : 1
+            )
+            .opacity(exposesUITestInputProxy ? 0.01 : 0.001)
             .clipped()
         }
         .contentShape(Rectangle())
@@ -236,19 +241,23 @@ final class GhosttyTerminalHostingView: UIView {
             hostedSurface = surface
 
             surface.removeFromSuperview()
-            surface.translatesAutoresizingMaskIntoConstraints = false
+            surface.translatesAutoresizingMaskIntoConstraints = true
+            surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            surface.frame = bounds
             addSubview(surface)
-            NSLayoutConstraint.activate([
-                surface.leadingAnchor.constraint(equalTo: leadingAnchor),
-                surface.trailingAnchor.constraint(equalTo: trailingAnchor),
-                surface.topAnchor.constraint(equalTo: topAnchor),
-                surface.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
+            surface.setNeedsLayout()
+            surface.layoutIfNeeded()
         }
 
         surface.setSoftwareKeyboardPresented(softwareKeyboardPresented)
         surface.setFocused(isFocused)
+        surface.frame = bounds
         surface.setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        hostedSurface?.frame = bounds
     }
 }
 
@@ -301,4 +310,3 @@ struct GhosttyPositionedTerminalView: View {
         }
     }
 }
-#endif

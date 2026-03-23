@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GlassdeckCore
 import UIKit
@@ -18,6 +17,9 @@ enum UITestLaunchSupport {
     private static let animationFramesEnvironmentKey = "GLASSDECK_UI_TEST_ANIMATION_FRAMES_PATH"
     private static let terminalColorSchemeEnvironmentKey = "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME"
     private static let preserveHostStateEnvironmentKey = "GLASSDECK_UI_TEST_PRESERVE_HOST_STATE"
+    private static let seedLiveSSHSessionEnvironmentKey = "GLASSDECK_UI_TEST_SEED_LIVE_SSH_SESSION"
+    private static let seedLiveSSHNameEnvironmentKey = "GLASSDECK_UI_TEST_SEED_LIVE_SSH_NAME"
+    private static let connectedTerminalCommandEnvironmentKey = "GLASSDECK_UI_TEST_CONNECTED_TERMINAL_COMMAND_BASE64"
     private static let hostBackedLaunchRoutingStateDefaultsKey = "glassdeck.ui-test.launch-routing-state"
     private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
 
@@ -43,6 +45,10 @@ enum UITestLaunchSupport {
 
     static var exposesTerminalRenderSummary: Bool {
         ProcessInfo.processInfo.arguments.contains("-uiTestExposeTerminalRenderSummary")
+    }
+
+    static var requiresPreviewSurface: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTestRequirePreviewSurface")
     }
 
     static var isPreservingHostState: Bool {
@@ -73,6 +79,21 @@ enum UITestLaunchSupport {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-uiTestDisableAnimations") {
             UserDefaults.standard.set(false, forKey: "UIViewAnimationEnabled")
+        }
+
+        sessionManager.setUITestConnectedCommand(connectedTerminalCommand())
+
+        if let liveSSHSeed = LiveSSHSeed.load() {
+            resetPersistentTestState()
+            seedClipboardIfNeeded()
+            appSettings.resetTerminalConfig()
+            appSettings.remoteTrackpadLastMode = .cursor
+            applyTerminalSettingsOverrides(appSettings)
+            applyLiveSSHSeed(
+                liveSSHSeed,
+                sessionManager: sessionManager,
+                connectionStore: connectionStore
+            )
         }
 
         if isPreservingHostState {
@@ -313,8 +334,8 @@ enum UITestLaunchSupport {
         session.status = .connected
         session.connectedAt = connectedAt
 
-        let didSeedSurface = sessionManager.attachSyntheticSurfaceForPreview(
-            to: session,
+        sessionManager.primeSyntheticPreviewSession(
+            session,
             seed: SessionManager.SyntheticTerminalSeed(
                 title: terminalTitle,
                 transcript: previewTranscript(marker: transcriptMarker, profile: profile),
@@ -324,10 +345,6 @@ enum UITestLaunchSupport {
                 interactionGeometry: interactionGeometry,
                 interactionCapabilities: interactionCapabilities
             )
-        )
-        assert(
-            didSeedSurface,
-            "Connected preview sessions must have a synthetic GhosttySurface."
         )
         return session
     }
@@ -349,6 +366,26 @@ enum UITestLaunchSupport {
         ]
         .joined(separator: "\n")
         .appending("\n")
+    }
+
+    private static func applyLiveSSHSeed(
+        _ seed: LiveSSHSeed,
+        sessionManager: SessionManager,
+        connectionStore: ConnectionStore
+    ) {
+        if let keyData = seed.privateKeyData, let keyID = seed.profile.sshKeyID {
+            SSHKeyManager.shared.savePrivateKey(id: keyID, keyData: keyData)
+        }
+
+        if let password = seed.password, !password.isEmpty {
+            try? SessionCredentialStore().storePassword(password, for: seed.profile.id)
+        }
+
+        connectionStore.replaceAll(with: [seed.profile])
+        sessionManager.replaceSessionsFromPersistedSnapshot(
+            seed.snapshot,
+            prepareSurfaces: true
+        )
     }
 
     private static func resetPersistentTestState() {
@@ -414,5 +451,94 @@ enum UITestLaunchSupport {
         externalMonitorConfiguration.colorScheme = scheme
         appSettings.setTerminalConfig(externalMonitorConfiguration, for: .externalMonitor)
     }
+
+    private static func connectedTerminalCommand(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        guard
+            let encoded = environment[connectedTerminalCommandEnvironmentKey],
+            let data = Data(base64Encoded: encoded),
+            let command = String(data: data, encoding: .utf8),
+            !command.isEmpty
+        else {
+            return nil
+        }
+
+        return command
+    }
+
+    private struct LiveSSHSeed {
+        private static let seededProfileID = UUID(uuidString: "99999999-1111-1111-1111-111111111111") ?? UUID()
+        private static let seededSessionID = UUID(uuidString: "99999999-2222-2222-2222-222222222222") ?? UUID()
+        private static let seededSSHKeyID = "glassdeck-ui-test-live-ssh"
+
+        let profile: ConnectionProfile
+        let snapshot: PersistedSessionSnapshot
+        let password: String?
+        let privateKeyData: Data?
+
+        @MainActor
+        static func load(
+            environment: [String: String] = ProcessInfo.processInfo.environment
+        ) -> LiveSSHSeed? {
+            guard environment[seedLiveSSHSessionEnvironmentKey] == "1" else {
+                return nil
+            }
+
+            guard
+                environment["GLASSDECK_LIVE_SSH_ENABLED"] == "1",
+                let host = environment["GLASSDECK_LIVE_SSH_HOST"],
+                let portString = environment["GLASSDECK_LIVE_SSH_PORT"],
+                let port = Int(portString),
+                let username = environment["GLASSDECK_LIVE_SSH_USER"]
+            else {
+                return nil
+            }
+
+            let privateKeyData = environment["GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64"]
+                .flatMap { Data(base64Encoded: $0) }
+            let usesSSHKey = privateKeyData?.isEmpty == false
+            let authMethod: AuthMethod = usesSSHKey ? .sshKey : .password
+            let connectionName = environment[seedLiveSSHNameEnvironmentKey] ?? "UITest Live SSH"
+            let password = environment["GLASSDECK_LIVE_SSH_PASSWORD"]
+
+            let profile = ConnectionProfile(
+                id: seededProfileID,
+                name: connectionName,
+                host: host,
+                port: port,
+                username: username,
+                authMethod: authMethod,
+                sshKeyID: usesSSHKey ? seededSSHKeyID : nil,
+                notes: AttributedString("UITest live SSH seed."),
+                lastConnected: .now,
+                createdAt: .now
+            )
+
+            let descriptor = PersistedSessionDescriptor(
+                id: seededSessionID,
+                profile: profile,
+                status: .connected,
+                connectedAt: .now,
+                reconnectState: .idle,
+                terminalTitle: "\(username)@\(host)",
+                terminalSize: TerminalSize(columns: 80, rows: 24),
+                terminalPixelSize: nil,
+                scrollbackLines: 0,
+                shouldRestoreConnectionOnForeground: true,
+                isOnExternalDisplay: false
+            )
+
+            return LiveSSHSeed(
+                profile: profile,
+                snapshot: PersistedSessionSnapshot(
+                    sessions: [descriptor],
+                    activeSessionID: descriptor.id,
+                    externalDisplaySessionID: nil
+                ),
+                password: authMethod == .password ? password : nil,
+                privateKeyData: privateKeyData
+            )
+        }
+    }
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import CoreLocation
 import GlassdeckCore
 import SwiftUI
@@ -298,4 +297,3 @@ struct SheetDismissButton: View {
         Button("Done") { dismiss() }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import UIKit
 
@@ -133,4 +132,3 @@ extension UIResponder {
         // Forwarded by subclasses that implement keyboard handling
     }
 }
-#endif

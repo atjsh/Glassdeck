@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import SwiftUI
 import UniformTypeIdentifiers
 import GlassdeckCore
@@ -389,4 +388,3 @@ struct GenerateKeyView: View {
     }
 }
 
-#endif

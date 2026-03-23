@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import GlassdeckCore
 import SwiftUI
 
@@ -215,4 +214,3 @@ private struct SessionSummaryCard: View {
         }
     }
 }
-#endif

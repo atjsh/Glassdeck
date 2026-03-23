@@ -1,4 +1,3 @@
-#if canImport(GhosttyKit)
 import Foundation
 import GhosttyKit
 
@@ -8,6 +7,7 @@ import GhosttyKit
 /// NOT the main thread. We guard the output handler with an NSLock and
 /// never touch @MainActor state from the callback.
 public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
+    private static let debugTerminalInput = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private let lock = NSLock()
     private var _outputHandler: (@Sendable (Data) -> Void)?
 
@@ -18,7 +18,7 @@ public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
 
     /// Binds this IO adapter to a ghostty surface.
     /// Must be called exactly once, from the main thread, before any I/O begins.
-    func configure(surface: ghostty_surface_t) {
+    public func configure(surface: ghostty_surface_t) {
         self.surfacePtr = surface
 
         ghostty_surface_set_write_callback(
@@ -29,6 +29,7 @@ public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
                 let io = Unmanaged<GhosttyKitSurfaceIO>.fromOpaque(userdata)
                     .takeUnretainedValue()
                 let data = Data(bytes: ptr, count: Int(len))
+                io.debugLog("callback len=\(data.count) data=\(GhosttyKitSurfaceIO.debugDescription(for: data))")
                 io.lock.lock()
                 let handler = io._outputHandler
                 io.lock.unlock()
@@ -39,7 +40,7 @@ public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
     }
 
     /// Detach from the surface, clearing the callback.
-    func detach() {
+    public func detach() {
         guard let surface = surfacePtr else { return }
         ghostty_surface_set_write_callback(surface, nil, nil)
         surfacePtr = nil
@@ -48,22 +49,33 @@ public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
     // MARK: - TerminalIO
 
     public func setOutputHandler(_ handler: (@Sendable (Data) -> Void)?) async {
-        lock.lock()
-        _outputHandler = handler
-        lock.unlock()
+        lock.withLock {
+            _outputHandler = handler
+        }
     }
 
     /// Feed SSH data into the terminal for rendering.
     public func write(_ data: Data) async {
         guard let surface = surfacePtr else { return }
+        debugLog("process_output len=\(data.count) data=\(Self.debugDescription(for: data))")
         data.withUnsafeBytes { buf in
             guard let ptr = buf.baseAddress else { return }
             ghostty_surface_process_output(
                 surface,
                 ptr.assumingMemoryBound(to: CChar.self),
-                buf.count
+                UInt(buf.count)
             )
         }
     }
+
+    private func debugLog(_ message: String) {
+        guard GhosttyKitSurfaceIO.debugTerminalInput else { return }
+        NSLog("GhosttyKitSurfaceIO %@", message)
+    }
+
+    private static func debugDescription(for data: Data) -> String {
+        String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
 }
-#endif

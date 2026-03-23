@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import UIKit
 import SwiftUI
 
@@ -32,4 +31,3 @@ class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = nil
     }
 }
-#endif

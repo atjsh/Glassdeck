@@ -21,8 +21,6 @@ Pods/
 
 # Frameworks
 Frameworks/*
-!Frameworks/CGhosttyVT.xcframework/
-!Frameworks/CGhosttyVT.xcframework/**
 !GlassdeckApp.xcodeproj/
 !GlassdeckApp.xcodeproj/project.pbxproj
 !GlassdeckApp.xcodeproj/project.xcworkspace/

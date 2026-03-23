@@ -40,14 +40,18 @@ final class GlassdeckAppUITests: XCTestCase {
 
         sessionRow.tap()
 
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
-        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.exists)
+        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.waitForExistence(timeout: UITestTimeout.standard))
+        XCTAssertTrue(app.buttons["session-menu-button"].firstMatch.exists)
     }
 
     func testSessionScenarioTerminalScreenshotIsNotBlank() {
-        let app = launchApp(scenario: "sessions", openActiveSession: true)
+        let app = launchApp(
+            scenario: "sessions",
+            openActiveSession: true,
+            additionalArguments: ["-uiTestRequirePreviewSurface"]
+        )
 
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: UITestTimeout.short))
+        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.waitForExistence(timeout: UITestTimeout.long))
         waitForTerminalRenderSummary(
             containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
             in: app
@@ -64,12 +68,13 @@ final class GlassdeckAppUITests: XCTestCase {
         let app = launchApp(
             scenario: "sessions",
             openActiveSession: true,
+            additionalArguments: ["-uiTestRequirePreviewSurface"],
             additionalEnvironment: [
                 "GLASSDECK_UI_TEST_TERMINAL_COLOR_SCHEME": "Default Light"
             ]
         )
 
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: UITestTimeout.short))
+        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.waitForExistence(timeout: UITestTimeout.long))
         waitForTerminalRenderSummary(
             containingAnyOf: ["GLASSDECK_SSH_OK", "preview.txt", "/home/glassdeck"],
             in: app
@@ -211,13 +216,11 @@ final class GlassdeckAppUITests: XCTestCase {
         )
     }
 
-    func testFilesSheetCanLaunchFromSessionDetailScenario() {
+    func testSessionDetailDoesNotExposeLegacyFilesSheet() {
         let app = launchApp(scenario: "sessions", openActiveSession: true)
 
-        XCTAssertTrue(app.buttons["session-files-button"].firstMatch.waitForExistence(timeout: UITestTimeout.short))
-        app.buttons["session-files-button"].firstMatch.tap()
-        XCTAssertTrue(app.otherElements["sftp-browser-view"].firstMatch.waitForExistence(timeout: UITestTimeout.short))
-        XCTAssertTrue(app.staticTexts["Connect"].firstMatch.exists || app.staticTexts["Current Path"].firstMatch.exists)
+        XCTAssertTrue(app.otherElements["session-detail-view"].firstMatch.waitForExistence(timeout: UITestTimeout.long))
+        XCTAssertFalse(app.buttons["session-files-button"].firstMatch.exists)
     }
 
     @discardableResult

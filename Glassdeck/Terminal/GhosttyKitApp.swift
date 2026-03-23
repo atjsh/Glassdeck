@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import Foundation
 import GhosttyKit
 import UIKit
@@ -104,4 +103,3 @@ extension Notification.Name {
     static let ghosttyKitSurfaceTitleChanged = Notification.Name("ghosttyKitSurfaceTitleChanged")
     static let ghosttyKitBellRung = Notification.Name("ghosttyKitBellRung")
 }
-#endif

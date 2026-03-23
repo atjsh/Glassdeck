@@ -1,4 +1,3 @@
-#if canImport(UIKit)
 import CoreGraphics
 import Foundation
 import GlassdeckCore
@@ -320,4 +319,3 @@ final class RemoteTrackpadCoordinator {
         return geometry
     }
 }
-#endif

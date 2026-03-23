@@ -133,6 +133,48 @@ public struct XCResultExporter: XCResultExporting {
             }
         }
 
+        if let screen = findScreen(in: layout.attachmentsDirectory) {
+            if let aliasAnomaly = createStableAlias(from: screen, to: layout.screen) {
+                anomalies.append(aliasAnomaly)
+            } else {
+                entries.append(
+                    makeEntry(
+                        phase: "08-screen",
+                        kind: "image",
+                        path: layout.relativePath(for: layout.screen)
+                    )
+                )
+            }
+        }
+
+        if let terminal = findTerminal(in: layout.attachmentsDirectory) {
+            if let aliasAnomaly = createStableAlias(from: terminal, to: layout.terminal) {
+                anomalies.append(aliasAnomaly)
+            } else {
+                entries.append(
+                    makeEntry(
+                        phase: "09-terminal",
+                        kind: "image",
+                        path: layout.relativePath(for: layout.terminal)
+                    )
+                )
+            }
+        }
+
+        if let uiTree = findUiTree(in: layout.diagnosticsDirectory) {
+            if let aliasAnomaly = createStableAlias(from: uiTree, to: layout.uiTree) {
+                anomalies.append(aliasAnomaly)
+            } else {
+                entries.append(
+                    makeEntry(
+                        phase: "10-ui-tree",
+                        kind: "text",
+                        path: layout.relativePath(for: layout.uiTree)
+                    )
+                )
+            }
+        }
+
         return XCResultExportResult(entries: entries, anomalies: anomalies)
     }
 
@@ -262,19 +304,102 @@ public struct XCResultExporter: XCResultExporting {
     }
 
     private func findRecording(in attachmentsDirectory: URL) -> URL? {
-        let manifestPath = attachmentsDirectory.appendingPathComponent("manifest.json")
-        if let manifestData = try? Data(contentsOf: manifestPath),
-           let manifest = try? JSONDecoder().decode([AttachmentManifestRecord].self, from: manifestData) {
-            let candidate = manifest
-                .flatMap(\.attachments)
-                .first {
-                    $0.exportedFileName.lowercased().hasSuffix(".mp4")
-                    || ($0.suggestedHumanReadableName?.lowercased().contains("screen recording") ?? false)
-                }
-                .map { attachmentsDirectory.appendingPathComponent($0.exportedFileName) }
-            if let candidate, fileManager.fileExists(atPath: candidate.path) {
-                return candidate
+        if let matchingFromManifest = findAttachment(
+            in: attachmentsDirectory,
+            manifestMatch: { item in
+                let suggestion = item.suggestedHumanReadableName?.lowercased() ?? ""
+                return suggestion.contains("screen recording")
+                    || item.exportedFileName.lowercased().hasSuffix(".mp4")
+            },
+            fallbackMatch: { fileURL in
+                fileURL.pathExtension.lowercased() == "mp4"
             }
+        ) {
+            return matchingFromManifest
+        }
+
+        return nil
+    }
+
+    private func findScreen(in attachmentsDirectory: URL) -> URL? {
+        return findAttachment(
+            in: attachmentsDirectory,
+            manifestMatch: { item in
+                let suggestion = item.suggestedHumanReadableName?.lowercased() ?? ""
+                let fileName = item.exportedFileName.lowercased()
+                return fileName.hasSuffix(".png")
+                    && (fileName.contains("screen") || suggestion.contains("screen"))
+            },
+            fallbackMatch: { fileURL in
+                fileURL.pathExtension.lowercased() == "png"
+                    && fileURL.lastPathComponent.lowercased().contains("screen")
+            }
+        )
+    }
+
+    private func findTerminal(in attachmentsDirectory: URL) -> URL? {
+        return findAttachment(
+            in: attachmentsDirectory,
+            manifestMatch: { item in
+                let suggestion = item.suggestedHumanReadableName?.lowercased() ?? ""
+                let fileName = item.exportedFileName.lowercased()
+                return fileName.hasSuffix(".png")
+                    && (fileName.contains("terminal") || suggestion.contains("terminal"))
+            },
+            fallbackMatch: { fileURL in
+                fileURL.pathExtension.lowercased() == "png"
+                    && fileURL.lastPathComponent.lowercased().contains("terminal")
+            }
+        )
+    }
+
+    private func findUiTree(in diagnosticsDirectory: URL) -> URL? {
+        if !fileManager.fileExists(atPath: diagnosticsDirectory.path) {
+            return nil
+        }
+
+        let explicit = diagnosticsDirectory.appendingPathComponent(ArtifactLayout.uiTreeFileName)
+        if fileManager.fileExists(atPath: explicit.path) {
+            return explicit
+        }
+
+        guard let enumerator = fileManager.enumerator(
+            at: diagnosticsDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+
+        let matches: [URL] = enumerator.compactMap { element in
+            guard let fileURL = element as? URL else { return nil }
+            let name = fileURL.lastPathComponent.lowercased()
+            guard name.hasSuffix(".txt") else { return nil }
+            if name.contains("ui-tree") {
+                return fileURL
+            }
+            return nil
+        }
+
+        return matches.sorted { lhs, rhs in
+            lhs.path < rhs.path
+        }.first
+    }
+
+    private func findAttachment(
+        in attachmentsDirectory: URL,
+        manifestMatch: (AttachmentManifestItem) -> Bool,
+        fallbackMatch: ((URL) -> Bool)? = nil
+    ) -> URL? {
+        if let matchingFromManifest = findMatchingManifestItem(
+            in: attachmentsDirectory,
+            match: manifestMatch
+        ) {
+            return matchingFromManifest
+        }
+
+        guard let fallbackMatch else {
+            return nil
         }
 
         guard let enumerator = fileManager.enumerator(
@@ -285,9 +410,33 @@ public struct XCResultExporter: XCResultExporting {
             return nil
         }
 
+        var matches: [URL] = []
         for case let fileURL as URL in enumerator {
-            if fileURL.pathExtension.lowercased() == "mp4" {
-                return fileURL
+            if fallbackMatch(fileURL) {
+                matches.append(fileURL)
+            }
+        }
+
+        return matches.sorted { lhs, rhs in
+            lhs.path < rhs.path
+        }.first
+    }
+
+    private func findMatchingManifestItem(
+        in attachmentsDirectory: URL,
+        match: (AttachmentManifestItem) -> Bool
+    ) -> URL? {
+        let manifestPath = attachmentsDirectory.appendingPathComponent("manifest.json")
+        guard let manifestData = try? Data(contentsOf: manifestPath),
+              let manifest = try? JSONDecoder().decode([AttachmentManifestRecord].self, from: manifestData) else {
+            return nil
+        }
+
+        let matches = manifest.flatMap(\.attachments).filter(match)
+        for match in matches {
+            let candidate = attachmentsDirectory.appendingPathComponent(match.exportedFileName)
+            if fileManager.fileExists(atPath: candidate.path) {
+                return candidate
             }
         }
         return nil

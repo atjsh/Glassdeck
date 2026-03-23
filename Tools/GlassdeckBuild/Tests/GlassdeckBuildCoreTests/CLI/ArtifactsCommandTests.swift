@@ -79,6 +79,21 @@ final class ArtifactsCommandTests: XCTestCase {
             atPath: paths.layout.resultBundle.path,
             withIntermediateDirectories: true
         )
+        FileManager.default.createFile(
+            atPath: paths.layout.screen.path,
+            contents: Data(),
+            attributes: nil
+        )
+        FileManager.default.createFile(
+            atPath: paths.layout.terminal.path,
+            contents: Data(),
+            attributes: nil
+        )
+        FileManager.default.createFile(
+            atPath: paths.layout.uiTree.path,
+            contents: Data(),
+            attributes: nil
+        )
 
         var command = try ArtifactsCommand.parse(["--command", "test"])
 
@@ -94,6 +109,9 @@ final class ArtifactsCommandTests: XCTestCase {
         XCTAssertTrue(output.contains(ArtifactLayout.resultBundleFileName))
         XCTAssertTrue(output.contains(ArtifactLayout.diagnosticsDirectoryName))
         XCTAssertTrue(output.contains(ArtifactLayout.summaryFileName))
+        XCTAssertTrue(output.contains(ArtifactLayout.screenFileName))
+        XCTAssertTrue(output.contains(ArtifactLayout.terminalFileName))
+        XCTAssertTrue(output.contains(ArtifactLayout.uiTreeFileName))
         XCTAssertTrue(output.contains("summary body"))
     }
 }

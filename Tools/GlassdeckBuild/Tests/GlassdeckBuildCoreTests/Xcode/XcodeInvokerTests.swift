@@ -165,6 +165,99 @@ final class XcodeInvokerTests: XCTestCase {
         XCTAssertEqual(aliasURL.appendingPathComponent(destination).lastPathComponent, paths.artifactRoot.lastPathComponent)
     }
 
+    func testExecuteMergesStableAliasEntriesForScreenTerminalAndUiTree() async throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        defer { try? FileManager.default.removeItem(at: workspaceRoot) }
+
+        let fixedDate = Date(timeIntervalSince1970: 2_000_000_000)
+        let nowProvider: @Sendable () -> Date = { fixedDate }
+        let artifactPaths = ArtifactPaths(
+            repoRoot: workspaceRoot.appendingPathComponent("Glassdeck"),
+            worker: "worker-0",
+            nowProvider: nowProvider
+        )
+        let run = artifactPaths.makeRun(command: "test", runId: "ui", timestamp: artifactPaths.formatRunTimestamp(fixedDate))
+        let paths = artifactPaths.paths(for: run)
+        try FileManager.default.createDirectory(at: paths.artifactRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: paths.resultBundle.deletingLastPathComponent(), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: paths.resultBundle.path, contents: Data(), attributes: nil)
+
+        let exporter = RecordingXCResultExporter(
+            exportResult: XCResultExportResult(
+                entries: [
+                    ArtifactIndexEntry(
+                        phase: "03-summary-json",
+                        kind: "json",
+                        path: ArtifactLayout.summaryJSONFileName,
+                        timestamp: fixedDate
+                    ),
+                    ArtifactIndexEntry(
+                        phase: "04-diagnostics",
+                        kind: "directory",
+                        path: ArtifactLayout.diagnosticsDirectoryName,
+                        timestamp: fixedDate
+                    ),
+                    ArtifactIndexEntry(
+                        phase: "05-app-stdout-stderr",
+                        kind: "text",
+                        path: ArtifactLayout.appStdoutStderrFileName,
+                        timestamp: fixedDate
+                    ),
+                    ArtifactIndexEntry(
+                        phase: "06-screen",
+                        kind: "image",
+                        path: ArtifactLayout.screenFileName,
+                        timestamp: fixedDate
+                    ),
+                    ArtifactIndexEntry(
+                        phase: "07-terminal",
+                        kind: "image",
+                        path: ArtifactLayout.terminalFileName,
+                        timestamp: fixedDate
+                    ),
+                    ArtifactIndexEntry(
+                        phase: "08-ui-tree",
+                        kind: "text",
+                        path: ArtifactLayout.uiTreeFileName,
+                        timestamp: fixedDate
+                    ),
+                ]
+            )
+        )
+        let invoker = makeInvoker(
+            artifactPaths: artifactPaths,
+            processRunner: ScriptedProcessRunner(
+                responses: [
+                    ScriptedResponse(result: ProcessResult(exitCode: 0, standardOutput: "ok", standardError: ""))
+                ]
+            ),
+            exporter: exporter,
+            workspaceRoot: workspaceRoot.appendingPathComponent("Glassdeck"),
+            nowProvider: nowProvider
+        )
+
+        let result = try await invoker.execute(
+            XcodeCommandRequest(
+                action: .testWithoutBuilding,
+                scheme: .ui,
+                simulatorIdentifier: "SIM-0001"
+            )
+        )
+
+        let index = try ArtifactManifestWriter().readIndex(from: result.indexPath)
+        XCTAssertEqual(index.entries.map(\.path), [
+            ArtifactLayout.logFileName,
+            ArtifactLayout.resultBundleFileName,
+            ArtifactLayout.summaryJSONFileName,
+            ArtifactLayout.diagnosticsDirectoryName,
+            ArtifactLayout.appStdoutStderrFileName,
+            ArtifactLayout.screenFileName,
+            ArtifactLayout.terminalFileName,
+            ArtifactLayout.uiTreeFileName,
+            ArtifactLayout.summaryFileName,
+        ])
+    }
+
     func testExecutePropagatesExportAnomaliesIntoSummaryAndIndex() async throws {
         let workspaceRoot = try makeWorkspaceRoot()
         defer { try? FileManager.default.removeItem(at: workspaceRoot) }

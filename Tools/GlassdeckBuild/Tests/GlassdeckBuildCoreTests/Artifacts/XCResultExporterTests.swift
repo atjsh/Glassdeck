@@ -2,14 +2,64 @@ import Foundation
 import XCTest
 @testable import GlassdeckBuildCore
 
+private func makeDefaultDiagnosticsOutput(_ outputDirectory: URL) throws {
+    try FileManager.default.createDirectory(
+        at: outputDirectory,
+        withIntermediateDirectories: true
+    )
+    let appLog = outputDirectory.appendingPathComponent(
+        "StandardOutputAndStandardError-com.atjsh.GlassdeckDev.txt"
+    )
+    try "app stdout\napp stderr\n".write(to: appLog, atomically: true, encoding: .utf8)
+}
+
+private func makeDefaultAttachmentsOutput(_ outputDirectory: URL) throws {
+    try FileManager.default.createDirectory(
+        at: outputDirectory,
+        withIntermediateDirectories: true
+    )
+    let recording = outputDirectory.appendingPathComponent("screen-recording.mp4")
+    FileManager.default.createFile(
+        atPath: recording.path,
+        contents: Data("recording".utf8),
+        attributes: nil
+    )
+    let manifest = """
+    [
+      {
+        "attachments": [
+          {
+            "exportedFileName": "screen-recording.mp4",
+            "suggestedHumanReadableName": "Screen Recording"
+          }
+        ]
+      }
+    ]
+    """
+    try manifest.write(
+        to: outputDirectory.appendingPathComponent("manifest.json"),
+        atomically: true,
+        encoding: .utf8
+    )
+}
+
 private final class XCResultToolStubProcessRunner: ProcessRunner {
     let summaryOutput: String
     let failingSubcommands: Set<String>
+    let diagnosticsOutput: @Sendable (URL) throws -> Void
+    let attachmentsOutput: @Sendable (URL) throws -> Void
     private(set) var invocations: [ProcessInvocation] = []
 
-    init(summaryOutput: String, failingSubcommands: Set<String> = []) {
+    init(
+        summaryOutput: String,
+        failingSubcommands: Set<String> = [],
+        diagnosticsOutput: @escaping @Sendable (URL) throws -> Void = makeDefaultDiagnosticsOutput,
+        attachmentsOutput: @escaping @Sendable (URL) throws -> Void = makeDefaultAttachmentsOutput
+    ) {
         self.summaryOutput = summaryOutput
         self.failingSubcommands = failingSubcommands
+        self.diagnosticsOutput = diagnosticsOutput
+        self.attachmentsOutput = attachmentsOutput
     }
 
     func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
@@ -25,14 +75,7 @@ private final class XCResultToolStubProcessRunner: ProcessRunner {
             return try handleDirectoryExport(
                 invocation: invocation,
                 subcommand: "diagnostics",
-                populate: { outputDirectory in
-                    try FileManager.default.createDirectory(
-                        at: outputDirectory,
-                        withIntermediateDirectories: true
-                    )
-                    let appLog = outputDirectory.appendingPathComponent("StandardOutputAndStandardError-com.atjsh.GlassdeckDev.txt")
-                    try "app stdout\napp stderr\n".write(to: appLog, atomically: true, encoding: .utf8)
-                }
+                populate: diagnosticsOutput
             )
         }
 
@@ -40,35 +83,7 @@ private final class XCResultToolStubProcessRunner: ProcessRunner {
             return try handleDirectoryExport(
                 invocation: invocation,
                 subcommand: "attachments",
-                populate: { outputDirectory in
-                    try FileManager.default.createDirectory(
-                        at: outputDirectory,
-                        withIntermediateDirectories: true
-                    )
-                    let recording = outputDirectory.appendingPathComponent("screen-recording.mp4")
-                    FileManager.default.createFile(
-                        atPath: recording.path,
-                        contents: Data("recording".utf8),
-                        attributes: nil
-                    )
-                    let manifest = """
-                    [
-                      {
-                        "attachments": [
-                          {
-                            "exportedFileName": "screen-recording.mp4",
-                            "suggestedHumanReadableName": "Screen Recording"
-                          }
-                        ]
-                      }
-                    ]
-                    """
-                    try manifest.write(
-                        to: outputDirectory.appendingPathComponent("manifest.json"),
-                        atomically: true,
-                        encoding: .utf8
-                    )
-                }
+                populate: attachmentsOutput
             )
         }
 
@@ -100,6 +115,134 @@ private final class XCResultToolStubProcessRunner: ProcessRunner {
 }
 
 final class XCResultExporterTests: XCTestCase {
+    func testExportWritesStableArtifactsAndAliasesForUiTreeScreenAndTerminal() async throws {
+        let tempRoot = try makeExporterTempRoot()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let bundle = tempRoot.appendingPathComponent("result.xcresult")
+        FileManager.default.createFile(atPath: bundle.path, contents: Data(), attributes: nil)
+        let outputRoot = tempRoot.appendingPathComponent("artifacts")
+
+        let runner = XCResultToolStubProcessRunner(
+            summaryOutput: "{ \"format\": \"json\" }",
+            diagnosticsOutput: { outputDirectory in
+                try FileManager.default.createDirectory(
+                    at: outputDirectory,
+                    withIntermediateDirectories: true
+                )
+                let appLog = outputDirectory.appendingPathComponent(
+                    "StandardOutputAndStandardError-com.atjsh.GlassdeckDev.txt"
+                )
+                try "app stdout\napp stderr\n".write(to: appLog, atomically: true, encoding: .utf8)
+                let uiTree = outputDirectory.appendingPathComponent("ui-tree-3f2a.txt")
+                try "ui tree body".write(to: uiTree, atomically: true, encoding: .utf8)
+            },
+            attachmentsOutput: { outputDirectory in
+                try FileManager.default.createDirectory(
+                    at: outputDirectory,
+                    withIntermediateDirectories: true
+                )
+                let screen = outputDirectory.appendingPathComponent("screen-shot.png")
+                FileManager.default.createFile(
+                    atPath: screen.path,
+                    contents: Data("screen".utf8),
+                    attributes: nil
+                )
+                let terminal = outputDirectory.appendingPathComponent("terminal-output.png")
+                FileManager.default.createFile(
+                    atPath: terminal.path,
+                    contents: Data("terminal".utf8),
+                    attributes: nil
+                )
+                let recording = outputDirectory.appendingPathComponent("screen-recording.mp4")
+                FileManager.default.createFile(
+                    atPath: recording.path,
+                    contents: Data("recording".utf8),
+                    attributes: nil
+                )
+                let manifest = """
+                [
+                  {
+                    "attachments": [
+                      {
+                        "exportedFileName": "screen-shot.png",
+                        "suggestedHumanReadableName": "Screen"
+                      },
+                      {
+                        "exportedFileName": "terminal-output.png",
+                        "suggestedHumanReadableName": "Terminal"
+                      },
+                      {
+                        "exportedFileName": "screen-recording.mp4",
+                        "suggestedHumanReadableName": "Screen Recording"
+                      }
+                    ]
+                  }
+                ]
+                """
+                try manifest.write(
+                    to: outputDirectory.appendingPathComponent("manifest.json"),
+                    atomically: true,
+                    encoding: .utf8
+                )
+            }
+        )
+        let exporter = XCResultExporter(processRunner: runner)
+        let result = try await exporter.export(resultBundle: bundle, outputDirectory: outputRoot)
+        let layout = ArtifactLayout(artifactRoot: outputRoot)
+
+        XCTAssertEqual(
+            Set(result.entries.map { $0.path }),
+            Set([
+                ArtifactLayout.summaryJSONFileName,
+                ArtifactLayout.diagnosticsDirectoryName,
+                ArtifactLayout.appStdoutStderrFileName,
+                ArtifactLayout.attachmentsDirectoryName,
+                ArtifactLayout.recordingFileName,
+                ArtifactLayout.screenFileName,
+                ArtifactLayout.terminalFileName,
+                ArtifactLayout.uiTreeFileName,
+            ])
+        )
+        XCTAssertEqual(result.anomalies, [])
+        XCTAssertEqual(
+            URL(fileURLWithPath: try FileManager.default.destinationOfSymbolicLink(atPath: layout.screen.path))
+                .standardizedFileURL
+                .path,
+            layout.attachmentsDirectory
+                .appendingPathComponent("screen-shot.png")
+                .standardizedFileURL
+                .path
+        )
+        XCTAssertEqual(
+            URL(fileURLWithPath: try FileManager.default.destinationOfSymbolicLink(atPath: layout.terminal.path))
+                .standardizedFileURL
+                .path,
+            layout.attachmentsDirectory
+                .appendingPathComponent("terminal-output.png")
+                .standardizedFileURL
+                .path
+        )
+        XCTAssertEqual(
+            URL(fileURLWithPath: try FileManager.default.destinationOfSymbolicLink(atPath: layout.uiTree.path))
+                .standardizedFileURL
+                .path,
+            layout.diagnosticsDirectory
+                .appendingPathComponent("ui-tree-3f2a.txt")
+                .standardizedFileURL
+                .path
+        )
+        XCTAssertEqual(
+            URL(fileURLWithPath: try FileManager.default.destinationOfSymbolicLink(atPath: layout.recording.path))
+                .standardizedFileURL
+                .path,
+            layout.attachmentsDirectory
+                .appendingPathComponent("screen-recording.mp4")
+                .standardizedFileURL
+                .path
+        )
+    }
+
     func testExportWritesStableArtifactsAndAliasesOptionalOutputs() async throws {
         let tempRoot = try makeExporterTempRoot()
         defer { try? FileManager.default.removeItem(at: tempRoot) }

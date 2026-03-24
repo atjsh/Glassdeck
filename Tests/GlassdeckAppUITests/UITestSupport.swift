@@ -76,6 +76,7 @@ extension XCTestCase {
             app.launchArguments.append("-uiTestOpenActiveSession")
         }
         app.launchArguments.append(contentsOf: additionalArguments)
+        app.launchEnvironment.merge(uiTestLaunchEnvironment()) { current, _ in current }
         app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
         app.launch()
         return app
@@ -93,10 +94,28 @@ extension XCTestCase {
             app.launchArguments.append("-uiTestOpenActiveSession")
         }
         app.launchArguments.append(contentsOf: additionalArguments)
+        app.launchEnvironment.merge(uiTestLaunchEnvironment()) { current, _ in current }
         app.launchEnvironment[UITestEnvironmentKeys.preserveHostBackedState] = "1"
         app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
         app.launch()
         return app
+    }
+
+    func uiTestLaunchEnvironment() -> [String: String] {
+        let basePath = "/tmp/glassdeck-ui-tests"
+        prepareUITestFilesystemEnvironment(basePath: basePath)
+        return [
+            "HOME": basePath,
+            "TMPDIR": "\(basePath)/tmp",
+            "XDG_CONFIG_HOME": "\(basePath)/config",
+            "XDG_CACHE_HOME": "\(basePath)/cache",
+            "XDG_STATE_HOME": "\(basePath)/state",
+            "GLASSDECK_UI_TEST_USE_SYNTHETIC_TERMINAL": "1",
+        ]
+    }
+
+    func uiTestFilesystemEnvironment() -> [String: String] {
+        uiTestLaunchEnvironment()
     }
 
     func captureScreenshot(
@@ -178,6 +197,15 @@ extension XCTestCase {
     ) {
         let screenName = "\(name)-screen"
         _ = captureScreenScreenshot(named: screenName)
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        captureTextAttachment(
+            named: "\(name)-application-state",
+            text: [
+                "target-app-state=\(uiApplicationStateDescription(app.state))",
+                "springboard-state=\(uiApplicationStateDescription(springboard.state))",
+            ].joined(separator: "\n")
+        )
 
         let sessionDetail = app.otherElements["session-detail-view"].firstMatch
         _ = captureElementScreenshotIfPresent(
@@ -460,6 +488,45 @@ extension XCTestCase {
         )
     }
 
+    func probeCheckpointName(
+        prefix: String,
+        phase: String,
+        step: Int,
+        kind: String
+    ) -> String {
+        "\(probeSlug(prefix))-\(String(format: "%02d", step))-\(probeSlug(phase))-\(probeSlug(kind))"
+    }
+
+    func terminalRenderSummaryText(
+        in app: XCUIApplication
+    ) -> String {
+        let summaryElement = app.descendants(matching: .any)
+            .matching(identifier: "terminal-render-summary")
+            .firstMatch
+        return (summaryElement.value as? String) ?? summaryElement.label
+    }
+
+    @discardableResult
+    func captureProbeCheckpoint(
+        in app: XCUIApplication,
+        prefix: String,
+        phase: String,
+        step: Int,
+        kind: String,
+        captureDiagnostics: Bool = false
+    ) -> String {
+        let checkpointName = probeCheckpointName(
+            prefix: prefix,
+            phase: phase,
+            step: step,
+            kind: kind
+        )
+        if captureDiagnostics {
+            captureTerminalDiagnostics(in: app, named: checkpointName)
+        }
+        return checkpointName
+    }
+
     func waitForTerminalToBecomeUsable(
         in app: XCUIApplication,
         timeout: TimeInterval = 30,
@@ -506,6 +573,23 @@ extension XCTestCase {
         )
     }
 
+    func uiApplicationStateDescription(_ state: XCUIApplication.State) -> String {
+        switch state {
+        case .unknown:
+            "unknown"
+        case .notRunning:
+            "not-running"
+        case .runningBackgroundSuspended:
+            "running-background-suspended"
+        case .runningBackground:
+            "running-background"
+        case .runningForeground:
+            "running-foreground"
+        @unknown default:
+            "unknown-\(state.rawValue)"
+        }
+    }
+
     @discardableResult
     func waitForAnimationProgress(
         pastFrame frame: Int,
@@ -549,12 +633,10 @@ extension XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let host = app.descendants(matching: .any)
-            .matching(identifier: "session-keyboard-host")
-            .firstMatch
+        let state = app.otherElements["session-keyboard-state"].firstMatch
         XCTAssertTrue(
-            host.waitForExistence(timeout: 5),
-            "Expected the terminal keyboard host to exist.",
+            state.waitForExistence(timeout: 5),
+            "Expected the terminal keyboard state element to exist.",
             file: file,
             line: line
         )
@@ -562,19 +644,28 @@ extension XCTestCase {
         let expectedValue = presented ? "presented" : "hidden"
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            let currentValue = (host.value as? String) ?? host.label
+            let currentValue = (state.value as? String) ?? state.label
             if currentValue == expectedValue {
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
 
-        let currentValue = (host.value as? String) ?? host.label
+        let currentValue = (state.value as? String) ?? state.label
         XCTFail(
             "Timed out waiting for terminal keyboard state to become \(expectedValue). Current state: \(currentValue)",
             file: file,
             line: line
         )
+    }
+
+    func currentTerminalKeyboardState(in app: XCUIApplication) -> String {
+        let state = app.otherElements["session-keyboard-state"].firstMatch
+        XCTAssertTrue(
+            state.waitForExistence(timeout: 5),
+            "Expected the terminal keyboard state element to exist."
+        )
+        return (state.value as? String) ?? state.label
     }
 
     /// Accept the host key trust alert if it appears after initiating an SSH
@@ -668,6 +759,26 @@ extension XCTestCase {
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
+
+    private func probeSlug(_ value: String) -> String {
+        accessibilitySlug(value)
+    }
+
+    private func prepareUITestFilesystemEnvironment(basePath: String) {
+        let fileManager = FileManager.default
+        for path in [
+            basePath,
+            "\(basePath)/tmp",
+            "\(basePath)/config",
+            "\(basePath)/cache",
+            "\(basePath)/state",
+        ] {
+            try? fileManager.createDirectory(
+                at: URL(fileURLWithPath: path, isDirectory: true),
+                withIntermediateDirectories: true
+            )
+        }
     }
 
     private static func alphaComponentOffset(

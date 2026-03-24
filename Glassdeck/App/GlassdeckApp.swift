@@ -221,12 +221,16 @@ struct ContentView: View {
             return
         }
 
+        if selectedTab != .sessions {
+            selectedTab = .sessions
+            return
+        }
+
         launchRoutingScheduled = true
         Task { @MainActor in
             defer { launchRoutingScheduled = false }
-            // Yield once so the view hierarchy settles before navigating.
+            // Yield once so the Sessions NavigationStack settles before pushing.
             await Task.yield()
-            selectedTab = .sessions
             sessionsPath = [session.id]
             appliedLaunchRouting = true
             UITestLaunchSupport.setLaunchRoutingState(.routeApplied)

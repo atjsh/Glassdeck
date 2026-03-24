@@ -43,6 +43,23 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertEqual(store.loadSnapshot(), snapshot)
     }
 
+    func testSessionPersistenceStoreClearsCorruptedSnapshotData() {
+        let suiteName = "Glassdeck.CorruptedSessionPersistenceStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set(Data("not-json".utf8), forKey: "persisted-sessions")
+        let store = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+
+        XCTAssertNil(store.loadSnapshot())
+        XCTAssertNil(defaults.data(forKey: "persisted-sessions"))
+    }
+
     func testSessionCredentialStoreRoundTripsPassword() throws {
         let store = SessionCredentialStore(
             service: "Glassdeck.SessionCredentialStoreTests.\(UUID().uuidString)"
@@ -191,6 +208,294 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertNil(restoredSession.surface)
     }
 
+    func testSessionManagerCanPrimeRestoredSessionWithoutPreparingSurface() throws {
+        let defaults = isolatedDefaults(named: "PrimeRestoredSessionWithoutSurface")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let credentialStore = SessionCredentialStore(
+            service: "Glassdeck.PrimeRestoredSessionWithoutSurface.\(UUID().uuidString)"
+        )
+        let profile = sampleProfile()
+        let sessionID = UUID()
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+            credentialStore.removeAll()
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore,
+            credentialStore: credentialStore
+        )
+        sessionManager.replaceSessionsFromPersistedSnapshot(
+            PersistedSessionSnapshot(
+                sessions: [
+                    PersistedSessionDescriptor(
+                        id: sessionID,
+                        profile: profile,
+                        status: .connected,
+                        connectedAt: Date(timeIntervalSince1970: 5_432),
+                        reconnectState: .idle,
+                        terminalTitle: "\(profile.username)@\(profile.host)",
+                        terminalSize: TerminalSize(columns: 80, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 0,
+                        shouldRestoreConnectionOnForeground: true,
+                        isOnExternalDisplay: false
+                    )
+                ],
+                activeSessionID: sessionID,
+                externalDisplaySessionID: nil
+            ),
+            prepareSurfaces: false
+        )
+
+        let restoredSession = try XCTUnwrap(sessionManager.activeSession)
+        XCTAssertNil(restoredSession.surface)
+        XCTAssertFalse(sessionManager.isSessionDetailPresentable(for: restoredSession))
+
+        sessionManager.primeSyntheticPreviewSession(
+            restoredSession,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "\(profile.username)@\(profile.host)",
+                transcript: """
+                \(profile.username)@\(profile.host):~$ ls ~/testdata
+                nested
+                nano-target.txt
+                preview.txt
+                """,
+                terminalSize: TerminalSize(columns: 100, rows: 30),
+                scrollbackLines: 3
+            )
+        )
+
+        XCTAssertNil(restoredSession.surface)
+        XCTAssertTrue(sessionManager.isSessionDetailPresentable(for: restoredSession))
+        XCTAssertEqual(restoredSession.status, .reconnecting)
+        XCTAssertTrue(restoredSession.shouldRestoreConnectionOnForeground)
+        XCTAssertEqual(restoredSession.terminalTitle, "\(profile.username)@\(profile.host)")
+        XCTAssertEqual(restoredSession.terminalSize, TerminalSize(columns: 100, rows: 30))
+        XCTAssertEqual(restoredSession.scrollbackLines, 3)
+        XCTAssertTrue(restoredSession.terminalVisibleTextSummary.contains("preview.txt"))
+    }
+
+    func testPrimeSyntheticPreviewSessionCanFreezeConnectedPresentationWithoutRestore() throws {
+        let defaults = isolatedDefaults(named: "FreezeSyntheticPreviewPresentation")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let credentialStore = SessionCredentialStore(
+            service: "Glassdeck.FreezeSyntheticPreviewPresentation.\(UUID().uuidString)"
+        )
+        let profile = sampleProfile()
+        let sessionID = UUID()
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+            credentialStore.removeAll()
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore,
+            credentialStore: credentialStore
+        )
+        sessionManager.replaceSessionsFromPersistedSnapshot(
+            PersistedSessionSnapshot(
+                sessions: [
+                    PersistedSessionDescriptor(
+                        id: sessionID,
+                        profile: profile,
+                        status: .connected,
+                        connectedAt: Date(timeIntervalSince1970: 6_789),
+                        reconnectState: .attempting(attempt: 1, maxAttempts: 5),
+                        terminalTitle: "\(profile.username)@\(profile.host)",
+                        terminalSize: TerminalSize(columns: 80, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 0,
+                        shouldRestoreConnectionOnForeground: true,
+                        isOnExternalDisplay: false
+                    )
+                ],
+                activeSessionID: sessionID,
+                externalDisplaySessionID: nil
+            ),
+            prepareSurfaces: false
+        )
+
+        let restoredSession = try XCTUnwrap(sessionManager.activeSession)
+        XCTAssertEqual(restoredSession.status, .reconnecting)
+        XCTAssertTrue(restoredSession.shouldRestoreConnectionOnForeground)
+
+        sessionManager.primeSyntheticPreviewSession(
+            restoredSession,
+            seed: SessionManager.SyntheticTerminalSeed(
+                title: "\(profile.username)@\(profile.host)",
+                transcript: """
+                \(profile.username)@\(profile.host):~$ echo GLASSDECK_UI_KEY_OK
+                GLASSDECK_UI_KEY_OK
+                \(profile.username)@\(profile.host):~$ ls ~/testdata
+                preview.txt
+                """,
+                terminalSize: TerminalSize(columns: 90, rows: 28),
+                scrollbackLines: 4
+            ),
+            runtimeMode: .freezeConnectedPresentation
+        )
+
+        XCTAssertEqual(restoredSession.status, .connected)
+        XCTAssertEqual(restoredSession.reconnectState, .idle)
+        XCTAssertFalse(restoredSession.shouldRestoreConnectionOnForeground)
+        XCTAssertNil(restoredSession.surface)
+        XCTAssertTrue(sessionManager.isSessionDetailPresentable(for: restoredSession))
+        XCTAssertTrue(restoredSession.terminalVisibleTextSummary.contains("GLASSDECK_UI_KEY_OK"))
+        XCTAssertTrue(restoredSession.terminalVisibleTextSummary.contains("preview.txt"))
+    }
+
+    func testPrepareDeferredLiveSSHResumeRoutesActiveSessionCorrectly() {
+        let defaults = isolatedDefaults(named: "PrepareDeferredLiveSSHResume")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let credentialStore = SessionCredentialStore(
+            service: "Glassdeck.PrepareDeferredLiveSSHResume.\(UUID().uuidString)"
+        )
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+            credentialStore.removeAll()
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore,
+            credentialStore: credentialStore
+        )
+        let session = SSHSessionModel(profile: sampleProfile())
+        session.status = .reconnecting
+        session.shouldRestoreConnectionOnForeground = false
+        sessionManager.replaceSessionsForPreview(
+            [session],
+            activeSessionID: session.id,
+            externalDisplaySessionID: nil,
+            hasExternalDisplayConnected: false
+        )
+
+        UITestLaunchSupport.storeDeferredLiveSSHResumeSessionID(session.id, defaults: defaults)
+
+        let routedSession = UITestLaunchSupport.prepareDeferredLiveSSHResumeIfNeeded(
+            sessionManager: sessionManager,
+            defaults: defaults
+        )
+
+        XCTAssertTrue(routedSession === session)
+        XCTAssertTrue(session.shouldRestoreConnectionOnForeground)
+        XCTAssertNil(
+            defaults.string(forKey: "glassdeck.ui-test.deferred-live-ssh-session-id")
+        )
+    }
+
+    func testLaunchRoutingStateRoundTripsForPreservedHostBackedFlows() {
+        let defaults = isolatedDefaults(named: "LaunchRoutingState")
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+        }
+
+        XCTAssertEqual(
+            UITestLaunchSupport.launchRoutingState(defaults: defaults),
+            .unavailable
+        )
+
+        UITestLaunchSupport.setLaunchRoutingState(
+            .waitingForRouteableSession,
+            defaults: defaults
+        )
+
+        XCTAssertEqual(
+            UITestLaunchSupport.launchRoutingState(defaults: defaults),
+            .waitingForRouteableSession
+        )
+
+        UITestLaunchSupport.clearLaunchRoutingState(defaults: defaults)
+
+        XCTAssertEqual(
+            UITestLaunchSupport.launchRoutingState(defaults: defaults),
+            .unavailable
+        )
+    }
+
+    func testConnectSurfacesCredentialPersistenceFailureWithoutBreakingSuccessfulConnection() async throws {
+        let defaults = isolatedDefaults(named: "CredentialPersistenceFailure")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let credentialStore = FailingCredentialStore()
+        let shellProvider = StubShellSessionProvider()
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore,
+            credentialStore: credentialStore,
+            shellProvider: shellProvider
+        )
+
+        let connectedSession = await sessionManager.connect(
+            to: sampleProfile(authMethod: .password),
+            password: "persist-me"
+        )
+        let session = try XCTUnwrap(connectedSession)
+
+        XCTAssertEqual(session.status, .connected)
+        XCTAssertEqual(
+            session.runtimeWarningMessage,
+            FailingCredentialStore.testError.localizedDescription
+        )
+        XCTAssertEqual(session.connectionPassword, "persist-me")
+    }
+
+    func testConnectPreparesSyntheticSurfacePresentationMetricsForManualLiveSession() async throws {
+        let defaults = isolatedDefaults(named: "SyntheticSurfacePresentationMetrics")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let credentialStore = SessionCredentialStore(
+            service: "Glassdeck.SyntheticSurfacePresentationMetrics.\(UUID().uuidString)"
+        )
+        let shellProvider = StubShellSessionProvider()
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+            credentialStore.removeAll()
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore,
+            credentialStore: credentialStore,
+            shellProvider: shellProvider
+        )
+
+        let connectedSession = await sessionManager.connect(
+            to: sampleProfile(authMethod: .password),
+            password: "glassdeck"
+        )
+        let session = try XCTUnwrap(connectedSession)
+
+        XCTAssertEqual(session.status, .connected)
+        XCTAssertNotNil(session.surface)
+        let pixelSize = try XCTUnwrap(session.terminalPixelSize)
+        XCTAssertGreaterThan(pixelSize.width, 0)
+        XCTAssertGreaterThan(pixelSize.height, 0)
+        XCTAssertTrue(session.terminalHasRenderedFrame)
+        XCTAssertTrue(sessionManager.isTerminalPresentationReady(for: session))
+    }
+
     func testLifecycleCoordinatorMarksConnectedSessionsForForegroundRestoreAndSyncsRuntime() {
         let defaults = isolatedDefaults(named: "LifecycleCoordinator")
         let settings = AppSettings(defaults: defaults)
@@ -215,14 +520,15 @@ final class SessionPersistenceTests: XCTestCase {
         )
         let session = SSHSessionModel(profile: sampleProfile())
         session.status = .connected
-        XCTAssertTrue(sessionManager.attachSyntheticSurfaceForPreview(
-            to: session,
+        sessionManager.primeSyntheticPreviewSession(
+            session,
             seed: SessionManager.SyntheticTerminalSeed(
                 title: "tester@example.com",
                 transcript: "$ echo ok\nok\n$",
                 terminalSize: TerminalSize(columns: 100, rows: 30)
-            )
-        ))
+            ),
+            runtimeMode: .freezeConnectedPresentation
+        )
         sessionManager.replaceSessionsForPreview(
             [session],
             activeSessionID: session.id,
@@ -297,4 +603,49 @@ private final class BackgroundRuntimeRecorder {
     var liveSessionValues: [Bool] = []
     var requestAuthorizationCount = 0
     var resumeCount = 0
+}
+
+private final class FailingCredentialStore: SessionCredentialStoring {
+    static let testError = SessionCredentialStore.CredentialStoreError.storeFailed(errSecInteractionNotAllowed)
+
+    func storePassword(_ password: String, for profileID: UUID) throws {
+        throw Self.testError
+    }
+
+    func password(for profileID: UUID) -> String? {
+        nil
+    }
+
+    func deletePassword(for profileID: UUID) throws {}
+
+    func removeAll() {}
+}
+
+private actor StubShellSessionProvider: ShellSessionProvider {
+    private let shell = StubInteractiveShell()
+
+    func connect(to profile: ConnectionProfile, password: String?) async throws -> UUID {
+        UUID()
+    }
+
+    func openShell(
+        connectionID: UUID,
+        configuration: ShellLaunchConfiguration
+    ) async throws -> any InteractiveShell {
+        shell
+    }
+
+    func disconnect(connectionID: UUID) async {}
+
+    func removeConnection(connectionID: UUID) async {}
+}
+
+private actor StubInteractiveShell: InteractiveShell {
+    nonisolated let output = AsyncThrowingStream<Data, Error> { _ in }
+
+    func write(_ data: Data) async throws {}
+
+    func resize(to size: TerminalSize, pixelSize: TerminalPixelSize?) async throws {}
+
+    func close() async {}
 }

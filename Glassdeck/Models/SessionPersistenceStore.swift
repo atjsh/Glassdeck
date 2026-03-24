@@ -54,7 +54,12 @@ final class SessionPersistenceStore {
             return nil
         }
 
-        return try? JSONDecoder().decode(PersistedSessionSnapshot.self, from: data)
+        do {
+            return try JSONDecoder().decode(PersistedSessionSnapshot.self, from: data)
+        } catch {
+            clear()
+            return nil
+        }
     }
 
     func saveSnapshot(_ snapshot: PersistedSessionSnapshot) {

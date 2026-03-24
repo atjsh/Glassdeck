@@ -29,6 +29,7 @@ final class SSHSessionModel: Identifiable {
     var connectionPassword: String?
     var pendingUITestConnectedCommand: String?
     var pendingSyntheticTerminalSeed: SessionManager.SyntheticTerminalSeed?
+    var runtimeWarningMessage: String?
 
     // Terminal state
     var terminalTitle: String?

@@ -6,9 +6,50 @@ final class DockerLiveUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testLiveDockerClipboardSeedFailsWhenKeyMaterialIsMissing() {
+        let configuration = LiveDockerUITestConfiguration(
+            host: "127.0.0.1",
+            port: 22222,
+            username: "glassdeck",
+            password: "glassdeck",
+            privateKeyPath: "/tmp/glassdeck-missing-key-\(UUID().uuidString)"
+        )
+
+        XCTAssertThrowsError(try liveDockerClipboardSeed(from: configuration)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                "Live Docker UI test key material is missing at \(configuration.privateKeyPath)."
+            )
+        }
+    }
+
+    func testLiveDockerClipboardSeedFailsWhenKeyMaterialIsUnreadable() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glassdeck-key-dir-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+
+        let configuration = LiveDockerUITestConfiguration(
+            host: "127.0.0.1",
+            port: 22222,
+            username: "glassdeck",
+            password: "glassdeck",
+            privateKeyPath: directoryURL.path
+        )
+
+        XCTAssertThrowsError(try liveDockerClipboardSeed(from: configuration)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                "Live Docker UI test key material is unreadable at \(configuration.privateKeyPath)."
+            )
+        }
+    }
+
     func testPasswordAuthFlowCapturesGhosttyScreenshot() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        let app = launchLiveDockerApp(configuration: configuration)
+        let app = try launchLiveDockerApp(configuration: configuration)
 
         createConnection(
             app: app,
@@ -44,7 +85,7 @@ final class DockerLiveUITests: XCTestCase {
 
     func testSSHKeyAuthFlowCapturesGhosttyScreenshot() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        let app = launchSeededLiveDockerSSHKeyApp(
+        let app = try launchSeededLiveDockerSSHKeyApp(
             configuration: configuration,
             connectionName: "Docker Key",
             connectedCommand: "find\n"
@@ -60,7 +101,7 @@ final class DockerLiveUITests: XCTestCase {
 
     func testPasswordAuthSessionReconnectsAfterSpringboardRoundTrip() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        let app = launchLiveDockerApp(configuration: configuration)
+        let app = try launchLiveDockerApp(configuration: configuration)
 
         createConnection(
             app: app,
@@ -107,7 +148,7 @@ final class DockerLiveUITests: XCTestCase {
 
     func testPasswordAuthSessionRelaunchesIntoDetailWithoutBlankTerminal() throws {
         let configuration = try LiveDockerUITestConfiguration.load()
-        var app = launchLiveDockerApp(configuration: configuration)
+        var app = try launchLiveDockerApp(configuration: configuration)
 
         createConnection(
             app: app,
@@ -166,61 +207,6 @@ final class DockerLiveUITests: XCTestCase {
         assertScreenshotIsNotBlank(of: terminalSurface, named: "docker-relaunch-terminal")
     }
 
-    private func launchLiveDockerApp(configuration: LiveDockerUITestConfiguration) -> XCUIApplication {
-        let clipboardSeed = (try? Data(contentsOf: URL(fileURLWithPath: configuration.privateKeyPath)))
-            .map { $0.base64EncodedString() } ?? ""
-        var environment = liveDockerLaunchEnvironment(from: configuration)
-        environment["GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64"] = clipboardSeed
-
-        return launchUITestApp(
-            scenario: "empty",
-            additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
-            additionalEnvironment: environment
-        )
-    }
-
-    private func liveDockerLaunchEnvironment(from configuration: LiveDockerUITestConfiguration) -> [String: String] {
-        [
-            "GLASSDECK_LIVE_SSH_ENABLED": "1",
-            "GLASSDECK_LIVE_SSH_HOST": configuration.host,
-            "GLASSDECK_LIVE_SSH_PORT": String(configuration.port),
-            "GLASSDECK_LIVE_SSH_USER": configuration.username,
-            "GLASSDECK_LIVE_SSH_PASSWORD": configuration.password,
-            "GLASSDECK_LIVE_SSH_KEY_PATH": configuration.privateKeyPath,
-        ]
-    }
-
-    private func launchLiveDockerHostBackedApp(configuration: LiveDockerUITestConfiguration) -> XCUIApplication {
-        return launchHostBackedUITestApp(
-            openActiveSession: true,
-            additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
-            additionalEnvironment: liveDockerLaunchEnvironment(from: configuration)
-        )
-    }
-
-    private func launchSeededLiveDockerSSHKeyApp(
-        configuration: LiveDockerUITestConfiguration,
-        connectionName: String,
-        connectedCommand: String? = nil
-    ) -> XCUIApplication {
-        let clipboardSeed = (try? Data(contentsOf: URL(fileURLWithPath: configuration.privateKeyPath)))
-            .map { $0.base64EncodedString() } ?? ""
-        var environment = liveDockerLaunchEnvironment(from: configuration)
-        environment["GLASSDECK_UI_TEST_CLIPBOARD_TEXT_BASE64"] = clipboardSeed
-        environment["GLASSDECK_UI_TEST_SEED_LIVE_SSH_SESSION"] = "1"
-        environment["GLASSDECK_UI_TEST_SEED_LIVE_SSH_NAME"] = connectionName
-        if let connectedCommand {
-            environment["GLASSDECK_UI_TEST_CONNECTED_TERMINAL_COMMAND_BASE64"] =
-                Data(connectedCommand.utf8).base64EncodedString()
-        }
-
-        return launchHostBackedUITestApp(
-            openActiveSession: true,
-            additionalArguments: ["-uiTestExposeTerminalRenderSummary"],
-            additionalEnvironment: environment
-        )
-    }
-
     private func createConnection(
         app: XCUIApplication,
         name: String,
@@ -241,29 +227,6 @@ final class DockerLiveUITests: XCTestCase {
             XCTAssertTrue(authPicker.waitForExistence(timeout: UITestTimeout.standard))
             authPicker.buttons["SSH Key"].firstMatch.tap()
         }
-    }
-
-    private func assertConnectedTerminal(for app: XCUIApplication) {
-        let sessionDetail = app.otherElements["session-detail-view"].firstMatch
-        if !sessionDetail.waitForExistence(timeout: 20) {
-            captureTerminalDiagnostics(in: app, named: "docker-terminal-missing-session-detail")
-        }
-        XCTAssertTrue(sessionDetail.exists)
-
-        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
-        if !terminalSurface.waitForExistence(timeout: 20) {
-            captureTerminalDiagnostics(in: app, named: "docker-terminal-missing-surface")
-        }
-        XCTAssertTrue(terminalSurface.exists)
-    }
-
-    private func enterTerminalCommand(_ command: String, in app: XCUIApplication) {
-        let terminalInput = app.descendants(matching: .any)
-            .matching(identifier: "session-keyboard-host")
-            .firstMatch
-        XCTAssertTrue(terminalInput.waitForExistence(timeout: UITestTimeout.long))
-        terminalInput.tap()
-        terminalInput.typeText(command)
     }
 }
 

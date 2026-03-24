@@ -68,6 +68,14 @@ public final class GhosttyKitSurfaceIO: TerminalIO, @unchecked Sendable {
         }
     }
 
+    public func emitInput(_ data: Data) {
+        debugLog("emitInput len=\(data.count) data=\(Self.debugDescription(for: data))")
+        lock.lock()
+        let handler = _outputHandler
+        lock.unlock()
+        handler?(data)
+    }
+
     private func debugLog(_ message: String) {
         guard GhosttyKitSurfaceIO.debugTerminalInput else { return }
         NSLog("GhosttyKitSurfaceIO %@", message)

@@ -1,6 +1,12 @@
 import SwiftUI
 import UIKit
 
+@MainActor
+protocol SessionKeyboardInputSink: AnyObject {
+    func insertText(_ text: String)
+    func deleteBackward()
+}
+
 struct SessionKeyboardInputHost: UIViewRepresentable {
     let session: SSHSessionModel
     let isFocused: Bool
@@ -13,6 +19,7 @@ struct SessionKeyboardInputHost: UIViewRepresentable {
     func updateUIView(_ uiView: SessionKeyboardHostView, context: Context) {
         uiView.update(
             surface: session.surface,
+            inputSink: session.surface,
             isFocused: isFocused,
             softwareKeyboardPresented: softwareKeyboardPresented
         )
@@ -22,9 +29,11 @@ struct SessionKeyboardInputHost: UIViewRepresentable {
 final class SessionKeyboardHostView: UITextField {
     private static let debugTerminalInput = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private weak var surface: GhosttySurface?
+    private weak var inputSink: (any SessionKeyboardInputSink)?
     private let suppressedInputView = UIView(frame: .zero)
     private var softwareKeyboardPresented = false
     private var suppressTextForwarding = false
+    private var lastObservedText = ""
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -47,26 +56,33 @@ final class SessionKeyboardHostView: UITextField {
         accessibilityIdentifier = "session-keyboard-host"
         accessibilityLabel = "Software Keyboard Host"
         accessibilityTraits.insert(.playsSound)
+        addTarget(self, action: #selector(handleEditingChanged), for: .editingChanged)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTextDidChangeNotification),
+            name: UITextField.textDidChangeNotification,
+            object: self
+        )
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) not supported")
     }
 
-    override var text: String? {
-        didSet {
-            guard !suppressTextForwarding else { return }
-            forwardTextDelta(from: oldValue ?? "", to: text ?? "")
-        }
-    }
-
-    func update(surface: GhosttySurface?, isFocused: Bool, softwareKeyboardPresented: Bool) {
+    func update(
+        surface: GhosttySurface?,
+        inputSink: (any SessionKeyboardInputSink)?,
+        isFocused: Bool,
+        softwareKeyboardPresented: Bool
+    ) {
         if self.surface !== surface {
             suppressTextForwarding = true
             text = ""
             suppressTextForwarding = false
+            lastObservedText = ""
         }
         self.surface = surface
+        self.inputSink = inputSink
 
         if self.softwareKeyboardPresented != softwareKeyboardPresented {
             self.softwareKeyboardPresented = softwareKeyboardPresented
@@ -74,8 +90,6 @@ final class SessionKeyboardHostView: UITextField {
             debugLog("softwareKeyboardPresented=\(softwareKeyboardPresented)")
             reloadInputViews()
         }
-
-        accessibilityValue = softwareKeyboardPresented ? "presented" : "hidden"
 
         if isFocused {
             if !isFirstResponder {
@@ -127,6 +141,7 @@ final class SessionKeyboardHostView: UITextField {
 
     @discardableResult
     private func captureKeyboardFocusIfNeeded() -> Bool {
+        ensureSoftwareKeyboardPresented()
         if isFirstResponder {
             return true
         }
@@ -135,16 +150,96 @@ final class SessionKeyboardHostView: UITextField {
 
     override func insertText(_ text: String) {
         debugLog("insertText \(Self.debugDescription(for: text))")
+        if !text.isEmpty {
+            inputSink?.insertText(text)
+        }
+        suppressTextForwarding = true
         super.insertText(text)
+        suppressTextForwarding = false
+        lastObservedText = self.text ?? ""
     }
 
     override func deleteBackward() {
         debugLog("deleteBackward")
+        inputSink?.deleteBackward()
+        suppressTextForwarding = true
         super.deleteBackward()
+        suppressTextForwarding = false
+        lastObservedText = self.text ?? ""
+    }
+
+    override func replace(_ range: UITextRange, withText text: String) {
+        debugLog("replace \(Self.debugDescription(for: text))")
+
+        if let replacementRange = replacementRange(for: range, in: self.text ?? "") {
+            forwardReplacement(in: replacementRange, with: text, from: self.text ?? "")
+        }
+
+        suppressTextForwarding = true
+        super.replace(range, withText: text)
+        suppressTextForwarding = false
+        lastObservedText = self.text ?? ""
     }
 
     override func caretRect(for position: UITextPosition) -> CGRect {
         .zero
+    }
+
+    private func ensureSoftwareKeyboardPresented() {
+        guard !softwareKeyboardPresented else { return }
+
+        softwareKeyboardPresented = true
+        inputView = nil
+        debugLog("softwareKeyboardPresented=true")
+        reloadInputViews()
+        surface?.setSoftwareKeyboardPresented(true)
+    }
+
+    @objc
+    private func handleEditingChanged() {
+        let currentText = text ?? ""
+        guard !suppressTextForwarding else {
+            lastObservedText = currentText
+            return
+        }
+
+        forwardTextDelta(from: lastObservedText, to: currentText)
+        lastObservedText = currentText
+    }
+
+    @objc
+    private func handleTextDidChangeNotification(_ notification: Notification) {
+        handleEditingChanged()
+    }
+
+    private func replacementRange(for textRange: UITextRange, in currentText: String) -> Range<String.Index>? {
+        let start = offset(from: beginningOfDocument, to: textRange.start)
+        let end = offset(from: beginningOfDocument, to: textRange.end)
+        guard start >= 0, end >= start else { return nil }
+
+        let nsRange = NSRange(location: start, length: end - start)
+        return Range(nsRange, in: currentText)
+    }
+
+    private func forwardReplacement(
+        in range: Range<String.Index>,
+        with replacementText: String,
+        from currentText: String
+    ) {
+        guard let inputSink else { return }
+
+        let removedCount = currentText[range].count
+        if removedCount > 0 {
+            debugLog("replace delete count=\(removedCount)")
+            for _ in 0..<removedCount {
+                inputSink.deleteBackward()
+            }
+        }
+
+        if !replacementText.isEmpty {
+            debugLog("replace insert \(Self.debugDescription(for: replacementText))")
+            inputSink.insertText(replacementText)
+        }
     }
 
     private func debugLog(_ message: String) {
@@ -153,7 +248,7 @@ final class SessionKeyboardHostView: UITextField {
     }
 
     private func forwardTextDelta(from oldValue: String, to newValue: String) {
-        guard oldValue != newValue, let surface else { return }
+        guard oldValue != newValue, let inputSink else { return }
 
         let oldCharacters = Array(oldValue)
         let newCharacters = Array(newValue)
@@ -162,7 +257,7 @@ final class SessionKeyboardHostView: UITextField {
             let inserted = String(newCharacters.dropFirst(oldCharacters.count))
             if !inserted.isEmpty {
                 debugLog("textDelta insert \(Self.debugDescription(for: inserted))")
-                surface.insertText(inserted)
+                inputSink.insertText(inserted)
             }
             return
         }
@@ -171,7 +266,7 @@ final class SessionKeyboardHostView: UITextField {
             let deleteCount = oldCharacters.count - newCharacters.count
             debugLog("textDelta delete count=\(deleteCount)")
             for _ in 0..<deleteCount {
-                surface.deleteBackward()
+                inputSink.deleteBackward()
             }
             return
         }
@@ -180,10 +275,10 @@ final class SessionKeyboardHostView: UITextField {
             "textDelta replace old=\(Self.debugDescription(for: oldValue)) new=\(Self.debugDescription(for: newValue))"
         )
         for _ in oldCharacters {
-            surface.deleteBackward()
+            inputSink.deleteBackward()
         }
         if !newValue.isEmpty {
-            surface.insertText(newValue)
+            inputSink.insertText(newValue)
         }
     }
 

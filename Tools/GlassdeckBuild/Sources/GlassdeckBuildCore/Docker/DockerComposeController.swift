@@ -48,22 +48,32 @@ public final class DockerComposeController {
         self.configuration = configuration
     }
 
-    public func composeInvocation(_ action: [String]) -> ProcessInvocation {
+    public func composeInvocation(
+        _ action: [String],
+        outputMode: ProcessOutputMode = .captureOnly
+    ) -> ProcessInvocation {
         let base = ["docker", "compose", "--project-name", configuration.projectName, "-f", configuration.composeFile.path]
         return ProcessInvocation(
             executable: configuration.dockerExecutable,
             arguments: base + action,
             workingDirectory: configuration.runtimeDirectory ?? configuration.composeFile.deletingLastPathComponent(),
-            environment: configuration.environment
+            environment: configuration.environment,
+            outputMode: outputMode
         )
     }
 
     public func upInvocation() -> ProcessInvocation {
-        composeInvocation(["up", "-d", "--build", "--remove-orphans"])
+        composeInvocation(
+            ["up", "-d", "--build", "--remove-orphans"],
+            outputMode: .captureAndStreamTimestamped
+        )
     }
 
     public func downInvocation() -> ProcessInvocation {
-        composeInvocation(["down", "--remove-orphans"])
+        composeInvocation(
+            ["down", "--remove-orphans"],
+            outputMode: .captureAndStreamTimestamped
+        )
     }
 
     public func psInvocation() -> ProcessInvocation {

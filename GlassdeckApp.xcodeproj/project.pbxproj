@@ -18,6 +18,7 @@
 		1A26E9797AF482E3591E0DBE /* RemoteTrackpadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50682CEA7008EA91FFACCA63 /* RemoteTrackpadView.swift */; };
 		1AD85BA84B4CF6D1C17B5985 /* TerminalTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36286365FB2BA217E77A74F1 /* TerminalTypes.swift */; };
 		1CFC0247F93C87A78D1471E1 /* HostKeyVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C0E8BDE6FB844C55279C64 /* HostKeyVerifier.swift */; };
+		1F473F6C2D114D7BBF95A1E0 /* DockerLiveProbeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F473F6C2D114D7BBF95A1DF /* DockerLiveProbeUITests.swift */; };
 		238456104395F3D1E0677A22 /* SSHConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8C5434B1CE3E167928D26D /* SSHConnectionManager.swift */; };
 		23E2FD7ED2F5433A0789C115 /* InputCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2CF4A869284921964E6599 /* InputCoordinator.swift */; };
 		2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */; };
@@ -70,6 +71,7 @@
 		B50F17463B3EA1EAF79C43A8 /* SSHAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 498A6E341C4B331BE4757D97 /* SSHAuthenticator.swift */; };
 		B9238B2A05296209F5F4A9C9 /* InteractiveShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7197037A07EEDF4779EC844A /* InteractiveShell.swift */; };
 		BE38DD292FA574FAA2B7B1B5 /* SSHShellSessionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDB1ED2AD494308F94E5F39 /* SSHShellSessionProvider.swift */; };
+		BFF9B19AAB714A58BE173D95 /* DockerLiveUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF9B19AAB714A58BE173D94 /* DockerLiveUITestSupport.swift */; };
 		C13335DD602D2D5B39250409 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 340623B38D06C3110ABD9183 /* IOSurface.framework */; };
 		C3F1F893FF605228DDF16520 /* PointerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */; };
 		C51405D26C0AA665BE8FE928 /* SSHCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33D976484FD96FC20BEC22A /* SSHCoreTests.swift */; };
@@ -172,6 +174,7 @@
 		16FD32CCA730D7979ABF01B1 /* SessionRecoveryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRecoveryPanel.swift; sourceTree = "<group>"; };
 		1E2C3044276437BE6B658CB6 /* SessionLifecycleCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLifecycleCoordinator.swift; sourceTree = "<group>"; };
 		1E54A997A0F4F64E7B511A33 /* SSHKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHKeyManager.swift; sourceTree = "<group>"; };
+		1F473F6C2D114D7BBF95A1DF /* DockerLiveProbeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveProbeUITests.swift; sourceTree = "<group>"; };
 		20B3138E2668BAC4233AD890 /* PointerInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerInputHandler.swift; sourceTree = "<group>"; };
 		20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveUITests.swift; sourceTree = "<group>"; };
 		21009691205AE27E102D8B7C /* ConnectionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionProfile.swift; sourceTree = "<group>"; };
@@ -226,6 +229,7 @@
 		BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTrackpadScreenshotUITests.swift; sourceTree = "<group>"; };
 		BBDF7780997986B7A106EA40 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		BFAB31B722BBDB381779394D /* GhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalView.swift; sourceTree = "<group>"; };
+		BFF9B19AAB714A58BE173D94 /* DockerLiveUITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerLiveUITestSupport.swift; sourceTree = "<group>"; };
 		C177AD1D58783D01618EAC18 /* TerminalRenderingConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderingConsistencyTests.swift; sourceTree = "<group>"; };
 		C181B166BD2A79C753076DF3 /* UITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
 		C3105D44E097230A7374ACEC /* RemoteControlMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlMode.swift; sourceTree = "<group>"; };
@@ -448,9 +452,11 @@
 		8656E458568ACBF343F9268D /* GlassdeckAppUITests */ = {
 			isa = PBXGroup;
 			children = (
+				1F473F6C2D114D7BBF95A1DF /* DockerLiveProbeUITests.swift */,
 				20EC4CA21F3A1F2CD1AE651B /* DockerLiveUITests.swift */,
 				9E0D826DED51A49CB3D0B278 /* GlassdeckAppUITests.swift */,
 				BB9943E73DB6027F874A854A /* RemoteTrackpadScreenshotUITests.swift */,
+				BFF9B19AAB714A58BE173D94 /* DockerLiveUITestSupport.swift */,
 				C181B166BD2A79C753076DF3 /* UITestSupport.swift */,
 			);
 			path = GlassdeckAppUITests;
@@ -836,8 +842,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1F473F6C2D114D7BBF95A1E0 /* DockerLiveProbeUITests.swift in Sources */,
 				2FCEEF66F90C8315E3CF407F /* DockerLiveUITests.swift in Sources */,
 				92B3AE8BCF98BA568F85486C /* GlassdeckAppUITests.swift in Sources */,
+				BFF9B19AAB714A58BE173D95 /* DockerLiveUITestSupport.swift in Sources */,
 				FC8505FAF84CE98066E4F9D9 /* RemoteTrackpadScreenshotUITests.swift in Sources */,
 				D0FFE6D936A614F8D29DC84A /* UITestSupport.swift in Sources */,
 			);

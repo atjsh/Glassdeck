@@ -26,6 +26,11 @@ final class SessionManager {
         var interactionCapabilities: GhosttyVTInteractionCapabilities?
     }
 
+    enum SyntheticPreviewRuntimeMode {
+        case preserveExistingSessionState
+        case freezeConnectedPresentation
+    }
+
     private(set) var sessions: [SSHSessionModel] = []
     private(set) var activeSessionID: UUID?
     private(set) var externalDisplaySessionID: UUID?
@@ -39,7 +44,7 @@ final class SessionManager {
     private var reconnectManager: SSHReconnectManager
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let persistenceStore: SessionPersistenceStore
-    @ObservationIgnored private let credentialStore: SessionCredentialStore
+    @ObservationIgnored private let credentialStore: any SessionCredentialStoring
     @ObservationIgnored private var restoredPersistedSessions = false
     @ObservationIgnored private var pendingUITestConnectedCommand: String?
     weak var lifecycleDelegate: SessionManagerLifecycleDelegate?
@@ -47,7 +52,7 @@ final class SessionManager {
     init(
         appSettings: AppSettings = AppSettings(),
         persistenceStore: SessionPersistenceStore = SessionPersistenceStore(),
-        credentialStore: SessionCredentialStore = SessionCredentialStore(),
+        credentialStore: any SessionCredentialStoring = SessionCredentialStore(),
         shellProvider: any ShellSessionProvider = SSHShellSessionProvider()
     ) {
         self.appSettings = appSettings
@@ -91,6 +96,10 @@ final class SessionManager {
             && activeSessionID == session.id
             && externalDisplaySessionID == session.id
             && session.isLiveForRemoteControl
+    }
+
+    static func connectedSessionsHaveSurfaces(_ sessions: [SSHSessionModel]) -> Bool {
+        sessions.allSatisfy { !$0.isConnected || $0.surface != nil }
     }
 
     /// Get the terminal surface for a session.
@@ -440,8 +449,19 @@ final class SessionManager {
 
     func primeSyntheticPreviewSession(
         _ session: SSHSessionModel,
-        seed: SyntheticTerminalSeed
+        seed: SyntheticTerminalSeed,
+        runtimeMode: SyntheticPreviewRuntimeMode = .preserveExistingSessionState
     ) {
+        switch runtimeMode {
+        case .preserveExistingSessionState:
+            break
+        case .freezeConnectedPresentation:
+            session.status = .connected
+            session.reconnectState = .idle
+            session.shouldRestoreConnectionOnForeground = false
+            session.bridge = nil
+        }
+
         session.pendingSyntheticTerminalSeed = seed
         session.terminalTitle = seed.title
         session.terminalVisibleTextSummary = seed.transcript
@@ -659,6 +679,7 @@ final class SessionManager {
     private func activateSurface(_ surface: GhosttySurface, for session: SSHSessionModel) {
         bind(surface: surface, to: session)
         applyPendingSyntheticPreviewSeedIfNeeded(to: surface, session: session)
+        surface.prepareSyntheticPresentationIfNeeded()
         applySessionPresentationState(to: surface, session: session)
         applySurfaceState(surface.stateSnapshot, to: session)
     }
@@ -828,6 +849,7 @@ final class SessionManager {
 
         session.requestedManualDisconnect = false
         session.connectionPassword = password
+        session.runtimeWarningMessage = nil
         session.reconnectState = isReconnect ? session.reconnectState : .idle
         session.status = isReconnect ? .reconnecting : .connecting
         session.shouldRestoreConnectionOnForeground = true
@@ -856,6 +878,10 @@ final class SessionManager {
                 )
             )
 
+            if surface.usesSyntheticTerminalBackend {
+                surface.clearSyntheticTranscript()
+            }
+
             let bridge = SSHPTYBridge(terminal: GhosttySurfaceTerminalIO(surface: surface))
             session.bridge = bridge
 
@@ -881,7 +907,11 @@ final class SessionManager {
                 }
             }
             if session.profile.authMethod == .password, let password, !password.isEmpty {
-                try? credentialStore.storePassword(password, for: session.profile.id)
+                do {
+                    try credentialStore.storePassword(password, for: session.profile.id)
+                } catch {
+                    session.runtimeWarningMessage = error.localizedDescription
+                }
             }
             persistSessions()
             notifySessionChanges()
@@ -958,6 +988,9 @@ final class SessionManager {
             activeSessionID: activeSessionID,
             externalDisplaySessionID: externalDisplaySessionID
         )
+        if persistenceStore.loadSnapshot() == snapshot {
+            return
+        }
         persistenceStore.saveSnapshot(snapshot)
     }
 

@@ -21,6 +21,7 @@ enum UITestLaunchSupport {
     private static let seedLiveSSHNameEnvironmentKey = "GLASSDECK_UI_TEST_SEED_LIVE_SSH_NAME"
     private static let connectedTerminalCommandEnvironmentKey = "GLASSDECK_UI_TEST_CONNECTED_TERMINAL_COMMAND_BASE64"
     private static let hostBackedLaunchRoutingStateDefaultsKey = "glassdeck.ui-test.launch-routing-state"
+    private static let deferredLiveSSHResumeSessionDefaultsKey = "glassdeck.ui-test.deferred-live-ssh-session-id"
     private static var activeAnimationPlayer: GhosttyHomeAnimationPlayer?
 
     enum HostBackedLaunchState: String {
@@ -60,15 +61,64 @@ enum UITestLaunchSupport {
     }
 
     static var launchRoutingState: HostBackedLaunchState {
-        HostBackedLaunchState(rawValue: UserDefaults.standard.string(forKey: hostBackedLaunchRoutingStateDefaultsKey) ?? "") ?? .unavailable
+        launchRoutingState()
     }
 
-    static func setLaunchRoutingState(_ state: HostBackedLaunchState) {
-        UserDefaults.standard.set(state.rawValue, forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    static func launchRoutingState(defaults: UserDefaults = .standard) -> HostBackedLaunchState {
+        HostBackedLaunchState(rawValue: defaults.string(forKey: hostBackedLaunchRoutingStateDefaultsKey) ?? "")
+            ?? .unavailable
     }
 
-    static func clearLaunchRoutingState() {
-        UserDefaults.standard.removeObject(forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    static func setLaunchRoutingState(_ state: HostBackedLaunchState, defaults: UserDefaults = .standard) {
+        defaults.set(state.rawValue, forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    }
+
+    static func clearLaunchRoutingState(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: hostBackedLaunchRoutingStateDefaultsKey)
+    }
+
+    static func storeDeferredLiveSSHResumeSessionID(
+        _ sessionID: UUID?,
+        defaults: UserDefaults = .standard
+    ) {
+        guard let sessionID else {
+            defaults.removeObject(forKey: deferredLiveSSHResumeSessionDefaultsKey)
+            return
+        }
+
+        defaults.set(sessionID.uuidString, forKey: deferredLiveSSHResumeSessionDefaultsKey)
+    }
+
+    @discardableResult
+    static func prepareDeferredLiveSSHResumeIfNeeded(
+        sessionManager: SessionManager,
+        defaults: UserDefaults = .standard
+    ) -> SSHSessionModel? {
+        guard
+            let rawSessionID = defaults.string(forKey: deferredLiveSSHResumeSessionDefaultsKey),
+            let sessionID = UUID(uuidString: rawSessionID),
+            let session = sessionManager.session(with: sessionID)
+        else {
+            defaults.removeObject(forKey: deferredLiveSSHResumeSessionDefaultsKey)
+            return nil
+        }
+
+        defaults.removeObject(forKey: deferredLiveSSHResumeSessionDefaultsKey)
+        session.shouldRestoreConnectionOnForeground = true
+        return session
+    }
+
+    static func resumeDeferredLiveSSHSeedIfNeeded(sessionManager: SessionManager) {
+        guard prepareDeferredLiveSSHResumeIfNeeded(sessionManager: sessionManager) != nil else {
+            return
+        }
+
+        Task { @MainActor in
+            // Give SwiftUI one more turn to mount the routed session detail view
+            // before reconnecting and preparing the live surface.
+            await Task.yield()
+            sessionManager.resumeRestorableSessionsIfNeeded()
+        }
     }
 
     static func configureIfNeeded(
@@ -384,8 +434,24 @@ enum UITestLaunchSupport {
         connectionStore.replaceAll(with: [seed.profile])
         sessionManager.replaceSessionsFromPersistedSnapshot(
             seed.snapshot,
-            prepareSurfaces: true
+            prepareSurfaces: false
         )
+        if let session = sessionManager.activeSession ?? sessionManager.sessions.first {
+            sessionManager.primeSyntheticPreviewSession(
+                session,
+                seed: SessionManager.SyntheticTerminalSeed(
+                    title: "\(seed.profile.username)@\(seed.profile.host)",
+                    transcript: previewTranscript(marker: previewTerminalMarker, profile: seed.profile),
+                    terminalSize: TerminalSize(columns: 80, rows: 24),
+                    scrollbackLines: 6
+                )
+            )
+            let shouldResumeLiveConnection = session.shouldRestoreConnectionOnForeground
+            session.shouldRestoreConnectionOnForeground = false
+            storeDeferredLiveSSHResumeSessionID(
+                shouldResumeLiveConnection ? session.id : nil
+            )
+        }
     }
 
     private static func resetPersistentTestState() {
@@ -395,6 +461,7 @@ enum UITestLaunchSupport {
         SessionCredentialStore().removeAll()
         HostKeyVerifier.clearAllKnownHosts()
         UserDefaults.standard.removeObject(forKey: "glassdeck.known-hosts")
+        storeDeferredLiveSSHResumeSessionID(nil)
         for keyID in SSHKeyManager.shared.listKeys() {
             try? SSHKeyManager.shared.deleteKey(id: keyID)
         }
@@ -501,7 +568,6 @@ enum UITestLaunchSupport {
             let authMethod: AuthMethod = usesSSHKey ? .sshKey : .password
             let connectionName = environment[seedLiveSSHNameEnvironmentKey] ?? "UITest Live SSH"
             let password = environment["GLASSDECK_LIVE_SSH_PASSWORD"]
-
             let profile = ConnectionProfile(
                 id: seededProfileID,
                 name: connectionName,
@@ -518,7 +584,7 @@ enum UITestLaunchSupport {
             let descriptor = PersistedSessionDescriptor(
                 id: seededSessionID,
                 profile: profile,
-                status: .connected,
+                status: .disconnected,
                 connectedAt: .now,
                 reconnectState: .idle,
                 terminalTitle: "\(username)@\(host)",

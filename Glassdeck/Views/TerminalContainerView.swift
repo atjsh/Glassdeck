@@ -99,7 +99,26 @@ private struct SessionDetailContent: View {
             return "[presentation] \(summary)"
         }()
 
+        let availableTerminalSummary: String? = {
+            guard !session.terminalVisibleTextSummary.isEmpty else { return nil }
+            if let terminalRenderFailureReason = session.terminalRenderFailureReason {
+                return
+                    "\(session.terminalVisibleTextSummary)\n[render unavailable] \(terminalRenderFailureReason)"
+            }
+            return session.terminalVisibleTextSummary
+        }()
+
         if !showingRemoteTrackpad && !terminalPresentationReady {
+            if session.surface == nil, let availableTerminalSummary {
+                return [
+                    availableTerminalSummary,
+                    "[presentation pending] Restoring terminal surface",
+                    presentationDebugLine,
+                ]
+                .compactMap { $0 }
+                .joined(separator: "\n")
+            }
+
             let pendingLine: String
             if session.surface == nil {
                 pendingLine = "[terminal pending] Restoring terminal surface"
@@ -110,19 +129,13 @@ private struct SessionDetailContent: View {
                 .compactMap { $0 }
                 .joined(separator: "\n")
         }
-        if session.terminalVisibleTextSummary.isEmpty {
+        guard let availableTerminalSummary else {
             return [session.terminalRenderFailureReason, presentationDebugLine]
                 .compactMap { $0?.isEmpty == false ? $0 : nil }
                 .joined(separator: "\n")
         }
-        let terminalSummary: String
-        if let terminalRenderFailureReason = session.terminalRenderFailureReason {
-            terminalSummary =
-                "\(session.terminalVisibleTextSummary)\n[render unavailable] \(terminalRenderFailureReason)"
-        } else {
-            terminalSummary = session.terminalVisibleTextSummary
-        }
-        return [terminalSummary, presentationDebugLine]
+
+        return [availableTerminalSummary, presentationDebugLine]
             .compactMap { $0 }
             .joined(separator: "\n")
     }
@@ -230,6 +243,7 @@ private struct SessionDetailContent: View {
                 id: session.id,
                 focusSurface: !exposesRenderSummaryForUITests
             )
+            UITestLaunchSupport.resumeDeferredLiveSSHSeedIfNeeded(sessionManager: sessionManager)
         }
         .accessibilityElement(children: .contain)
         .overlay(alignment: .bottomTrailing) {

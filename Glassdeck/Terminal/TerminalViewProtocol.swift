@@ -51,6 +51,9 @@ struct TerminalSurfaceView: View {
                         configuration: GhosttyHomeAnimationSequence.testingTerminalConfiguration,
                         metricsPreset: GhosttyHomeAnimationSequence.testingMetricsPreset
                     )
+                } else if surface.usesSyntheticTerminalBackend {
+                    SyntheticTerminalPreview(surface: surface)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     GhosttyTerminalViewWrapper(
                         surface: surface,
@@ -77,29 +80,44 @@ struct TerminalSurfaceView: View {
             }
         }
         .overlay {
-            SessionKeyboardInputHost(
-                session: session,
-                isFocused: session.isConnected,
-                softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented
-            )
-            .frame(
-                width: exposesUITestInputProxy ? 44 : 1,
-                height: exposesUITestInputProxy ? 44 : 1
-            )
-            .opacity(exposesUITestInputProxy ? 0.01 : 0.001)
-            .clipped()
+            ZStack {
+                SessionKeyboardInputHost(
+                    session: session,
+                    isFocused: session.isConnected,
+                    softwareKeyboardPresented: session.localTerminalSoftwareKeyboardPresented
+                )
+                .frame(
+                    width: exposesUITestInputProxy ? 44 : 1,
+                    height: exposesUITestInputProxy ? 44 : 1
+                )
+                .opacity(exposesUITestInputProxy ? 0.01 : 0.001)
+                .clipped()
+
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: 1, height: 1)
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("session-keyboard-state")
+                    .accessibilityValue(session.localTerminalSoftwareKeyboardPresented ? "presented" : "hidden")
+            }
         }
         .contentShape(Rectangle())
         .simultaneousGesture(
             TapGesture().onEnded {
-                guard session.isConnected else { return }
-                let presented = !session.localTerminalSoftwareKeyboardPresented
-                session.localTerminalSoftwareKeyboardPresented = presented
-                session.surface?.setSoftwareKeyboardPresented(presented)
+                toggleLocalSoftwareKeyboardPresentation()
             }
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("terminal-surface-view")
+    }
+
+    private func toggleLocalSoftwareKeyboardPresentation() {
+        guard session.isConnected else { return }
+        let presented = !session.localTerminalSoftwareKeyboardPresented
+        session.localTerminalSoftwareKeyboardPresented = presented
+        session.surface?.setSoftwareKeyboardPresented(presented)
     }
 
     @ViewBuilder
@@ -292,11 +310,7 @@ struct GhosttyPositionedTerminalView: View {
             ZStack {
                 Color.black
 
-                GhosttyTerminalViewWrapper(
-                    surface: surface,
-                    isFocused: isFocused,
-                    softwareKeyboardPresented: softwareKeyboardPresented
-                )
+                terminalContent
                 .frame(
                     width: naturalBounds.width,
                     height: naturalBounds.height
@@ -309,4 +323,147 @@ struct GhosttyPositionedTerminalView: View {
             .clipped()
         }
     }
+
+    @ViewBuilder
+    private var terminalContent: some View {
+        if surface.usesSyntheticTerminalBackend {
+            SyntheticTerminalPreview(surface: surface)
+        } else {
+            GhosttyTerminalViewWrapper(
+                surface: surface,
+                isFocused: isFocused,
+                softwareKeyboardPresented: softwareKeyboardPresented
+            )
+        }
+    }
+}
+
+private struct SyntheticTerminalPreview: View {
+    let surface: GhosttySurface
+
+    private var surfaceState: GhosttySurfaceState {
+        surface.stateSnapshot
+    }
+
+    private var theme: TerminalTheme {
+        surface.terminalConfiguration.colorScheme.theme
+    }
+
+    private var backgroundColor: Color {
+        terminalColor(theme.background)
+    }
+
+    private var foregroundColor: Color {
+        terminalColor(theme.foreground)
+    }
+
+    private var accentColor: Color {
+        terminalColor(theme.palette.dropFirst(2).first ?? theme.cursor)
+    }
+
+    private var borderColor: Color {
+        terminalColor(theme.palette.dropFirst(4).first ?? theme.cursor)
+    }
+
+    private var previewText: String {
+        let summary = condensedTerminalPreviewText(surfaceState.visibleTextSummary)
+        if !summary.isEmpty {
+            return summary
+        }
+
+        if !surfaceState.presentationDebugSummary.isEmpty {
+            return surfaceState.presentationDebugSummary
+        }
+
+        return "$ synthetic terminal ready"
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+        shape
+            .fill(backgroundColor)
+            .overlay {
+                VStack(alignment: .leading, spacing: 0) {
+                    headerBar
+                    LinearGradient(
+                        colors: [accentColor.opacity(0.95), borderColor.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 7)
+
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(borderColor.opacity(0.28))
+                            .frame(width: 4)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("$ glassdeck")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(accentColor)
+
+                            Text(previewText)
+                                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                                .foregroundStyle(foregroundColor)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        }
+                        .padding(16)
+                    }
+                }
+            }
+            .overlay {
+                shape.stroke(borderColor.opacity(0.9), lineWidth: 2)
+            }
+            .clipShape(shape)
+    }
+
+    private var headerBar: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(terminalColor(theme.palette.dropFirst().first ?? theme.cursor))
+                .frame(width: 10, height: 10)
+            Circle()
+                .fill(terminalColor(theme.palette.dropFirst(3).first ?? theme.cursor))
+                .frame(width: 10, height: 10)
+            Circle()
+                .fill(accentColor)
+                .frame(width: 10, height: 10)
+
+            Spacer()
+
+            Text(surfaceState.terminalSize.columns > 0 && surfaceState.terminalSize.rows > 0
+                 ? "\(surfaceState.terminalSize.columns)x\(surfaceState.terminalSize.rows)"
+                 : "synthetic")
+                .font(.caption2.monospaced())
+                .foregroundStyle(foregroundColor.opacity(0.72))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+}
+
+private func terminalColor(_ color: GhosttyVTColor) -> Color {
+    Color(
+        red: Double(color.r) / 255,
+        green: Double(color.g) / 255,
+        blue: Double(color.b) / 255
+    )
+}
+
+private func condensedTerminalPreviewText(_ summary: String) -> String {
+    let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedSummary.isEmpty else { return "" }
+
+    let recentLines = trimmedSummary
+        .split(whereSeparator: { $0.isNewline })
+        .suffix(10)
+        .map(String.init)
+        .joined(separator: "\n")
+
+    if recentLines.count <= 640 {
+        return recentLines
+    }
+
+    return String(recentLines.suffix(640))
 }

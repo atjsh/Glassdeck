@@ -125,15 +125,17 @@ enum GhosttySurfaceError: Error, LocalizedError {
 // MARK: - GhosttySurface
 
 @MainActor
-final class GhosttySurface: UIView, UIKeyInput {
+final class GhosttySurface: UIView, UIKeyInput, SessionKeyboardInputSink {
     private static let bellSoundID: SystemSoundID = 1103
     private static let debugTerminalInput = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private static let initialSurfaceFrame = CGRect(x: 0, y: 0, width: 800, height: 600)
     private static let resizeDebounceInterval: Duration = .milliseconds(16)
     private static let logger = Logger(subsystem: "com.glassdeck", category: "GhosttyTerminalView")
+    private static let syntheticTerminalEnvironmentKey = "GLASSDECK_UI_TEST_USE_SYNTHETIC_TERMINAL"
 
     private let configuration: TerminalConfiguration
     private let metricsPreset: GhosttySurfaceMetricsPreset?
+    private let syntheticTerminalEnabled: Bool
     private var surface: ghostty_surface_t?
     private var ghosttyConfig: ghostty_config_t?
     let surfaceIO: GhosttyKitSurfaceIO
@@ -158,6 +160,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     private var currentAnimationAccentColumnsByRow: [Int: IndexSet]?
     private var titleObserver: NSObjectProtocol?
     private var bellObserver: NSObjectProtocol?
+    private var syntheticVisibleTextSummary = ""
 
     var title: String?
     var isHealthy = true
@@ -167,6 +170,10 @@ final class GhosttySurface: UIView, UIKeyInput {
     var onSoftwareKeyboardPresentationChange: ((Bool) -> Void)?
     var terminalConfiguration: TerminalConfiguration {
         configuration
+    }
+
+    var usesSyntheticTerminalBackend: Bool {
+        syntheticTerminalEnabled
     }
 
     override class var layerClass: AnyClass {
@@ -187,7 +194,9 @@ final class GhosttySurface: UIView, UIKeyInput {
 
     var stateSnapshot: GhosttySurfaceState {
         var visibleTextSummary = ""
-        if UITestLaunchSupport.exposesTerminalRenderSummary, let surface {
+        if usesSyntheticTerminalBackend {
+            visibleTextSummary = syntheticVisibleTextSummary
+        } else if UITestLaunchSupport.exposesTerminalRenderSummary, let surface {
             visibleTextSummary = Self.readVisibleText(from: surface)
         }
 
@@ -197,7 +206,7 @@ final class GhosttySurface: UIView, UIKeyInput {
             pixelSize: pixelSize,
             scrollbackLines: configuration.scrollbackLines,
             isHealthy: isHealthy,
-            renderFailureReason: surface == nil ? "Surface not created" : nil,
+            renderFailureReason: usesSyntheticTerminalBackend || surface != nil ? nil : "Surface not created",
             visibleTextSummary: visibleTextSummary,
             hasRenderedFrame: renderCount > 0 && currentPixelSize.width > 0 && currentPixelSize.height > 0,
             animationProgress: currentAnimationProgress,
@@ -269,9 +278,14 @@ final class GhosttySurface: UIView, UIKeyInput {
     ) throws {
         self.configuration = configuration
         self.metricsPreset = metricsPreset
+        self.syntheticTerminalEnabled =
+            ProcessInfo.processInfo.environment[Self.syntheticTerminalEnvironmentKey] == "1"
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         self.surfaceIO = GhosttyKitSurfaceIO()
         super.init(frame: Self.initialSurfaceFrame)
-        try createSurface()
+        if !syntheticTerminalEnabled {
+            try createSurface()
+        }
         setupView()
         setupNotificationObservers()
     }
@@ -306,6 +320,10 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func writeToTerminal(_ data: Data) {
+        if usesSyntheticTerminalBackend {
+            appendSyntheticTranscript(data)
+            return
+        }
         guard let surface else { return }
         if configuration.bellSound, data.contains(0x07) {
             AudioServicesPlaySystemSound(Self.bellSoundID)
@@ -341,6 +359,10 @@ final class GhosttySurface: UIView, UIKeyInput {
     func setFocused(_ focused: Bool) {
         guard focused != terminalIsFocused else { return }
         terminalIsFocused = focused
+        guard !usesSyntheticTerminalBackend else {
+            publishState()
+            return
+        }
         guard let surface else { return }
         ghostty_surface_set_focus(surface, focused)
         publishState()
@@ -387,6 +409,12 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func insertText(_ text: String) {
+        if usesSyntheticTerminalBackend {
+            guard !text.isEmpty else { return }
+            debugLog("insertText \(Self.debugDescription(for: text))")
+            surfaceIO.emitInput(Data(text.utf8))
+            return
+        }
         guard let surface, !text.isEmpty else { return }
         debugLog("insertText \(Self.debugDescription(for: text))")
         text.withCString { cstr in
@@ -395,6 +423,11 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func deleteBackward() {
+        if usesSyntheticTerminalBackend {
+            debugLog("deleteBackward")
+            surfaceIO.emitInput(Data("\u{7f}".utf8))
+            return
+        }
         guard let surface else { return }
         debugLog("deleteBackward")
         let del = "\u{7f}"
@@ -404,6 +437,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func setMarkedText(_ markedText: String?) {
+        guard !usesSyntheticTerminalBackend else { return }
         guard let surface else { return }
         if let markedText, !markedText.isEmpty {
             markedText.withCString { cstr in
@@ -415,6 +449,7 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     func unmarkText() {
+        guard !usesSyntheticTerminalBackend else { return }
         guard let surface else { return }
         ghostty_surface_preedit(surface, nil, 0)
     }
@@ -430,6 +465,11 @@ final class GhosttySurface: UIView, UIKeyInput {
     }
 
     override func paste(_ sender: Any?) {
+        if usesSyntheticTerminalBackend, let string = UIPasteboard.general.string, !string.isEmpty {
+            debugLog("paste \(Self.debugDescription(for: string))")
+            surfaceIO.emitInput(Data(string.utf8))
+            return
+        }
         guard let surface, let string = UIPasteboard.general.string else { return }
         debugLog("paste \(Self.debugDescription(for: string))")
         string.withCString { cstr in
@@ -557,6 +597,10 @@ final class GhosttySurface: UIView, UIKeyInput {
         _ presses: Set<UIPress>,
         action: KeyAction
     ) -> Set<UIPress> {
+        if usesSyntheticTerminalBackend {
+            return handleSyntheticHardwarePresses(presses, action: action)
+        }
+
         guard let surface else { return presses }
         var unhandled = Set<UIPress>()
         let ghosttyAction = action.ghosttyAction
@@ -635,6 +679,9 @@ final class GhosttySurface: UIView, UIKeyInput {
         isAccessibilityElement = true
         accessibilityIdentifier = "ghostty-terminal-surface"
         accessibilityTraits.insert(.allowsDirectInteraction)
+
+        guard !usesSyntheticTerminalBackend else { return }
+
         metalLayer.pixelFormat = .bgra8Unorm
         metalLayer.framebufferOnly = false
         metalLayer.contentsScale = traitCollection.displayScale
@@ -722,6 +769,10 @@ final class GhosttySurface: UIView, UIKeyInput {
 
     private func updateLayout() {
         guard bounds.width > 0, bounds.height > 0 else { return }
+        if usesSyntheticTerminalBackend {
+            updateSyntheticLayout()
+            return
+        }
         guard let surface else { return }
 
         let scale = traitCollection.displayScale
@@ -852,6 +903,30 @@ final class GhosttySurface: UIView, UIKeyInput {
         onStateChange?(stateSnapshot)
     }
 
+    func clearSyntheticTranscript() {
+        guard usesSyntheticTerminalBackend else { return }
+        syntheticVisibleTextSummary = ""
+        publishState()
+    }
+
+    func prepareSyntheticPresentationIfNeeded() {
+        guard usesSyntheticTerminalBackend else { return }
+        guard currentPixelSize.width == 0 || currentPixelSize.height == 0 || renderCount == 0 else {
+            return
+        }
+        if bounds.width <= 0 || bounds.height <= 0 {
+            frame = Self.initialSurfaceFrame
+        }
+        updateSyntheticLayout()
+        if let size = pendingResizeSize {
+            resizeDebounceTask?.cancel()
+            resizeDebounceTask = nil
+            applyResize(size: size, pixelSize: pendingResizePixelSize)
+            pendingResizeSize = nil
+            pendingResizePixelSize = nil
+        }
+    }
+
     private func presentationDebugSummary() -> String {
         let scale = max(currentDisplayScale, 1)
         let drawableSize = metalLayer.drawableSize
@@ -907,6 +982,106 @@ final class GhosttySurface: UIView, UIKeyInput {
             encoding: .utf8,
             freeWhenDone: false
         ) ?? ""
+    }
+
+    private func appendSyntheticTranscript(_ data: Data) {
+        let rendered = String(decoding: data, as: UTF8.self)
+        if !rendered.isEmpty {
+            syntheticVisibleTextSummary.append(rendered)
+            syntheticVisibleTextSummary = Self.condensedSyntheticSummary(syntheticVisibleTextSummary)
+        }
+        renderCount += 1
+        publishState()
+    }
+
+    private func updateSyntheticLayout() {
+        let scale = max(traitCollection.displayScale, 1)
+        currentDisplayScale = scale
+
+        let displayMode = GhosttySurfaceLayoutMetrics.displayMode(for: window?.windowScene)
+        let resolvedCellSize = GhosttySurfaceLayoutMetrics.cellSize(
+            for: configuration,
+            mode: displayMode,
+            metricsPreset: metricsPreset
+        )
+        let basePadding = GhosttySurfaceLayoutMetrics.basePadding(
+            for: bounds,
+            mode: displayMode,
+            metricsPreset: metricsPreset
+        )
+        let usableWidth = max(1, bounds.width - basePadding.left - basePadding.right)
+        let usableHeight = max(1, bounds.height - basePadding.top - basePadding.bottom)
+        let columns = max(1, Int(floor(usableWidth / resolvedCellSize.width)))
+        let rows = max(1, Int(floor(usableHeight / resolvedCellSize.height)))
+        let contentWidth = CGFloat(columns) * resolvedCellSize.width
+        let contentHeight = CGFloat(rows) * resolvedCellSize.height
+        let extraHorizontal = max(0, bounds.width - basePadding.left - basePadding.right - contentWidth)
+        let extraVertical = max(0, bounds.height - basePadding.top - basePadding.bottom - contentHeight)
+
+        cellSize = resolvedCellSize
+        currentPadding = UIEdgeInsets(
+            top: basePadding.top + floor(extraVertical / 2),
+            left: basePadding.left + floor(extraHorizontal / 2),
+            bottom: basePadding.bottom + ceil(extraVertical / 2),
+            right: basePadding.right + ceil(extraHorizontal / 2)
+        )
+
+        let newTerminalSize = TerminalSize(columns: columns, rows: rows)
+        let newPixelSize = TerminalPixelSize(
+            width: Int((bounds.width * scale).rounded()),
+            height: Int((bounds.height * scale).rounded())
+        )
+        let newCellPixelSize = TerminalPixelSize(
+            width: Int((resolvedCellSize.width * scale).rounded()),
+            height: Int((resolvedCellSize.height * scale).rounded())
+        )
+        let sizeChanged = newTerminalSize != currentTerminalSize || newPixelSize != currentPixelSize
+        currentCellPixelSize = newCellPixelSize
+        renderCount += 1
+
+        guard sizeChanged else {
+            publishState()
+            return
+        }
+
+        scheduleResize(size: newTerminalSize, pixelSize: newPixelSize)
+    }
+
+    private func handleSyntheticHardwarePresses(
+        _ presses: Set<UIPress>,
+        action: KeyAction
+    ) -> Set<UIPress> {
+        guard action == .press else { return [] }
+
+        var unhandled = Set<UIPress>()
+        for press in presses {
+            guard let key = press.key else {
+                unhandled.insert(press)
+                continue
+            }
+
+            let characters = key.charactersIgnoringModifiers.isEmpty
+                ? key.characters
+                : key.charactersIgnoringModifiers
+            if characters.isEmpty {
+                unhandled.insert(press)
+                continue
+            }
+
+            surfaceIO.emitInput(Data(characters.utf8))
+        }
+        return unhandled
+    }
+
+    private static func condensedSyntheticSummary(_ summary: String) -> String {
+        let trimmed = summary.trimmingCharacters(in: .newlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if trimmed.count <= 2_048 {
+            return trimmed
+        }
+
+        return String(trimmed.suffix(2_048))
     }
 
     private static func createGhosttyConfig(for terminal: TerminalConfiguration) -> ghostty_config_t? {
@@ -1128,4 +1303,3 @@ private extension GhosttySurface {
             .replacingOccurrences(of: "\r", with: "\\r")
     }
 }
-

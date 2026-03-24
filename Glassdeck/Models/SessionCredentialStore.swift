@@ -1,7 +1,14 @@
 import Foundation
 import Security
 
-final class SessionCredentialStore {
+protocol SessionCredentialStoring: AnyObject {
+    func storePassword(_ password: String, for profileID: UUID) throws
+    func password(for profileID: UUID) -> String?
+    func deletePassword(for profileID: UUID) throws
+    func removeAll()
+}
+
+final class SessionCredentialStore: SessionCredentialStoring {
     private static let defaultKeychainService = "com.glassdeck.session-credentials"
     private let keychainService: String
 

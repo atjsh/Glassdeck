@@ -154,6 +154,44 @@ final class GlassdeckAppUITests: XCTestCase {
         waitForTerminalKeyboardState(presented: false, in: app)
     }
 
+    func testSessionScenarioKeyboardHostTapDoesNotHidePresentedKeyboard() {
+        let app = launchApp(scenario: "sessions", openActiveSession: true)
+
+        let terminalSurface = app.otherElements["terminal-surface-view"].firstMatch
+        XCTAssertTrue(terminalSurface.waitForExistence(timeout: UITestTimeout.standard))
+        waitForTerminalKeyboardState(presented: false, in: app)
+
+        terminalSurface.tap()
+        waitForTerminalKeyboardState(presented: true, in: app)
+
+        let keyboardHost = app.descendants(matching: .any)
+            .matching(identifier: "session-keyboard-host")
+            .firstMatch
+        XCTAssertTrue(keyboardHost.waitForExistence(timeout: UITestTimeout.standard))
+
+        keyboardHost.tap()
+        waitForTerminalKeyboardState(presented: true, in: app)
+    }
+
+    func testSessionScenarioExposesSeparateKeyboardStateElement() {
+        let app = launchApp(
+            scenario: "sessions",
+            openActiveSession: true,
+            additionalArguments: ["-uiTestExposeTerminalRenderSummary"]
+        )
+
+        let keyboardHost = app.textFields["session-keyboard-host"].firstMatch
+        XCTAssertTrue(keyboardHost.waitForExistence(timeout: UITestTimeout.standard))
+
+        let keyboardState = app.otherElements["session-keyboard-state"].firstMatch
+        XCTAssertTrue(keyboardState.waitForExistence(timeout: UITestTimeout.standard))
+        XCTAssertEqual((keyboardState.value as? String) ?? keyboardState.label, "hidden")
+
+        let hostValue = keyboardHost.value as? String
+        XCTAssertNotEqual(hostValue, "hidden")
+        XCTAssertNotEqual(hostValue, "presented")
+    }
+
     func testSSHKeysSheetShowsEmptyStateWhenNoKeysExist() {
         let app = launchApp(scenario: "connections")
 
@@ -241,6 +279,7 @@ final class GlassdeckAppUITests: XCTestCase {
             app.launchArguments.append("-uiTestOpenActiveSession")
         }
         app.launchArguments.append(contentsOf: additionalArguments)
+        app.launchEnvironment.merge(uiTestFilesystemEnvironment()) { current, _ in current }
         app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
         app.launch()
         return app

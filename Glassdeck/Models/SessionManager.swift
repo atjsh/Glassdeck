@@ -613,12 +613,16 @@ final class SessionManager {
         _ snapshot: PersistedSessionSnapshot,
         prepareSurfaces: Bool
     ) {
+        let resolvedExternalDisplaySessionID = Self.externalDisplaySessionID(
+            from: snapshot
+        )
+
         sessions = snapshot.sessions.map(Self.session(from:))
         activeSessionID = snapshot.activeSessionID
-        externalDisplaySessionID = snapshot.externalDisplaySessionID
+        externalDisplaySessionID = resolvedExternalDisplaySessionID
 
         for session in sessions {
-            session.isOnExternalDisplay = session.id == externalDisplaySessionID
+            session.isOnExternalDisplay = session.id == resolvedExternalDisplaySessionID
             if session.profile.authMethod == .password {
                 session.connectionPassword = credentialStore.password(for: session.profile.id)
             }
@@ -1043,6 +1047,17 @@ final class SessionManager {
         session.isOnExternalDisplay = descriptor.isOnExternalDisplay
         session.wasRestoredFromPersistence = true
         return session
+    }
+
+    private static func externalDisplaySessionID(
+        from snapshot: PersistedSessionSnapshot
+    ) -> UUID? {
+        if let explicitExternalDisplaySessionID = snapshot.externalDisplaySessionID,
+           snapshot.sessions.contains(where: { $0.id == explicitExternalDisplaySessionID }) {
+            return explicitExternalDisplaySessionID
+        }
+
+        return snapshot.sessions.first(where: \.isOnExternalDisplay)?.id
     }
 
     private static func persistedStatus(from status: SSHSessionModel.SessionStatus) -> PersistedSessionDescriptor.Status {

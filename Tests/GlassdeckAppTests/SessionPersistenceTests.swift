@@ -208,6 +208,182 @@ final class SessionPersistenceTests: XCTestCase {
         XCTAssertNil(restoredSession.surface)
     }
 
+    func testSessionManagerRestorePersistedSessionsIsIdempotent() {
+        let defaults = isolatedDefaults(named: "RestorePersistedSessionIdempotent")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let sessionID = UUID()
+        persistenceStore.saveSnapshot(
+            PersistedSessionSnapshot(
+                sessions: [
+                    PersistedSessionDescriptor(
+                        id: sessionID,
+                        profile: sampleProfile(),
+                        status: .connected,
+                        connectedAt: Date(timeIntervalSince1970: 4_000),
+                        reconnectState: .attempting(attempt: 2, maxAttempts: 5),
+                        terminalTitle: "tester@restore-idempotent",
+                        terminalSize: TerminalSize(columns: 120, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 111,
+                        shouldRestoreConnectionOnForeground: false,
+                        isOnExternalDisplay: false
+                    )
+                ],
+                activeSessionID: sessionID,
+                externalDisplaySessionID: nil
+            )
+        )
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore
+        )
+
+        let initialSessionIDs = sessionManager.sessions.map(\.id)
+        let initialActiveSessionID = sessionManager.activeSessionID
+        let initialExternalDisplaySessionID = sessionManager.externalDisplaySessionID
+
+        XCTAssertEqual(initialSessionIDs.count, 1)
+
+        sessionManager.restorePersistedSessionsIfNeeded()
+
+        XCTAssertEqual(sessionManager.sessions.map(\.id), initialSessionIDs)
+        XCTAssertEqual(sessionManager.activeSessionID, initialActiveSessionID)
+        XCTAssertEqual(
+            sessionManager.externalDisplaySessionID,
+            initialExternalDisplaySessionID
+        )
+
+        sessionManager.closeSession(id: sessionID)
+
+        XCTAssertNil(sessionManager.activeSessionID)
+        XCTAssertTrue(sessionManager.sessions.isEmpty)
+
+        sessionManager.restorePersistedSessionsIfNeeded()
+
+        XCTAssertTrue(sessionManager.sessions.isEmpty)
+        XCTAssertNil(sessionManager.externalDisplaySessionID)
+    }
+
+    func testSessionManagerClearsPersistedSnapshotWhenNoSessionsRemain() throws {
+        let defaults = isolatedDefaults(named: "PersistedSnapshotClearsOnEmpty")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let sessionID = UUID()
+
+        persistenceStore.saveSnapshot(
+            PersistedSessionSnapshot(
+                sessions: [
+                    PersistedSessionDescriptor(
+                        id: sessionID,
+                        profile: sampleProfile(),
+                        status: .disconnected,
+                        connectedAt: nil,
+                        reconnectState: .idle,
+                        terminalTitle: "clear@session",
+                        terminalSize: TerminalSize(columns: 80, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 0,
+                        shouldRestoreConnectionOnForeground: false,
+                        isOnExternalDisplay: false
+                    )
+                ],
+                activeSessionID: sessionID,
+                externalDisplaySessionID: nil
+            )
+        )
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore
+        )
+
+        XCTAssertNotNil(persistenceStore.loadSnapshot())
+
+        let restoredSession = try XCTUnwrap(sessionManager.sessions.first)
+        sessionManager.closeSession(id: restoredSession.id)
+
+        XCTAssertNil(persistenceStore.loadSnapshot())
+    }
+
+    func testSessionManagerMigratesExternalDisplayRoutingFromPersistedSessionFlag() throws {
+        let defaults = isolatedDefaults(named: "MigrateExternalDisplayRouting")
+        let persistenceStore = SessionPersistenceStore(
+            defaults: defaults,
+            storageKey: "persisted-sessions"
+        )
+        let sessionID = UUID()
+        let legacyExternalSessionID = UUID()
+
+        persistenceStore.saveSnapshot(
+            PersistedSessionSnapshot(
+                sessions: [
+                    PersistedSessionDescriptor(
+                        id: sessionID,
+                        profile: sampleProfile(),
+                        status: .connected,
+                        connectedAt: Date(timeIntervalSince1970: 10_101),
+                        reconnectState: .idle,
+                        terminalTitle: "legacy@session",
+                        terminalSize: TerminalSize(columns: 80, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 111,
+                        shouldRestoreConnectionOnForeground: false,
+                        isOnExternalDisplay: false
+                    ),
+                    PersistedSessionDescriptor(
+                        id: legacyExternalSessionID,
+                        profile: sampleProfile(),
+                        status: .connected,
+                        connectedAt: Date(timeIntervalSince1970: 10_102),
+                        reconnectState: .idle,
+                        terminalTitle: "legacy@ext",
+                        terminalSize: TerminalSize(columns: 90, rows: 24),
+                        terminalPixelSize: nil,
+                        scrollbackLines: 128,
+                        shouldRestoreConnectionOnForeground: false,
+                        isOnExternalDisplay: true
+                    )
+                ],
+                activeSessionID: sessionID,
+                externalDisplaySessionID: nil
+            )
+        )
+        defer {
+            defaults.removePersistentDomain(forName: suiteName(from: defaults))
+        }
+
+        let sessionManager = SessionManager(
+            appSettings: AppSettings(defaults: defaults),
+            persistenceStore: persistenceStore
+        )
+
+        XCTAssertEqual(sessionManager.externalDisplaySessionID, legacyExternalSessionID)
+        XCTAssertEqual(sessionManager.activeSessionID, sessionID)
+        XCTAssertTrue(
+            try XCTUnwrap(sessionManager.externalDisplaySession).isOnExternalDisplay
+        )
+
+        let refreshedSnapshot = try XCTUnwrap(persistenceStore.loadSnapshot())
+        XCTAssertEqual(refreshedSnapshot.externalDisplaySessionID, legacyExternalSessionID)
+        XCTAssertFalse(
+            try XCTUnwrap(
+                refreshedSnapshot.sessions.first(where: { $0.id == sessionID })
+            ).isOnExternalDisplay
+        )
+    }
+
     func testSessionManagerCanPrimeRestoredSessionWithoutPreparingSurface() throws {
         let defaults = isolatedDefaults(named: "PrimeRestoredSessionWithoutSurface")
         let persistenceStore = SessionPersistenceStore(

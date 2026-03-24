@@ -39,3 +39,4 @@ Frameworks/*
 .vscode/
 buildServer.json
 .xcodebuildmcp/
+WORKFLOW.md

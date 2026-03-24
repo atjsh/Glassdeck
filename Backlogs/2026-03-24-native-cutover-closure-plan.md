@@ -5,13 +5,15 @@ Last updated: 2026-03-24
 ## Integration State
 - Primary integration worktree: `/Users/jeonseonghun/git-atjsh/Glassdeck`
 - Primary branch: `codex/fill-native-cutover-gaps`
-- Primary HEAD: `85940551a1127673ad3e92fdd904fee22d905c57`
+- Primary validated stack head: `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a`
 - Current green closure baseline:
   - committed primary closure stack entry `85940551a1127673ad3e92fdd904fee22d905c57` `Close native cutover live probe blocker`
+  - committed primary follow-on entry `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a` `Migrate legacy external display routing on restore`
   - live prompt probe: green
   - live command-injection probe: green
   - live render-only probe: green
   - host-backed relaunch acceptance: green
+  - full `SessionPersistenceTests` unit slice: green
 - Landed base commits:
   - `e01c2e5060a07578d22f19526ec28d22a8159a30` `Create native cutover baseline snapshot`
   - `5be0f1a97bcba4ddd6cd0b377528585537f90c51` `Implement runner artifact export cleanup`
@@ -19,6 +21,8 @@ Last updated: 2026-03-24
   - `8125f4c57b3a4a5f03f3c5afdc84d47a8f2ef54f` `Add shared xcode executor and bounded log capture`
   - `0896d2630d95359500ca57c34ab68f1a07c417ae` `Add runner stable artifact aliases and tests`
   - `c0d362953ed4f8186247622efa82b4378af58037` `Fix runner workspace detection for git worktrees`
+  - `6b0b2e0b5d37d9d2c75b0444bdf2a2e12bca2c4d` `Resolve simulator for build/test commands`
+  - `3c99bb534ca14ed071f156a17498aeac48dbe732` `Align runner tests with executor preview API`
 
 ## Stale Worktree Cleanup
 - Completed:
@@ -54,20 +58,20 @@ Last updated: 2026-03-24
   - Simulator: none; do not boot or use Simulator
 - Worker 1:
   - Model: `gpt-5.3-codex-spark`
-  - Branch: `codex/runner-artifact-aliases`
-  - Worktree: `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-runner-artifacts`
+  - Branch: retired on 2026-03-24 after accepted runner slices were integrated into `codex/fill-native-cutover-gaps`
+  - Worktree: retired on 2026-03-24 after cleanup from the primary worktree
   - Ownership: `Tools/GlassdeckBuild/Sources/GlassdeckBuildCore/Artifacts/`, minimal `XcodeInvoker`, matching runner tests
   - Simulator: `iPhone 17 Pro` `8647FB0C-AD1D-4A0D-81E1-814D1877FC15`
 - Worker 2:
   - Model: `gpt-5.3-codex-spark`
-  - Branch: `codex/ui-harness-split`
-  - Worktree: `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-ui-harness`
+  - Branch: retired on 2026-03-24 after the current primary closure diff superseded the older harness split
+  - Worktree: retired on 2026-03-24 after cleanup from the primary worktree
   - Ownership: `Glassdeck/App/`, `Tests/GlassdeckAppUITests/`, plus only the artifact-name mapping touchpoint required by probe export
   - Simulator: `iPhone 17 Pro Max` `8BA84984-26FB-41EC-A0E3-748C658FBCD4`
 - Worker 3:
   - Model: `gpt-5.3-codex-spark`
-  - Branch: `codex/session-state-tests`
-  - Worktree: `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-session-state`
+  - Branch: retired on 2026-03-24 after the useful persistence slice was recovered directly in the primary worktree
+  - Worktree: retired on 2026-03-24 after cleanup from the primary worktree
   - Ownership: `Glassdeck/Models/SessionManager.swift`, `Tests/GlassdeckAppTests/`
   - Simulator: `iPhone Air` `48B92811-6D0D-4E23-A157-2B201386D6A0`
 - Team rule:
@@ -84,7 +88,8 @@ Last updated: 2026-03-24
 5. Completed: worker 1 probe artifact alias export integrated in the primary worktree.
 6. Completed in the primary worktree: Phase 1 live blocker closure via explicit keyboard-input seam, event-first forwarding, fallback-only text-delta handling, deterministic keyboard/input tests, restored-live-state tests, and failure-path persistence/setup coverage.
 7. Completed in the primary worktree: bounded follow-on helper extraction for `UITestLaunchSupport` and `SessionManager` only as far as required to stabilize live resume, host-backed routing, and off-window synthetic presentation metrics.
-8. Next: freeze or supersede the remaining worker slices, then continue cherry-pick-only integration non-interactively in the primary worktree.
+8. Completed: worker 2 and worker 3 were explicitly superseded from the primary worktree and retired after the accepted runner/live-fix stack was green.
+9. Next: compare `main` against `codex/fill-native-cutover-gaps`, decide whether promotion can be a fast-forward or needs a fresh cherry-pick-only promotion branch, then finish final cleanup.
 
 ## Validation Commands
 - Runner tests:
@@ -98,26 +103,17 @@ Last updated: 2026-03-24
   - live relaunch acceptance path
 
 ## Open Blockers
-- No remaining live UI acceptance blocker in the primary worktree. The ordered validation stack is green on the current closure diff.
-- Remaining closure blockers are integration and cleanup only:
-  - worker 2 branch `codex/ui-harness-split` still has dirty changes in `Glassdeck/App/UITestLaunchSupport.swift` and `Tests/GlassdeckAppUITests/DockerLiveProbeUITests.swift`, so it is not yet a frozen cherry-pick target.
-  - worker 3 branch `codex/session-state-tests` still has dirty changes in `Glassdeck/Models/SessionManager.swift` and `Tests/GlassdeckAppTests/SessionPersistenceTests.swift`, so it is not yet a frozen cherry-pick target.
-  - worker 1 branch `codex/runner-artifact-aliases` already has its accepted alias-export/worktree-detection changes integrated by equivalent primary commits, but it still carries one extra unique commit `9b815de` (`Resolve simulator for build/test commands`) that has not yet been explicitly accepted or dropped.
-  - `glassdeck-build docker up` on worker `0` still collides with an already-running `glassdeck-test-ssh-ssh-1` container on host port `22222`; continue reusing the existing live fixture or isolate ports instead of taking the default blindly.
+- No remaining live UI acceptance blocker in the primary worktree. The ordered validation stack is green on the accepted closure diff.
+- No remaining worker-branch integration blocker. `codex/ui-harness-split` and `codex/session-state-tests` were superseded explicitly and retired from the primary worktree.
+- Remaining closure work is promotion and final cleanup only:
+  - compare `main` against `codex/fill-native-cutover-gaps` and choose fast-forward versus a fresh cherry-pick-only promotion branch
+  - remove obsolete `temp/stale-worktree-patches/` artifacts once the final promotion stack proves they are fully superseded
 
 ## Environment Mitigations
-- Worker worktree framework seeding:
-  - `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-runner-artifacts/Frameworks/GhosttyKit.xcframework` is a transient symlink to the primary materialized framework.
-  - `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-ui-harness/Frameworks/GhosttyKit.xcframework` is a transient symlink to the primary materialized framework.
-  - `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-session-state/Frameworks/GhosttyKit.xcframework` is a transient symlink to the primary materialized framework.
-  - Each worker worktree also has a local `Frameworks/GhosttyKit.xcframework.state.json` copy so direct `xcodebuild` and repo checks do not fail on a missing state marker.
-  - These `Frameworks/` entries are local-only mitigation and must not be committed.
-- Worker worktree vendor submodules:
-  - Active worker worktrees now have `Vendor/ghostty-fork` materialized with `git submodule update --init Vendor/ghostty-fork Vendor/swift-ssh-client`.
-  - This is a required precondition for `glassdeck-build build/test/run` in a fresh worktree; otherwise `ghosttyBuilder.prepare()` fails because `Vendor/ghostty-fork/build.zig` is missing.
+- No active worker worktrees remain. The temporary framework-link and submodule-seeding mitigations were only needed during parallel worker validation and are no longer part of the active stack.
 - Runner worktree root detection:
   - `glassdeck-build` now resolves alternate git worktree roots without assuming the checkout directory is literally named `Glassdeck`.
-  - Verified via `glassdeck-build doctor --dry-run` from each worker worktree, which now resolves the actual worktree root path.
+  - Verified earlier via `glassdeck-build doctor --dry-run` from the worker worktrees before they were retired.
 - Live UI runner environment:
   - Earlier fallback remains valid: `glassdeck-build sim set-env` can still be used when a shell or CI context does not propagate the live Docker env into the UI test runner.
   - Current primary-worktree closure validation on simulator `B703B3A6-69A3-4B2C-815B-45BC91E16265` passed directly under the inherited live-Docker env in this shell session, so the canonical record for this wave is the exact `glassdeck-build test --scheme ui` commands listed below.
@@ -149,7 +145,11 @@ Last updated: 2026-03-24
   - Seeded all active worker worktrees with transient `GhosttyKit.xcframework` framework links and local state markers so direct `xcodebuild` validation can continue without committing framework artifacts.
 - Worker integration:
   - Integrated worker 1 commit `a6f503a` as primary commit `0896d26` to export stable alias outputs for `screen.png`, `terminal.png`, and `ui-tree.txt`.
+  - Integrated the remaining accepted worker 1 runner slice from `9b815de` by landing primary commits `6b0b2e0` (`Resolve simulator for build/test commands`) and `3c99bb5` (`Align runner tests with executor preview API`) after conflict resolution against the current executor/output-mode API.
+  - Removed worker 1 worktree `/Users/jeonseonghun/git-atjsh/.worktrees/glassdeck-runner-artifacts` and deleted local branch `codex/runner-artifact-aliases` once the runner slice was green in the primary worktree.
   - Committed the green primary closure diff as `8594055` (`Close native cutover live probe blocker`) before further worker integration so the accepted live-fix baseline is no longer just dirty worktree state.
+  - Explicitly superseded worker 2 branch `codex/ui-harness-split` and retired its worktree because the current primary harness already carried the stricter deferred-live-resume path and the remaining worker diff would weaken the accepted command probe path.
+  - Recovered worker 3's only still-useful persistence gap directly in primary commit `561d969` (`Migrate legacy external display routing on restore`), added restored-persistence coverage for idempotent restore and empty-snapshot clearing, then retired branch `codex/session-state-tests` and its worktree as superseded.
 - Validation:
   - `swift test --package-path /Users/jeonseonghun/git-atjsh/Glassdeck/Tools/GlassdeckBuild`
   - Status: passing on 2026-03-24 after the executor, bounded-capture, simulator-resolution, alias-export, and worktree-detection changes. Current total: 93 tests.
@@ -180,6 +180,8 @@ Last updated: 2026-03-24
   - Status: passing on 2026-03-24 in the primary worktree after the live-shell handoff fix. The prompt-only probe now proves live prompt output without seeded preview markers.
   - `swift run --package-path /Users/jeonseonghun/git-atjsh/Glassdeck/Tools/GlassdeckBuild glassdeck-build test --scheme unit --simulator B703B3A6-69A3-4B2C-815B-45BC91E16265 --only-testing GlassdeckAppTests/SessionPersistenceTests`
   - Status: passing on 2026-03-24 through the native runner before the final closure pass. This suite is now supplemented by deterministic live-resume and off-window synthetic-presentation coverage in the current primary closure baseline.
+  - `swift run --package-path /Users/jeonseonghun/git-atjsh/Glassdeck/Tools/GlassdeckBuild glassdeck-build test --scheme unit --simulator B703B3A6-69A3-4B2C-815B-45BC91E16265 --only-testing GlassdeckAppTests/SessionPersistenceTests`
+  - Status: passing on 2026-03-24 after recovering the legacy external-display routing fallback and restoring the idempotent/empty-snapshot persistence coverage. Result bundle: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/results/test/20260324-061027-unit.xcresult`. Summary: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/artifacts/test/20260324-061027-unit/summary.txt`.
   - `~/Library/Logs/DiagnosticReports/Glassdeck-2026-03-24-014338.ips`
   - `~/Library/Logs/DiagnosticReports/Glassdeck-2026-03-24-014505.ips`
   - Status: historical worker-simulator crash reports showing SIGABRT during `GhosttySurface.createSurface()` → `SessionManager.prepareSurface()` → `UITestLaunchSupport` while forcing preview-surface creation. Keep them as related preview-surface diagnostics, but they were not reproduced in the final primary closure validation stack.
@@ -197,6 +199,6 @@ Last updated: 2026-03-24
   - Status: passing on 2026-03-24 in the current primary closure baseline. This confirms the off-window synthetic-presentation fix keeps the relaunch path out of the blank-terminal placeholder state. Result bundle: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/results/test/20260324-054605-ui.xcresult`. Summary: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/artifacts/test/20260324-054605-ui/summary.txt`.
 
 ## Next Pending Step
-- Freeze or explicitly supersede the remaining worker 2 / worker 3 slices, then integrate only clean accepted commits into `codex/fill-native-cutover-gaps` from the primary worktree via cherry-pick.
-- Re-run targeted validation after each accepted cherry-pick, record the integrated SHA(s) in this ledger, and retire only the worker worktrees and local branches whose accepted content is fully integrated.
-- If the current primary closure diff fully supersedes a worker branch, record that supersession decision explicitly before deleting the stale branch/worktree; do not remove worker state ambiguously.
+- Compare `main` against `codex/fill-native-cutover-gaps` and choose the clean promotion path: fast-forward if the branch already matches the desired final stack, otherwise create a fresh promotion branch from `main` and cherry-pick only the accepted final commits in order.
+- Re-run the validation required for promotion on the chosen final stack, then fast-forward `main`.
+- Remove obsolete `temp/stale-worktree-patches/` artifacts only after the promoted stack proves they are fully superseded.

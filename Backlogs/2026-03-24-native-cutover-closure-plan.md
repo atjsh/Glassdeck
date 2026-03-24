@@ -36,20 +36,15 @@ Last updated: 2026-03-24
   - Deleted stale branch `codex/log-trim`
   - Deleted stale branch `codex/runner-export-cleanup`
   - Deleted stale branch `codex/ui-probe-harness`
+  - Reviewed `log-trim.patch`, `runner-export-cleanup.patch`, and `ui-probe-harness.patch` against the promoted `main` stack and removed the obsolete `temp/stale-worktree-patches/` directory after confirming those salvage artifacts were superseded.
 - Remaining stale worktrees requiring diff/patch review before removal:
   - none
-- Salvage artifacts:
-  - `/Users/jeonseonghun/git-atjsh/Glassdeck/temp/stale-worktree-patches/log-trim.patch`
-  - `/Users/jeonseonghun/git-atjsh/Glassdeck/temp/stale-worktree-patches/runner-export-cleanup.patch`
-  - `/Users/jeonseonghun/git-atjsh/Glassdeck/temp/stale-worktree-patches/ui-probe-harness.patch`
 - File overlap summary:
   - `log-trim` overlaps current primary runner CLI/output files and adds `Tests/GlassdeckBuildCoreTests/TestHelpers.swift`
   - `runner-export-cleanup` overlaps current primary runner files and adds artifact-focused tests plus `TimestampedProcessOutputWriter.swift`
   - `ui-probe-harness` overlaps current primary UI probe files only
 - Cleanup rule:
-  - Review each patch against the current primary dirty state.
-  - Salvage unique hunks into active implementation flow.
-  - Remove the stale worktree and delete the stale branch only after salvage is complete.
+  - Completed. Salvage review was performed against the promoted `main` stack, unique accepted hunks were either integrated earlier or proven superseded, and the obsolete patch artifacts were deleted.
 
 ## Fixed Codex Team
 - Researcher:
@@ -108,9 +103,7 @@ Last updated: 2026-03-24
 - No remaining live UI acceptance blocker in the primary worktree. The ordered validation stack is green on the accepted closure diff.
 - No remaining worker-branch integration blocker. `codex/ui-harness-split` and `codex/session-state-tests` were superseded explicitly and retired from the primary worktree.
 - No remaining local promotion blocker. `main` now contains the accepted closure stack.
-- Remaining optional cleanup:
-  - remove obsolete `temp/stale-worktree-patches/` artifacts once the promoted stack is confirmed to fully supersede them
-  - publish local `main` when ready; this pass did not push to `origin`
+- No remaining in-repo cleanup blocker. The closure ledger now stands as the historical record for this wave.
 
 ## Environment Mitigations
 - No active worker worktrees remain. The temporary framework-link and submodule-seeding mitigations were only needed during parallel worker validation and are no longer part of the active stack.
@@ -203,5 +196,4 @@ Last updated: 2026-03-24
   - Status: passing on 2026-03-24 in the current primary closure baseline. This confirms the off-window synthetic-presentation fix keeps the relaunch path out of the blank-terminal placeholder state. Result bundle: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/results/test/20260324-054605-ui.xcresult`. Summary: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/artifacts/test/20260324-054605-ui/summary.txt`.
 
 ## Next Pending Step
-- Optional: remove obsolete `temp/stale-worktree-patches/` artifacts after one last review against the promoted `main` stack.
-- Optional: publish local `main` when ready.
+- No remaining in-repo step. Publish `main` externally when ready.

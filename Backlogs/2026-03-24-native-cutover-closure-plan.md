@@ -4,8 +4,9 @@ Last updated: 2026-03-24
 
 ## Integration State
 - Primary integration worktree: `/Users/jeonseonghun/git-atjsh/Glassdeck`
-- Primary branch: `codex/fill-native-cutover-gaps`
+- Primary branch: `main`
 - Primary validated stack head: `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a`
+- Local promotion status: `main` was fast-forwarded to the accepted closure stack on 2026-03-24 and `codex/fill-native-cutover-gaps` was deleted.
 - Current green closure baseline:
   - committed primary closure stack entry `85940551a1127673ad3e92fdd904fee22d905c57` `Close native cutover live probe blocker`
   - committed primary follow-on entry `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a` `Migrate legacy external display routing on restore`
@@ -89,7 +90,8 @@ Last updated: 2026-03-24
 6. Completed in the primary worktree: Phase 1 live blocker closure via explicit keyboard-input seam, event-first forwarding, fallback-only text-delta handling, deterministic keyboard/input tests, restored-live-state tests, and failure-path persistence/setup coverage.
 7. Completed in the primary worktree: bounded follow-on helper extraction for `UITestLaunchSupport` and `SessionManager` only as far as required to stabilize live resume, host-backed routing, and off-window synthetic presentation metrics.
 8. Completed: worker 2 and worker 3 were explicitly superseded from the primary worktree and retired after the accepted runner/live-fix stack was green.
-9. Next: compare `main` against `codex/fill-native-cutover-gaps`, decide whether promotion can be a fast-forward or needs a fresh cherry-pick-only promotion branch, then finish final cleanup.
+9. Completed: `main` was fast-forwarded locally to the accepted closure stack and `codex/fill-native-cutover-gaps` was deleted.
+10. Next: optional final cleanup only, focused on deleting obsolete salvage artifacts once they are confirmed fully superseded and publishing `main` when desired.
 
 ## Validation Commands
 - Runner tests:
@@ -105,9 +107,10 @@ Last updated: 2026-03-24
 ## Open Blockers
 - No remaining live UI acceptance blocker in the primary worktree. The ordered validation stack is green on the accepted closure diff.
 - No remaining worker-branch integration blocker. `codex/ui-harness-split` and `codex/session-state-tests` were superseded explicitly and retired from the primary worktree.
-- Remaining closure work is promotion and final cleanup only:
-  - compare `main` against `codex/fill-native-cutover-gaps` and choose fast-forward versus a fresh cherry-pick-only promotion branch
-  - remove obsolete `temp/stale-worktree-patches/` artifacts once the final promotion stack proves they are fully superseded
+- No remaining local promotion blocker. `main` now contains the accepted closure stack.
+- Remaining optional cleanup:
+  - remove obsolete `temp/stale-worktree-patches/` artifacts once the promoted stack is confirmed to fully supersede them
+  - publish local `main` when ready; this pass did not push to `origin`
 
 ## Environment Mitigations
 - No active worker worktrees remain. The temporary framework-link and submodule-seeding mitigations were only needed during parallel worker validation and are no longer part of the active stack.
@@ -150,6 +153,7 @@ Last updated: 2026-03-24
   - Committed the green primary closure diff as `8594055` (`Close native cutover live probe blocker`) before further worker integration so the accepted live-fix baseline is no longer just dirty worktree state.
   - Explicitly superseded worker 2 branch `codex/ui-harness-split` and retired its worktree because the current primary harness already carried the stricter deferred-live-resume path and the remaining worker diff would weaken the accepted command probe path.
   - Recovered worker 3's only still-useful persistence gap directly in primary commit `561d969` (`Migrate legacy external display routing on restore`), added restored-persistence coverage for idempotent restore and empty-snapshot clearing, then retired branch `codex/session-state-tests` and its worktree as superseded.
+  - Fast-forwarded local `main` to the accepted stack and deleted local branch `codex/fill-native-cutover-gaps` once promotion-path inspection showed `main` was a strict ancestor of the clean linear closure stack.
 - Validation:
   - `swift test --package-path /Users/jeonseonghun/git-atjsh/Glassdeck/Tools/GlassdeckBuild`
   - Status: passing on 2026-03-24 after the executor, bounded-capture, simulator-resolution, alias-export, and worktree-detection changes. Current total: 93 tests.
@@ -199,6 +203,5 @@ Last updated: 2026-03-24
   - Status: passing on 2026-03-24 in the current primary closure baseline. This confirms the off-window synthetic-presentation fix keeps the relaunch path out of the blank-terminal placeholder state. Result bundle: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/results/test/20260324-054605-ui.xcresult`. Summary: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/artifacts/test/20260324-054605-ui/summary.txt`.
 
 ## Next Pending Step
-- Compare `main` against `codex/fill-native-cutover-gaps` and choose the clean promotion path: fast-forward if the branch already matches the desired final stack, otherwise create a fresh promotion branch from `main` and cherry-pick only the accepted final commits in order.
-- Re-run the validation required for promotion on the chosen final stack, then fast-forward `main`.
-- Remove obsolete `temp/stale-worktree-patches/` artifacts only after the promoted stack proves they are fully superseded.
+- Optional: remove obsolete `temp/stale-worktree-patches/` artifacts after one last review against the promoted `main` stack.
+- Optional: publish local `main` when ready.

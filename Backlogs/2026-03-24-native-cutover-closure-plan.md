@@ -7,6 +7,7 @@ Last updated: 2026-03-24
 - Primary branch: `main`
 - Primary validated stack head: `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a`
 - Local promotion status: `main` was fast-forwarded to the accepted closure stack on 2026-03-24 and `codex/fill-native-cutover-gaps` was deleted.
+- Remote publication status: `origin/main` was updated to the accepted closure stack on 2026-03-24 at commit `0f6c52b6fc636f102f2866eb37fce98d5f20f615`.
 - Current green closure baseline:
   - committed primary closure stack entry `85940551a1127673ad3e92fdd904fee22d905c57` `Close native cutover live probe blocker`
   - committed primary follow-on entry `561d969035e41e8b75b3a8dc6d4e1e70d5b3a52a` `Migrate legacy external display routing on restore`
@@ -103,6 +104,7 @@ Last updated: 2026-03-24
 - No remaining live UI acceptance blocker in the primary worktree. The ordered validation stack is green on the accepted closure diff.
 - No remaining worker-branch integration blocker. `codex/ui-harness-split` and `codex/session-state-tests` were superseded explicitly and retired from the primary worktree.
 - No remaining local promotion blocker. `main` now contains the accepted closure stack.
+- No remaining remote publication blocker. `origin/main` now contains the accepted closure stack.
 - No remaining in-repo cleanup blocker. The closure ledger now stands as the historical record for this wave.
 
 ## Environment Mitigations
@@ -147,6 +149,7 @@ Last updated: 2026-03-24
   - Explicitly superseded worker 2 branch `codex/ui-harness-split` and retired its worktree because the current primary harness already carried the stricter deferred-live-resume path and the remaining worker diff would weaken the accepted command probe path.
   - Recovered worker 3's only still-useful persistence gap directly in primary commit `561d969` (`Migrate legacy external display routing on restore`), added restored-persistence coverage for idempotent restore and empty-snapshot clearing, then retired branch `codex/session-state-tests` and its worktree as superseded.
   - Fast-forwarded local `main` to the accepted stack and deleted local branch `codex/fill-native-cutover-gaps` once promotion-path inspection showed `main` was a strict ancestor of the clean linear closure stack.
+  - Pushed `main` to `origin/main` at `0f6c52b` after the stale-patch cleanup record was committed.
 - Validation:
   - `swift test --package-path /Users/jeonseonghun/git-atjsh/Glassdeck/Tools/GlassdeckBuild`
   - Status: passing on 2026-03-24 after the executor, bounded-capture, simulator-resolution, alias-export, and worktree-detection changes. Current total: 93 tests.
@@ -196,4 +199,4 @@ Last updated: 2026-03-24
   - Status: passing on 2026-03-24 in the current primary closure baseline. This confirms the off-window synthetic-presentation fix keeps the relaunch path out of the blank-terminal placeholder state. Result bundle: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/results/test/20260324-054605-ui.xcresult`. Summary: `/Users/jeonseonghun/git-atjsh/Glassdeck/.build/glassdeck-build/artifacts/test/20260324-054605-ui/summary.txt`.
 
 ## Next Pending Step
-- No remaining in-repo step. Publish `main` externally when ready.
+- No remaining plan step. Native cutover closure is complete in both the local and published repo state.

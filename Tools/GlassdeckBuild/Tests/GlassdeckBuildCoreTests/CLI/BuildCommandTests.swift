@@ -46,12 +46,13 @@ final class BuildCommandTests: XCTestCase {
             workerID: 2,
             processRunner: ScriptedProcessRunner(responses: [])
         )
+        let request = command.executionRequest(simulatorIdentifier: "SIM-1234")
 
-        let invocation = command.previewInvocation(using: context, simulatorIdentifier: "SIM-1234")
+        let invocation = command.previewInvocation(using: context, request: request)
         let renderedArguments = invocation.arguments.joined(separator: " ")
 
         XCTAssertEqual(invocation.executable, "/usr/bin/xcodebuild")
-        XCTAssertEqual(invocation.outputMode, .captureAndStreamTimestampedFiltered(.xcodebuild))
+        XCTAssertEqual(invocation.outputMode, ProcessOutputMode.captureAndStreamTimestampedFiltered(.xcodebuild))
         XCTAssertTrue(invocation.arguments.contains("build"))
         XCTAssertTrue(renderedArguments.contains("/tmp/ws/Glassdeck/.build/glassdeck-build/results/build/"))
         XCTAssertTrue(invocation.arguments.contains("platform=iOS Simulator,id=SIM-1234"))

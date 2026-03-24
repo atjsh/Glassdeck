@@ -65,15 +65,16 @@ final class TestCommandTests: XCTestCase {
             workerID: 3,
             processRunner: ScriptedProcessRunner(responses: [])
         )
+        let request = try command.executionRequest(simulatorIdentifier: "SIM-1234")
 
-        let invocation = try command.previewInvocation(using: context, simulatorIdentifier: "SIM-1234")
+        let invocation = try command.previewInvocation(using: context, request: request)
         let renderedArguments = invocation.arguments.joined(separator: " ")
 
         XCTAssertTrue(invocation.arguments.contains("test-without-building"))
         XCTAssertTrue(invocation.arguments.contains("platform=iOS Simulator,id=SIM-1234"))
         XCTAssertTrue(invocation.arguments.contains("GlassdeckAppUI"))
         XCTAssertTrue(renderedArguments.contains("/tmp/ws/Glassdeck/.build/glassdeck-build/results/test/"))
-        XCTAssertEqual(invocation.outputMode, .captureAndStreamTimestampedFiltered(.xcodebuild))
+        XCTAssertEqual(invocation.outputMode, ProcessOutputMode.captureAndStreamTimestampedFiltered(.xcodebuild))
     }
 
     func testPreviewInvocationUsesQuietOutputModeWhenRequested() throws {
